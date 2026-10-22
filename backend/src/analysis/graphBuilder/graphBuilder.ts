@@ -352,6 +352,13 @@ export function buildGraph(
 
     const fileNode = fileNodesByPath.get(file.path)!;
 
+    const recordedApiCalls: {
+      method: string;
+      url: string | null;
+      line: number;
+      matched: boolean;
+    }[] = [];
+
     for (const apiCall of parsed.apiCalls) {
       if (apiCall.isRuntimeBuilt) {
         // Runtime-built URL (e.g. baseUrl + id): unresolved edge
@@ -371,10 +378,24 @@ export function buildGraph(
             type: 'runtime_url_unresolved',
           }),
         });
+        recordedApiCalls.push({
+          method: apiCall.method || 'GET',
+          url: apiCall.url ?? null,
+          line: apiCall.line,
+          matched: false,
+        });
         continue;
       }
 
-      if (!apiCall.url) continue;
+      if (!apiCall.url) {
+        recordedApiCalls.push({
+          method: apiCall.method || 'GET',
+          url: null,
+          line: apiCall.line,
+          matched: false,
+        });
+        continue;
+      }
 
       // Normalize url
       const callUrl = apiCall.url.trim().replace(/\/+$/, '') || '/';
@@ -402,6 +423,12 @@ export function buildGraph(
             url: apiCall.url,
             method: apiCall.method,
           }),
+        });
+        recordedApiCalls.push({
+          method: apiCall.method || 'GET',
+          url: apiCall.url ?? null,
+          line: apiCall.line,
+          matched: true,
         });
         continue;
       }
@@ -432,10 +459,28 @@ export function buildGraph(
             method: apiCall.method,
           }),
         });
+        recordedApiCalls.push({
+          method: apiCall.method || 'GET',
+          url: apiCall.url ?? null,
+          line: apiCall.line,
+          matched: true,
+        });
         continue;
       }
 
       // Non-matching calls (e.g. /api/notice/list): creates no resolved link
+      recordedApiCalls.push({
+        method: apiCall.method || 'GET',
+        url: apiCall.url ?? null,
+        line: apiCall.line,
+        matched: false,
+      });
+    }
+
+    if (recordedApiCalls.length > 0) {
+      const existingMeta = JSON.parse(fileNode.meta_json || '{}');
+      existingMeta.apiCalls = recordedApiCalls;
+      fileNode.meta_json = JSON.stringify(existingMeta);
     }
   }
 

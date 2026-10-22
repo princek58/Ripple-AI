@@ -11,6 +11,7 @@ import config from '../config.js';
 import { getDatabase } from '../db/connection.js';
 import { ProjectsRepository } from '../db/projectsRepository.js';
 import { ScansRepository } from '../db/scansRepository.js';
+import { GraphRepository } from '../db/graphRepository.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { validate } from '../utils/validation.js';
 
@@ -433,6 +434,129 @@ router.get(
 
     const scans = scansRepo.findByProjectId(id);
     return sendSuccess(res, scans);
+  }
+);
+
+const graphQuerySchema = z
+  .object({
+    level: z.coerce.number().int().min(1).max(3).default(1),
+    focus: z.string().uuid({ message: 'Invalid focus ID format, must be a UUID' }).optional(),
+    depth: z.coerce.number().int().min(1).max(3).default(1),
+    maxNodes: z.coerce.number().int().min(1).max(500).default(200),
+  })
+  .refine(
+    (data) => {
+      if ((data.level === 2 || data.level === 3) && !data.focus) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'focus parameter is required for level 2 and level 3',
+      path: ['focus'],
+    }
+  );
+
+const graphSearchQuerySchema = z.object({
+  q: z.string().optional(),
+  type: z.enum(['project', 'module', 'frontend', 'backend', 'api', 'database', 'config', 'test']).optional(),
+  severity: z.enum(['critical', 'high', 'medium', 'low', 'unknown']).optional(),
+  verification: z.enum(['not_tested', 'reproduced', 'fix_proposed', 'fix_verified']).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+const nodeDetailsParamsSchema = z.object({
+  id: z.string().uuid({ message: 'Invalid project ID format, must be a UUID' }),
+  nodeId: z.string().uuid({ message: 'Invalid node ID format, must be a UUID' }),
+});
+
+// GET /api/projects/:id/graph/search - Search nodes with filters
+router.get(
+  '/projects/:id/graph/search',
+  validate({ params: projectIdParamsSchema, query: graphSearchQuerySchema }),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { q, type, severity, verification, limit, offset } = req.query as any;
+
+    const db = getDatabase();
+    const projectsRepo = new ProjectsRepository(db);
+    const graphRepo = new GraphRepository(db);
+
+    const project = projectsRepo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    const result = graphRepo.search(id, {
+      q,
+      type,
+      severity,
+      verification,
+      limit,
+      offset,
+    });
+
+    return sendSuccess(res, result);
+  }
+);
+
+// GET /api/projects/:id/graph/nodes/:nodeId - Detailed node view with connections
+router.get(
+  '/projects/:id/graph/nodes/:nodeId',
+  validate({ params: nodeDetailsParamsSchema }),
+  (req: Request, res: Response) => {
+    const { id, nodeId } = req.params;
+
+    const db = getDatabase();
+    const projectsRepo = new ProjectsRepository(db);
+    const graphRepo = new GraphRepository(db);
+
+    const project = projectsRepo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    const result = graphRepo.getNodeDetails(id, nodeId);
+    if (!result) {
+      return sendError(res, 'Node not found', 404);
+    }
+
+    return sendSuccess(res, result);
+  }
+);
+
+// GET /api/projects/:id/graph - Level 1, Level 2, or Level 3 graph view
+router.get(
+  '/projects/:id/graph',
+  validate({ params: projectIdParamsSchema, query: graphQuerySchema }),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { level, focus, depth, maxNodes } = req.query as any;
+
+    const db = getDatabase();
+    const projectsRepo = new ProjectsRepository(db);
+    const graphRepo = new GraphRepository(db);
+
+    const project = projectsRepo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    let result = null;
+    if (level === 1) {
+      result = graphRepo.getLevel1(id, maxNodes);
+    } else if (level === 2) {
+      result = graphRepo.getLevel2(id, focus, maxNodes);
+    } else if (level === 3) {
+      result = graphRepo.getLevel3(id, focus, depth, maxNodes);
+    }
+
+    if (!result) {
+      return sendError(res, 'Graph node not found in project', 404);
+    }
+
+    return sendSuccess(res, result);
   }
 );
 

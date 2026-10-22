@@ -54,9 +54,9 @@ RippleAI/
 - GET /api/health
 - POST /api/projects (multipart ZIP) · GET /api/projects · GET /api/projects/:id · DELETE /api/projects/:id · GET /api/projects/:id/files?page=1&pageSize=50&q= -> { items: [{ id, path, size, language, sensitive }], page, pageSize, total }
 - POST /api/projects/:id/scan -> { data: Scan, error } · GET /api/projects/:id/scans -> { data: Scan[], error } (newest first)
-- GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<n> -> {nodes, edges, shown, total}
-- GET /api/projects/:id/graph/search?q=&type=&severity=&verification=
-- GET /api/projects/:id/graph/nodes/:nodeId -> details, incoming/outgoing edges, lines, related findings
+- GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<1-3>&maxNodes=<n> -> { data: { nodes, edges, clusters, shown, total, level, focus }, error }
+- GET /api/projects/:id/graph/search?q=&type=&severity=&verification=&limit=&offset= -> { data: { items, total }, error }
+- GET /api/projects/:id/graph/nodes/:nodeId -> { data: { node, parentModule, incomingEdges, outgoingEdges, lineRange, relatedFindings }, error }
 - GET /api/projects/:id/summary -> KPI counts, findings by severity, verification coverage counts
 - GET /api/projects/:id/findings (filters) · GET /api/findings/:id
 - GET/POST /api/findings/:id/fixes · POST /api/fixes/:id/approve|reject
