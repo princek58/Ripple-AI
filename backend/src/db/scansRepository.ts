@@ -79,16 +79,18 @@ export class ScansRepository {
   }
 
   /**
-   * Replaces the graph for a project atomically inside a single transaction.
-   * Deletes old nodes and edges, inserts new ones, and marks scan completed.
+   * Replaces the graph and findings for a project atomically inside a single transaction.
+   * Deletes old findings, edges, and nodes, inserts new ones, and marks scan completed.
    */
   saveGraphTransaction(
     projectId: string,
     scanId: string,
     nodes: GraphNode[],
     edges: GraphEdge[],
-    scanUpdate: CompleteScanInput
+    scanUpdate: CompleteScanInput,
+    findings: any[] = []
   ): Scan {
+    const deleteFindings = this.db.prepare('DELETE FROM findings WHERE project_id = ?');
     const deleteEdges = this.db.prepare('DELETE FROM edges WHERE project_id = ?');
     const deleteNodes = this.db.prepare('DELETE FROM nodes WHERE project_id = ?');
 
@@ -108,6 +110,15 @@ export class ScansRepository {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    const insertFinding = this.db.prepare(`
+      INSERT INTO findings (
+        id, project_id, scan_id, rule_id, title, summary,
+        severity, confidence, verification, evidence_json,
+        node_ids_json, likely_cause, not_confirmed, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
     const updateScanStmt = this.db.prepare(`
       UPDATE scans
       SET status = ?, finished_at = ?, files_total = ?, files_skipped = ?, notes = ?
@@ -121,7 +132,8 @@ export class ScansRepository {
     `);
 
     const tx = this.db.transaction(() => {
-      // 1. Delete previous nodes and edges
+      // 1. Delete previous findings, edges, and nodes
+      deleteFindings.run(projectId);
       deleteEdges.run(projectId);
       deleteNodes.run(projectId);
 
@@ -158,7 +170,27 @@ export class ScansRepository {
         );
       }
 
-      // 4. Update scan status
+      // 4. Insert new findings
+      for (const finding of findings) {
+        insertFinding.run(
+          finding.id,
+          finding.project_id,
+          finding.scan_id,
+          finding.rule_id,
+          finding.title,
+          finding.summary,
+          finding.severity,
+          finding.confidence,
+          finding.verification,
+          finding.evidence_json ?? null,
+          finding.node_ids_json ?? null,
+          finding.likely_cause ?? null,
+          finding.not_confirmed ?? null,
+          finding.created_at || new Date().toISOString()
+        );
+      }
+
+      // 5. Update scan status
       updateScanStmt.run(
         scanUpdate.status,
         scanUpdate.finished_at,
@@ -168,7 +200,7 @@ export class ScansRepository {
         scanId
       );
 
-      // 5. Update project last_scan_at
+      // 6. Update project last_scan_at
       updateProjectLastScan.run(scanUpdate.finished_at, projectId);
     });
 

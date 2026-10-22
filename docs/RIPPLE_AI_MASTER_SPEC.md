@@ -57,8 +57,8 @@ RippleAI/
 - GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<1-3>&maxNodes=<n> -> { data: { nodes, edges, clusters, shown, total, level, focus }, error }
 - GET /api/projects/:id/graph/search?q=&type=&severity=&verification=&limit=&offset= -> { data: { items, total }, error }
 - GET /api/projects/:id/graph/nodes/:nodeId -> { data: { node, parentModule, incomingEdges, outgoingEdges, lineRange, relatedFindings }, error }
-- GET /api/projects/:id/summary -> KPI counts, findings by severity, verification coverage counts
-- GET /api/projects/:id/findings (filters) · GET /api/findings/:id
+- GET /api/projects/:id/summary -> { data: { lastScan: { finished_at, status }, counts: { nodes, edges, unresolvedEdges, files }, kpi: { openFindings, criticalPlusHigh, fixesPendingApproval, verifiedFixes }, bySeverity, byConfidence, byVerification, affectedModules: [{ moduleId, label, findingCount, maxSeverity }] }, error }
+- GET /api/projects/:id/findings?severity=&confidence=&verification=&rule_id=&q=&page=&pageSize= -> { data: { items, page, pageSize, total }, error } · GET /api/findings/:id -> { data: { ...finding, nodes: [{ id, label, type, path }] }, error }
 - GET/POST /api/findings/:id/fixes · POST /api/fixes/:id/approve|reject
 - GET /api/projects/:id/tests · POST /api/projects/:id/reports · GET /api/reports/:id?format=md
 Every response uses { data, error } shape. Validate all input with zod.
@@ -75,7 +75,13 @@ Max ZIP 50 MB, max 5,000 files, max total uncompressed 200 MB, max single file 5
 - Graph API never returns the whole project at once: lazy expansion, shown/total counts, clustering for large groups.
 
 ## 8. Phase 1 checks (each creates findings with evidence)
-circular dependency · broken import · isolated/unused file · env var used but not declared (names only) · API contract mismatch (frontend request vs backend route/response shape) · basic secret-pattern exposure (never print the value). New findings start as likely or hypothesis; never confirmed unless the evidence itself proves it (e.g. import path points to a file that does not exist).
+- circular_dependency: strongly connected components over resolved import edges. Severity low, confidence confirmed. not_confirmed: runtime failure.
+- broken_import: relative imports pointing to nonexistent files. Severity high, confidence confirmed. not_confirmed: whether code runs in production.
+- isolated_file: files with 0 incoming import/call/test edges (excluding entry files, configs, tests). Severity low, confidence hypothesis. not_confirmed: dynamic or framework loading.
+- env_undeclared: process.env names missing from .env.example. Severity medium, confidence likely (or hypothesis if no .env file). not_confirmed: deployment config. Names only.
+- api_unmatched_call: frontend fetch/axios URL with no matching route; includes closest route in likely_cause. Severity medium, confidence likely. not_confirmed: proxy or dynamic routes. (Note: response-shape comparison is NOT done in this step).
+- secret_pattern: private key headers, AWS access keys, or credential assignments. Severity high, confidence likely (or low + hypothesis if placeholder). Never critical or confirmed in Phase 1. Evidence = file, line, pattern name only. Never store or print secret values.
+New findings start with verification = not_tested; never confirmed unless the evidence itself proves it.
 
 ## 9. Graph UI rules (Rule 31)
 Four levels L1 Project, L2 Module, L3 Code, L4 Evidence/Investigation. Breadcrumb: Project > Module > Node > Function. Always show "Showing X of Y nodes". Filters: module, filename, type, severity, verification. Node details panel on the right.

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { extractZip, ZipError, type ExtractResult } from '../analysis/zip/index.js';
 import { scanProjectFiles } from '../analysis/scanner/index.js';
 import { buildGraph } from '../analysis/graphBuilder/index.js';
+import { runAllChecks } from '../checks/index.js';
 import config from '../config.js';
 import { getDatabase } from '../db/connection.js';
 import { ProjectsRepository } from '../db/projectsRepository.js';
@@ -158,10 +159,16 @@ router.post('/projects', async (req: Request, res: Response) => {
       return sendError(res, 'Failed to extract ZIP archive', 400, 'ZIP_INVALID');
     }
 
-    // Move extracted files atomically to backend/storage/<projectId>/files/
+    // Move extracted files to backend/storage/<projectId>/files/
     try {
       fs.mkdirSync(projectDir, { recursive: true });
-      fs.renameSync(tempExtractionDir, projectFilesDir);
+      try {
+        fs.renameSync(tempExtractionDir, projectFilesDir);
+      } catch {
+        // On Windows renameSync can occasionally fail with EPERM/EBUSY; fallback to copy + delete
+        fs.cpSync(tempExtractionDir, projectFilesDir, { recursive: true });
+        fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+      }
     } catch {
       if (fs.existsSync(tempExtractionDir)) {
         fs.rmSync(tempExtractionDir, { recursive: true, force: true });
@@ -382,9 +389,19 @@ router.post(
         projectName: project.name,
       });
 
+      // 4. Run static analysis checks
+      const checksResult = runAllChecks({
+        projectId: id,
+        scanId,
+        nodes: graphResult.nodes,
+        edges: graphResult.edges,
+        files: scannedFiles,
+      });
+
+      const combinedNotes = `${graphResult.notes} ${checksResult.notesSummary}`.trim();
       const finishedAt = new Date().toISOString();
 
-      // 4. Save graph and mark scan completed inside single transaction
+      // 5. Save graph and findings inside single transaction
       const completedScan = scansRepo.saveGraphTransaction(
         id,
         scanId,
@@ -395,8 +412,9 @@ router.post(
           status: 'completed',
           files_total: graphResult.filesTotal,
           files_skipped: graphResult.filesSkipped,
-          notes: graphResult.notes,
-        }
+          notes: combinedNotes,
+        },
+        checksResult.findings
       );
 
       return sendSuccess(res, completedScan);

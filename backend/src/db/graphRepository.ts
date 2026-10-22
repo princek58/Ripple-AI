@@ -14,6 +14,8 @@ export interface GraphNodeRecord {
   line_end: number | null;
   language: string | null;
   meta_json: string | null;
+  findingCount?: number;
+  maxSeverity?: string | null;
   stub?: boolean;
 }
 
@@ -77,6 +79,14 @@ export interface NodeDetailsEdge {
   } | null;
 }
 
+export interface RelatedFindingSummary {
+  id: string;
+  title: string;
+  severity: string;
+  confidence: string;
+  verification: string;
+}
+
 export interface NodeDetailsResult {
   node: GraphNodeRecord;
   parentModule: {
@@ -90,7 +100,7 @@ export interface NodeDetailsResult {
     start: number | null;
     end: number | null;
   } | null;
-  relatedFindings: any[];
+  relatedFindings: RelatedFindingSummary[];
 }
 
 const RELATION_STRENGTH: Record<string, number> = {
@@ -102,6 +112,28 @@ const RELATION_STRENGTH: Record<string, number> = {
   configures: 2,
   tests: 1,
 };
+
+const SEVERITY_WEIGHT: Record<string, number> = {
+  critical: 5,
+  high: 4,
+  medium: 3,
+  low: 2,
+  unknown: 1,
+};
+
+function getMaxSeverity(severities: string[]): string | null {
+  if (severities.length === 0) return null;
+  let maxWeight = -1;
+  let maxSev: string | null = null;
+  for (const s of severities) {
+    const weight = SEVERITY_WEIGHT[s] ?? 0;
+    if (weight > maxWeight) {
+      maxWeight = weight;
+      maxSev = s;
+    }
+  }
+  return maxSev;
+}
 
 function getStrongestRelation(relations: string[]): string {
   if (relations.length === 0) return 'imports';
@@ -201,6 +233,78 @@ export class GraphRepository {
   constructor(private db: Database.Database) {}
 
   /**
+   * Attaches findingCount and maxSeverity to nodes.
+   * Module nodes aggregate their children's findings.
+   */
+  private attachFindingCounts(projectId: string, nodes: GraphNodeRecord[]): GraphNodeRecord[] {
+    const findings = this.db
+      .prepare('SELECT id, severity, node_ids_json FROM findings WHERE project_id = ?')
+      .all(projectId) as any[];
+
+    // Map: nodeId -> list of severities for findings directly pointing to this node
+    const directSeverities = new Map<string, string[]>();
+    for (const f of findings) {
+      let nodeIds: string[] = [];
+      try {
+        nodeIds = JSON.parse(f.node_ids_json);
+      } catch {}
+
+      for (const nid of nodeIds) {
+        const list = directSeverities.get(nid) || [];
+        list.push(f.severity);
+        directSeverities.set(nid, list);
+      }
+    }
+
+    // Map: child node id -> parent_id (module)
+    const childRows = this.db
+      .prepare('SELECT id, parent_id FROM nodes WHERE project_id = ? AND parent_id IS NOT NULL')
+      .all(projectId) as { id: string; parent_id: string }[];
+
+    const parentMap = new Map<string, string>();
+    for (const cr of childRows) {
+      parentMap.set(cr.id, cr.parent_id);
+    }
+
+    // Map: moduleId -> list of severities of module and all its children
+    const moduleAggregatedSeverities = new Map<string, string[]>();
+    for (const [nid, sevs] of directSeverities.entries()) {
+      // Direct on module
+      const directList = moduleAggregatedSeverities.get(nid) || [];
+      directList.push(...sevs);
+      moduleAggregatedSeverities.set(nid, directList);
+
+      // Child's parent module
+      const parentMod = parentMap.get(nid);
+      if (parentMod) {
+        const parentList = moduleAggregatedSeverities.get(parentMod) || [];
+        parentList.push(...sevs);
+        moduleAggregatedSeverities.set(parentMod, parentList);
+      }
+    }
+
+    // Also project-level aggregation
+    const allProjectSeverities = findings.map((f) => f.severity);
+
+    return nodes.map((node) => {
+      let sevs: string[] = [];
+      if (node.type === 'module') {
+        sevs = moduleAggregatedSeverities.get(node.id) || [];
+      } else if (node.type === 'project') {
+        sevs = allProjectSeverities;
+      } else {
+        sevs = directSeverities.get(node.id) || [];
+      }
+
+      return {
+        ...node,
+        findingCount: sevs.length,
+        maxSeverity: getMaxSeverity(sevs),
+      };
+    });
+  }
+
+  /**
    * Level 1: Project node + module nodes + derived module-to-module edges
    */
   getLevel1(projectId: string, maxNodes = 200): GraphResult | null {
@@ -209,7 +313,6 @@ export class GraphRepository {
       .get(projectId, 'project') as GraphNodeRecord | undefined;
 
     if (!projectNode) {
-      // Check if project exists at all
       const proj = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
       if (!proj) return null;
     }
@@ -232,7 +335,6 @@ export class GraphRepository {
       nodeModuleMap.set(row.id, row.parent_id);
     }
 
-    // Module id set
     const moduleIds = new Set(moduleNodes.map((m) => m.id));
 
     // Aggregate cross-module edges
@@ -279,10 +381,10 @@ export class GraphRepository {
       });
     }
 
-    // Sort derived edges deterministically
     derivedEdges.sort((a, b) => a.id.localeCompare(b.id));
 
-    const clustered = applyClustering(rawNodes, derivedEdges, maxNodes);
+    const nodesWithFindings = this.attachFindingCounts(projectId, rawNodes);
+    const clustered = applyClustering(nodesWithFindings, derivedEdges, maxNodes);
 
     return {
       nodes: clustered.nodes,
@@ -307,7 +409,6 @@ export class GraphRepository {
       return null;
     }
 
-    // Module's direct children (level 3 files, API nodes, config nodes)
     const children = this.db
       .prepare('SELECT * FROM nodes WHERE project_id = ? AND parent_id = ? ORDER BY path ASC, id ASC')
       .all(projectId, focusModuleId) as GraphNodeRecord[];
@@ -316,7 +417,6 @@ export class GraphRepository {
     const nodes: GraphNodeRecord[] = [...children];
     const edges: GraphEdgeRecord[] = [];
 
-    // Internal edges and boundary edges
     const relatedEdges = this.db
       .prepare(`
         SELECT * FROM edges 
@@ -325,7 +425,6 @@ export class GraphRepository {
       `)
       .all(projectId, projectId, focusModuleId, projectId, focusModuleId) as GraphEdgeRecord[];
 
-    // Map all project nodes for module identification
     const allProjectNodes = this.db
       .prepare('SELECT id, type, parent_id, label, path FROM nodes WHERE project_id = ?')
       .all(projectId) as { id: string; type: string; parent_id: string | null; label: string; path: string }[];
@@ -345,7 +444,6 @@ export class GraphRepository {
       const isSourceChild = childIds.has(edge.source_id);
       const isTargetChild = childIds.has(edge.target_id);
 
-      // Case 1: Internal edge (both ends are within this module) or unresolved edge anchored here
       if (isSourceChild && isTargetChild) {
         edges.push({
           ...edge,
@@ -355,8 +453,6 @@ export class GraphRepository {
       }
 
       if (edge.status === 'unresolved' && isSourceChild) {
-        // Unresolved edge: always keep, never hide
-        // If target node does not exist in module nodes, add stub
         if (!childIds.has(edge.target_id) && !nodes.some((n) => n.id === edge.target_id)) {
           const stubLabel = edge.relation === 'imports' ? 'Unresolved import' : 'Unresolved target';
           const stub: GraphNodeRecord = {
@@ -384,7 +480,6 @@ export class GraphRepository {
         continue;
       }
 
-      // Case 2: Outgoing boundary edge (source in module, target in another module)
       if (isSourceChild && !isTargetChild) {
         const targetParentModId = nodeParentMap.get(edge.target_id);
         const targetModId = targetParentModId || edge.target_id;
@@ -403,7 +498,6 @@ export class GraphRepository {
         }
       }
 
-      // Case 3: Incoming boundary edge (target in module, source in another module)
       if (!isSourceChild && isTargetChild) {
         const sourceParentModId = nodeParentMap.get(edge.source_id);
         const sourceModId = sourceParentModId || edge.source_id;
@@ -423,12 +517,10 @@ export class GraphRepository {
       }
     }
 
-    // Add boundary module nodes if any boundary edges exist
     for (const modNode of otherModulesMap.values()) {
       nodes.push(modNode);
     }
 
-    // Create derived aggregated boundary edges
     for (const [targetModId, data] of outgoingBoundaryToModule.entries()) {
       const strongest = getStrongestRelation(data.relations);
       const evidence = { count: data.count, strongestRelation: strongest };
@@ -467,7 +559,8 @@ export class GraphRepository {
 
     edges.sort((a, b) => a.id.localeCompare(b.id));
 
-    const clustered = applyClustering(nodes, edges, maxNodes);
+    const nodesWithFindings = this.attachFindingCounts(projectId, nodes);
+    const clustered = applyClustering(nodesWithFindings, edges, maxNodes);
 
     return {
       nodes: clustered.nodes,
@@ -525,7 +618,6 @@ export class GraphRepository {
             visitedNodes.set(neighborId, neighborNode);
             queue.push({ id: neighborId, currentDepth: currentDepth + 1 });
           } else if (edge.status === 'unresolved') {
-            // Unresolved target stub
             const stub: GraphNodeRecord = {
               id: neighborId,
               project_id: projectId,
@@ -547,7 +639,6 @@ export class GraphRepository {
       }
     }
 
-    // Also pick up any edges between all visited nodes
     const nodeIdsArray = Array.from(visitedNodes.keys());
     if (nodeIdsArray.length > 1) {
       const placeholders = nodeIdsArray.map(() => '?').join(',');
@@ -571,7 +662,8 @@ export class GraphRepository {
     const rawNodes = Array.from(visitedNodes.values());
     const rawEdges = Array.from(visitedEdges.values()).sort((a, b) => a.id.localeCompare(b.id));
 
-    const clustered = applyClustering(rawNodes, rawEdges, maxNodes);
+    const nodesWithFindings = this.attachFindingCounts(projectId, rawNodes);
+    const clustered = applyClustering(nodesWithFindings, rawEdges, maxNodes);
 
     return {
       nodes: clustered.nodes,
@@ -608,7 +700,7 @@ export class GraphRepository {
     if (filters.severity && filters.severity.trim()) {
       conditions.push(`
         id IN (
-          SELECT value FROM findings f, json_each(f.node_ids_json)
+          SELECT json_each.value FROM findings f, json_each(f.node_ids_json)
           WHERE f.project_id = ? AND f.severity = ?
         )
       `);
@@ -618,7 +710,7 @@ export class GraphRepository {
     if (filters.verification && filters.verification.trim()) {
       conditions.push(`
         id IN (
-          SELECT value FROM findings f, json_each(f.node_ids_json)
+          SELECT json_each.value FROM findings f, json_each(f.node_ids_json)
           WHERE f.project_id = ? AND f.verification = ?
         )
       `);
@@ -641,15 +733,16 @@ export class GraphRepository {
     `);
 
     const items = queryStmt.all(...params, limit, offset) as GraphNodeRecord[];
+    const itemsWithFindings = this.attachFindingCounts(projectId, items);
 
     return {
-      items,
+      items: itemsWithFindings,
       total,
     };
   }
 
   /**
-   * Detailed node query with incoming/outgoing edges and parent module
+   * Detailed node query with incoming/outgoing edges, parent module, and related findings
    */
   getNodeDetails(projectId: string, nodeId: string): NodeDetailsResult | null {
     const proj = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
@@ -661,14 +754,17 @@ export class GraphRepository {
 
     if (!node) return null;
 
+    // Attach finding count and max severity to this node
+    const [nodeWithCounts] = this.attachFindingCounts(projectId, [node]);
+
     // Redact sensitive nodes if any
-    const isSensitive = node.path.includes('.env') || node.language === 'Environment';
+    const isSensitive = nodeWithCounts.path.includes('.env') || nodeWithCounts.language === 'Environment';
     const returnedNode: GraphNodeRecord = isSensitive
       ? {
-          ...node,
+          ...nodeWithCounts,
           meta_json: JSON.stringify({ sensitive: true }),
         }
-      : node;
+      : nodeWithCounts;
 
     // Parent module
     let parentModule: { id: string; label: string; path: string } | null = null;
@@ -749,13 +845,30 @@ export class GraphRepository {
       }
     }
 
+    // Query real related findings for this node
+    const relatedFindingsRows = this.db
+      .prepare(`
+        SELECT f.id, f.title, f.severity, f.confidence, f.verification
+        FROM findings f, json_each(f.node_ids_json)
+        WHERE f.project_id = ? AND json_each.value = ?
+        ORDER BY 
+          CASE f.severity 
+            WHEN 'critical' THEN 1 
+            WHEN 'high' THEN 2 
+            WHEN 'medium' THEN 3 
+            WHEN 'low' THEN 4 
+            ELSE 5 
+          END, f.created_at DESC
+      `)
+      .all(projectId, nodeId) as RelatedFindingSummary[];
+
     return {
       node: returnedNode,
       parentModule,
       incomingEdges,
       outgoingEdges,
       lineRange: lineStart ? { start: lineStart, end: lineEnd ?? lineStart } : null,
-      relatedFindings: [],
+      relatedFindings: relatedFindingsRows,
     };
   }
 }

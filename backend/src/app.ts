@@ -2,6 +2,7 @@ import express from 'express';
 import config from './config.js';
 import healthRouter from './routes/health.js';
 import projectsRouter from './routes/projects.js';
+import findingsRouter from './routes/findings.js';
 import { notFoundHandler, errorHandler } from './utils/errors.js';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
 // API Routes
 app.use('/api', healthRouter);
 app.use('/api', projectsRouter);
+app.use('/api', findingsRouter);
 
 // 404 Handler for undefined routes
 app.use(notFoundHandler);
