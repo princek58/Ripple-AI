@@ -5,9 +5,12 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { extractZip, ZipError, type ExtractResult } from '../analysis/zip/index.js';
+import { scanProjectFiles } from '../analysis/scanner/index.js';
+import { buildGraph } from '../analysis/graphBuilder/index.js';
 import config from '../config.js';
 import { getDatabase } from '../db/connection.js';
 import { ProjectsRepository } from '../db/projectsRepository.js';
+import { ScansRepository } from '../db/scansRepository.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { validate } from '../utils/validation.js';
 
@@ -242,9 +245,10 @@ router.post('/projects', async (req: Request, res: Response) => {
     }
   } finally {
     activeUploads--;
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
+    const fileToUnlink = tempFilePath || (req as any).file?.path;
+    if (fileToUnlink && fs.existsSync(fileToUnlink)) {
       try {
-        fs.unlinkSync(tempFilePath);
+        fs.unlinkSync(fileToUnlink);
       } catch {
         // ignore unlink errors
       }
@@ -332,6 +336,103 @@ router.delete(
     }
 
     return sendSuccess(res, { id, deleted: true });
+  }
+);
+
+// POST /api/projects/:id/scan - Scan project files and build dependency graph
+router.post(
+  '/projects/:id/scan',
+  validate({ params: projectIdParamsSchema }),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const db = getDatabase();
+    const projectsRepo = new ProjectsRepository(db);
+    const scansRepo = new ScansRepository(db);
+
+    const project = projectsRepo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    const scanId = crypto.randomUUID();
+    const startedAt = new Date().toISOString();
+
+    // 1. Create running scan record
+    scansRepo.create({
+      id: scanId,
+      project_id: id,
+      started_at: startedAt,
+      status: 'running',
+    });
+
+    try {
+      const storageBase = path.resolve(config.storagePath);
+      const projectFilesDir = path.resolve(storageBase, id, 'files');
+
+      // 2. Scan project files safely
+      const scannedFiles = scanProjectFiles(projectFilesDir, {
+        maxSingleFileSizeBytes: config.upload.maxSingleFileSizeBytes,
+      });
+
+      // 3. Build graph
+      const graphResult = buildGraph(scannedFiles, {
+        projectId: id,
+        scanId,
+        projectName: project.name,
+      });
+
+      const finishedAt = new Date().toISOString();
+
+      // 4. Save graph and mark scan completed inside single transaction
+      const completedScan = scansRepo.saveGraphTransaction(
+        id,
+        scanId,
+        graphResult.nodes,
+        graphResult.edges,
+        {
+          finished_at: finishedAt,
+          status: 'completed',
+          files_total: graphResult.filesTotal,
+          files_skipped: graphResult.filesSkipped,
+          notes: graphResult.notes,
+        }
+      );
+
+      return sendSuccess(res, completedScan);
+    } catch (err: unknown) {
+      const finishedAt = new Date().toISOString();
+      const message = err instanceof Error ? err.message : String(err);
+
+      scansRepo.update(scanId, {
+        finished_at: finishedAt,
+        status: 'failed',
+        files_total: 0,
+        files_skipped: 0,
+        notes: `Scan failed: ${message}`,
+      });
+
+      return sendError(res, `Scan failed: ${message}`, 500, 'SCAN_FAILED');
+    }
+  }
+);
+
+// GET /api/projects/:id/scans - List scans for a project, newest first
+router.get(
+  '/projects/:id/scans',
+  validate({ params: projectIdParamsSchema }),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const db = getDatabase();
+    const projectsRepo = new ProjectsRepository(db);
+    const scansRepo = new ScansRepository(db);
+
+    const project = projectsRepo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    const scans = scansRepo.findByProjectId(id);
+    return sendSuccess(res, scans);
   }
 );
 

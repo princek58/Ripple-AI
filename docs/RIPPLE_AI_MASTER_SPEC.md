@@ -53,7 +53,7 @@ RippleAI/
 ## 5. Backend API (Phase 1)
 - GET /api/health
 - POST /api/projects (multipart ZIP) · GET /api/projects · GET /api/projects/:id · DELETE /api/projects/:id · GET /api/projects/:id/files?page=1&pageSize=50&q= -> { items: [{ id, path, size, language, sensitive }], page, pageSize, total }
-- POST /api/projects/:id/scan · GET /api/projects/:id/scans
+- POST /api/projects/:id/scan -> { data: Scan, error } · GET /api/projects/:id/scans -> { data: Scan[], error } (newest first)
 - GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<n> -> {nodes, edges, shown, total}
 - GET /api/projects/:id/graph/search?q=&type=&severity=&verification=
 - GET /api/projects/:id/graph/nodes/:nodeId -> details, incoming/outgoing edges, lines, related findings
