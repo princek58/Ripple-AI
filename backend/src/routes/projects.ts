@@ -1,17 +1,255 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router, type Request, type Response } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
-import { ProjectsRepository } from '../db/projectsRepository.js';
-import { getDatabase } from '../db/connection.js';
+import { extractZip, ZipError, type ExtractResult } from '../analysis/zip/index.js';
 import config from '../config.js';
+import { getDatabase } from '../db/connection.js';
+import { ProjectsRepository } from '../db/projectsRepository.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { validate } from '../utils/validation.js';
 
 const router = Router();
 
+// Concurrency limiter for uploads: at most 2 concurrent uploads
+let activeUploads = 0;
+const MAX_CONCURRENT_UPLOADS = 2;
+
+export function getActiveUploads(): number {
+  return activeUploads;
+}
+
+export function setActiveUploads(count: number): void {
+  activeUploads = count;
+}
+
+export function resetActiveUploads(): void {
+  activeUploads = 0;
+}
+
 const projectIdParamsSchema = z.object({
   id: z.string().uuid({ message: 'Invalid project ID format, must be a UUID' }),
+});
+
+const filesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
+  q: z.string().optional(),
+});
+
+// POST /api/projects - Upload ZIP and extract project
+router.post('/projects', async (req: Request, res: Response) => {
+  if (activeUploads >= MAX_CONCURRENT_UPLOADS) {
+    if (!req.complete) {
+      req.on('data', () => {});
+      await new Promise<void>((resolve) => {
+        req.on('end', () => resolve());
+        req.on('error', () => resolve());
+        req.resume();
+      });
+    }
+    return sendError(res, 'Too many concurrent uploads', 429, 'TOO_MANY_UPLOADS');
+  }
+
+  activeUploads++;
+  let tempFilePath: string | null = null;
+
+  try {
+    const limits = config.upload;
+
+    // Ensure temp storage directory exists
+    fs.mkdirSync(config.tempStoragePath, { recursive: true });
+
+    const storage = multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        cb(null, config.tempStoragePath);
+      },
+      filename: (_req, _file, cb) => {
+        cb(null, `${crypto.randomUUID()}.tmp`);
+      },
+    });
+
+    const upload = multer({
+      storage,
+      limits: {
+        fileSize: limits.maxZipSizeBytes,
+        files: 1,
+      },
+    }).single('file');
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        upload(req, res, (err: unknown) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve();
+        });
+      });
+    } catch (uploadErr: unknown) {
+      if (uploadErr instanceof multer.MulterError && uploadErr.code === 'LIMIT_FILE_SIZE') {
+        return sendError(
+          res,
+          `File size exceeds limit (${limits.maxZipSizeBytes} bytes)`,
+          413,
+          'FILE_TOO_LARGE'
+        );
+      }
+      return sendError(res, 'Invalid file upload', 400, 'UPLOAD_ERROR');
+    }
+
+    if (!req.file) {
+      return sendError(res, 'No file uploaded, expected multipart field "file"', 400, 'MISSING_FILE');
+    }
+
+    tempFilePath = req.file.path;
+
+    // Check first 2 bytes are ZIP signature 'PK' (0x50, 0x4B)
+    try {
+      const fd = fs.openSync(tempFilePath, 'r');
+      const magic = Buffer.alloc(2);
+      const bytesRead = fs.readSync(fd, magic, 0, 2, 0);
+      fs.closeSync(fd);
+
+      if (bytesRead < 2 || magic[0] !== 0x50 || magic[1] !== 0x4b) {
+        return sendError(res, 'Uploaded file is not a valid ZIP', 400, 'ZIP_INVALID');
+      }
+    } catch {
+      return sendError(res, 'Failed to inspect uploaded file', 400, 'ZIP_INVALID');
+    }
+
+    // Set up project and extraction paths
+    const projectId = crypto.randomUUID();
+    const storageBase = path.resolve(config.storagePath);
+    const tempExtractionDir = path.resolve(config.tempStoragePath, `extract_${projectId}`);
+    const projectDir = path.resolve(storageBase, projectId);
+    const projectFilesDir = path.resolve(projectDir, 'files');
+
+    // Safety check: Ensure paths stay inside backend/storage
+    if (
+      !tempExtractionDir.startsWith(storageBase + path.sep) ||
+      !projectDir.startsWith(storageBase + path.sep)
+    ) {
+      return sendError(res, 'Invalid storage path', 400, 'ZIP_UNSAFE_PATH');
+    }
+
+    // Extract ZIP
+    let extractResult: ExtractResult;
+    try {
+      extractResult = await extractZip(tempFilePath, tempExtractionDir, limits);
+    } catch (extractErr: unknown) {
+      if (fs.existsSync(tempExtractionDir)) {
+        fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(projectDir)) {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+
+      if (extractErr instanceof ZipError) {
+        const statusCode = extractErr.code === 'ZIP_INVALID' ? 400 : 422;
+        return sendError(res, extractErr.message, statusCode, extractErr.code);
+      }
+      return sendError(res, 'Failed to extract ZIP archive', 400, 'ZIP_INVALID');
+    }
+
+    // Move extracted files atomically to backend/storage/<projectId>/files/
+    try {
+      fs.mkdirSync(projectDir, { recursive: true });
+      fs.renameSync(tempExtractionDir, projectFilesDir);
+    } catch {
+      if (fs.existsSync(tempExtractionDir)) {
+        fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(projectDir)) {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+      return sendError(res, 'Failed to move extracted files to storage', 500, 'STORAGE_ERROR');
+    }
+
+    // Sanitise project name from ZIP filename:
+    // strip extension, allow letters, digits, space, dot, dash, underscore, max 80 chars, fallback "project"
+    const originalName = req.file.originalname || '';
+    const nameWithoutExt = path.basename(originalName, path.extname(originalName));
+    const sanitizedName = nameWithoutExt
+      .replace(/[^a-zA-Z0-9 ._-]/g, '')
+      .trim()
+      .slice(0, 80)
+      .trim();
+    const projectName = sanitizedName || 'project';
+
+    // Unique languages
+    const languages = Array.from(new Set(extractResult.files.map((f) => f.language))).sort();
+    const languagesJson = JSON.stringify(languages);
+
+    // Skipped summary notes
+    const skippedCategories: Record<string, number> = {};
+    for (const item of extractResult.skipped) {
+      const cat = item.reason.split(' ')[0] || item.reason;
+      skippedCategories[cat] = (skippedCategories[cat] || 0) + 1;
+    }
+    const notes =
+      extractResult.skippedCount > 0
+        ? `Skipped ${extractResult.skippedCount} file(s): ` +
+          Object.entries(skippedCategories)
+            .map(([cat, count]) => `${cat} (${count})`)
+            .join(', ')
+        : null;
+
+    // Database save in single transaction
+    const db = getDatabase();
+    const repo = new ProjectsRepository(db);
+    const scanId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    try {
+      const project = repo.createWithScanAndFiles({
+        project: {
+          id: projectId,
+          name: projectName,
+          size_bytes: extractResult.totalBytes,
+          file_count: extractResult.extractedCount,
+          languages: languagesJson,
+          created_at: now,
+          last_scan_at: now,
+        },
+        scan: {
+          id: scanId,
+          started_at: now,
+          finished_at: now,
+          status: 'completed',
+          files_total: extractResult.totalEntries,
+          files_skipped: extractResult.skippedCount,
+          notes,
+        },
+        files: extractResult.files.map((f) => ({
+          id: crypto.randomUUID(),
+          path: f.path,
+          size: f.size,
+          language: f.language,
+          sensitive: f.sensitive,
+        })),
+      });
+
+      return sendSuccess(res, project, 201);
+    } catch {
+      // On DB failure, delete project folder and leave no partial data
+      if (fs.existsSync(projectDir)) {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+      return sendError(res, 'Failed to save project records to database', 500, 'DB_ERROR');
+    }
+  } finally {
+    activeUploads--;
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch {
+        // ignore unlink errors
+      }
+    }
+  }
 });
 
 // GET /api/projects - list projects, newest first
@@ -40,6 +278,31 @@ router.get(
   }
 );
 
+// GET /api/projects/:id/files - list project files with pagination and search
+router.get(
+  '/projects/:id/files',
+  validate({ params: projectIdParamsSchema, query: filesQuerySchema }),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { page, pageSize, q } = req.query as unknown as {
+      page: number;
+      pageSize: number;
+      q?: string;
+    };
+
+    const db = getDatabase();
+    const repo = new ProjectsRepository(db);
+
+    const project = repo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    const filesResult = repo.findFiles(id, { page, pageSize, q });
+    return sendSuccess(res, filesResult);
+  }
+);
+
 // DELETE /api/projects/:id - delete project and its storage
 router.delete(
   '/projects/:id',
@@ -54,7 +317,7 @@ router.delete(
       return sendError(res, 'Project not found', 404);
     }
 
-    // 1. Delete from database (foreign key cascade removes scans, nodes, edges, findings, etc.)
+    // 1. Delete from database (foreign key cascade removes scans, project_files, nodes, etc.)
     repo.delete(id);
 
     // 2. Safely clean up storage folder under backend/storage/<id> if it exists

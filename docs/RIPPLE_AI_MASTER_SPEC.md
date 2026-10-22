@@ -34,6 +34,7 @@ RippleAI/
 ## 4. Data model (SQLite)
 - projects(id, name, created_at, size_bytes, file_count, languages, last_scan_at)
 - scans(id, project_id, started_at, finished_at, status, files_total, files_skipped, notes)
+- project_files(id, project_id, scan_id, path, size, language, sensitive)
 - nodes(id, project_id, scan_id, type, level, parent_id, label, path, line_start, line_end, language, meta_json)
   - type: project | module | frontend | backend | api | database | config | test
   - level: 1 (project/module), 2 (module internals), 3 (file/function/route)
@@ -51,7 +52,7 @@ RippleAI/
 
 ## 5. Backend API (Phase 1)
 - GET /api/health
-- POST /api/projects (multipart ZIP) · GET /api/projects · GET /api/projects/:id · DELETE /api/projects/:id
+- POST /api/projects (multipart ZIP) · GET /api/projects · GET /api/projects/:id · DELETE /api/projects/:id · GET /api/projects/:id/files?page=1&pageSize=50&q= -> { items: [{ id, path, size, language, sensitive }], page, pageSize, total }
 - POST /api/projects/:id/scan · GET /api/projects/:id/scans
 - GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<n> -> {nodes, edges, shown, total}
 - GET /api/projects/:id/graph/search?q=&type=&severity=&verification=

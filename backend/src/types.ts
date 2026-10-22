@@ -56,6 +56,16 @@ export interface Scan {
   notes: string | null;
 }
 
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  scan_id: string;
+  path: string;
+  size: number;
+  language: string;
+  sensitive: boolean;
+}
+
 export interface Node {
   id: string;
   project_id: string;
