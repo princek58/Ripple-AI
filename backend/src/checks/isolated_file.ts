@@ -20,9 +20,14 @@ export function checkIsolatedFile(context: CheckContext): CheckFinding[] {
   const { projectId, scanId, nodes, edges } = context;
 
   // Build incoming edge counts for each node (imports, calls, tests)
+  // Only resolved edges from a DIFFERENT node count (self-edges and unresolved edges do not count)
   const incomingCount = new Map<string, number>();
   for (const edge of edges) {
-    if (['imports', 'calls', 'tests'].includes(edge.relation)) {
+    if (
+      ['imports', 'calls', 'tests'].includes(edge.relation) &&
+      edge.source_id !== edge.target_id &&
+      edge.status === 'resolved'
+    ) {
       incomingCount.set(edge.target_id, (incomingCount.get(edge.target_id) || 0) + 1);
     }
   }

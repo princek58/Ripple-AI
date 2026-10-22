@@ -47,7 +47,7 @@ RippleAI/
   - confidence: confirmed | likely | hypothesis
   - verification: not_tested | reproduced | fix_proposed | fix_verified
 - fixes(id, finding_id, diff_text, files_json, status, approved_at) status: proposed | approved | rejected
-- test_runs(id, project_id, name, status) status: pass | fail | skipped | not_run (Phase 1: everything not_run)
+- test_runs(id, project_id, scan_id, name, status, created_at) status: pass | fail | skipped | not_run (Phase 1: everything not_run)
 - reports(id, project_id, created_at, markdown)
 
 ## 5. Backend API (Phase 1)
@@ -59,8 +59,9 @@ RippleAI/
 - GET /api/projects/:id/graph/nodes/:nodeId -> { data: { node, parentModule, incomingEdges, outgoingEdges, lineRange, relatedFindings }, error }
 - GET /api/projects/:id/summary -> { data: { lastScan: { finished_at, status }, counts: { nodes, edges, unresolvedEdges, files }, kpi: { openFindings, criticalPlusHigh, fixesPendingApproval, verifiedFixes }, bySeverity, byConfidence, byVerification, affectedModules: [{ moduleId, label, findingCount, maxSeverity }] }, error }
 - GET /api/projects/:id/findings?severity=&confidence=&verification=&rule_id=&q=&page=&pageSize= -> { data: { items, page, pageSize, total }, error } · GET /api/findings/:id -> { data: { ...finding, nodes: [{ id, label, type, path }] }, error }
-- GET/POST /api/findings/:id/fixes · POST /api/fixes/:id/approve|reject
-- GET /api/projects/:id/tests · POST /api/projects/:id/reports · GET /api/reports/:id?format=md
+- GET/POST /api/findings/:id/fixes · GET /api/projects/:id/fixes?status=&page=&pageSize= · POST /api/fixes/:id/approve · POST /api/fixes/:id/reject
+- GET /api/projects/:id/tests -> { data: { items: [{ id, name, status }], counts: { pass, fail, skipped, not_run }, note }, error }
+- POST /api/projects/:id/reports -> { data: Report, error } · GET /api/projects/:id/reports -> { data: Report[], error } · GET /api/reports/:id?format=md -> JSON or raw Markdown
 Every response uses { data, error } shape. Validate all input with zod.
 
 ## 6. ZIP safety (implement in the upload step)
@@ -74,7 +75,7 @@ Max ZIP 50 MB, max 5,000 files, max total uncompressed 200 MB, max single file 5
 - Every edge stores relation, status, confidence and evidence. Unresolvable references become unresolved edges.
 - Graph API never returns the whole project at once: lazy expansion, shown/total counts, clustering for large groups.
 
-## 8. Phase 1 checks (each creates findings with evidence)
+## 8. Phase 1 checks and fixes (each creates findings with evidence)
 - circular_dependency: strongly connected components over resolved import edges. Severity low, confidence confirmed. not_confirmed: runtime failure.
 - broken_import: relative imports pointing to nonexistent files. Severity high, confidence confirmed. not_confirmed: whether code runs in production.
 - isolated_file: files with 0 incoming import/call/test edges (excluding entry files, configs, tests). Severity low, confidence hypothesis. not_confirmed: dynamic or framework loading.
@@ -82,6 +83,12 @@ Max ZIP 50 MB, max 5,000 files, max total uncompressed 200 MB, max single file 5
 - api_unmatched_call: frontend fetch/axios URL with no matching route; includes closest route in likely_cause. Severity medium, confidence likely. not_confirmed: proxy or dynamic routes. (Note: response-shape comparison is NOT done in this step).
 - secret_pattern: private key headers, AWS access keys, or credential assignments. Severity high, confidence likely (or low + hypothesis if placeholder). Never critical or confirmed in Phase 1. Evidence = file, line, pattern name only. Never store or print secret values.
 New findings start with verification = not_tested; never confirmed unless the evidence itself proves it.
+
+Fix generation rules:
+- Deterministic templates only for env_undeclared (appends NAME= to .env.example), api_unmatched_call (changes URL to closest route with <=2 context lines), and broken_import (changes specifier only if exactly 1 matching file exists).
+- All other rules, secret patterns, and ambiguous cases return 422 NO_AUTOMATIC_FIX with a generic manual-fix hint.
+- Uploaded original files under backend/storage/<id>/files/ are immutable and NEVER modified. Approving a fix writes a standalone .patch file under backend/storage/<id>/patches/<fixId>.patch. Approval sets status approved; finding verification remains fix_proposed (approval is not verification). Rejecting reverts verification to not_tested if no other active fix exists. Approving or rejecting twice returns 409.
+- env_undeclared fixes are generated against the sanitized .env.example (comments removed at upload), so the patch may need manual merging.
 
 ## 9. Graph UI rules (Rule 31)
 Four levels L1 Project, L2 Module, L3 Code, L4 Evidence/Investigation. Breadcrumb: Project > Module > Node > Function. Always show "Showing X of Y nodes". Filters: module, filename, type, severity, verification. Node details panel on the right.

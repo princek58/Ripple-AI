@@ -78,6 +78,7 @@ describe('Step 3b Upload Route, Database Save and File Listing', () => {
     expect(project.name).toBe('valid-app');
     expect(project.file_count).toBe(4);
     expect(project.size_bytes).toBeGreaterThan(0);
+    expect(Array.isArray(project.languages)).toBe(true);
     expect(project.languages).toContain('TypeScript');
     expect(project.languages).toContain('JSON');
     expect(project.languages).toContain('Markdown');

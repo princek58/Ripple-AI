@@ -7,7 +7,7 @@ export interface CreateProjectInput {
   created_at?: string;
   size_bytes?: number;
   file_count?: number;
-  languages?: string;
+  languages?: string | string[];
   last_scan_at?: string | null;
 }
 
@@ -17,7 +17,7 @@ export interface CreateProjectWithScanAndFilesInput {
     name: string;
     size_bytes: number;
     file_count: number;
-    languages: string;
+    languages: string | string[];
     created_at?: string;
     last_scan_at?: string | null;
   };
@@ -58,24 +58,51 @@ export interface ListFilesResult {
   total: number;
 }
 
+function parseLanguages(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return [];
+}
+
+function toProject(row: any): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    created_at: row.created_at,
+    size_bytes: row.size_bytes,
+    file_count: row.file_count,
+    languages: parseLanguages(row.languages),
+    last_scan_at: row.last_scan_at ?? null,
+  };
+}
+
 export class ProjectsRepository {
   constructor(private db: Database.Database) {}
 
   findAll(): Project[] {
     const stmt = this.db.prepare('SELECT * FROM projects ORDER BY created_at DESC');
-    return stmt.all() as Project[];
+    const rows = stmt.all() as any[];
+    return rows.map(toProject);
   }
 
   findById(id: string): Project | undefined {
     const stmt = this.db.prepare('SELECT * FROM projects WHERE id = ?');
-    return stmt.get(id) as Project | undefined;
+    const row = stmt.get(id);
+    return row ? toProject(row) : undefined;
   }
 
   create(project: CreateProjectInput): Project {
     const createdAt = project.created_at || new Date().toISOString();
     const sizeBytes = project.size_bytes ?? 0;
     const fileCount = project.file_count ?? 0;
-    const languages = project.languages ?? '[]';
+    const languagesStr = Array.isArray(project.languages)
+      ? JSON.stringify(project.languages)
+      : (project.languages ?? '[]');
     const lastScanAt = project.last_scan_at ?? null;
 
     const stmt = this.db.prepare(`
@@ -89,24 +116,27 @@ export class ProjectsRepository {
       createdAt,
       sizeBytes,
       fileCount,
-      languages,
+      languagesStr,
       lastScanAt
     );
 
-    return {
+    return toProject({
       id: project.id,
       name: project.name,
       created_at: createdAt,
       size_bytes: sizeBytes,
       file_count: fileCount,
-      languages,
+      languages: languagesStr,
       last_scan_at: lastScanAt,
-    };
+    });
   }
 
   createWithScanAndFiles(input: CreateProjectWithScanAndFilesInput): Project {
     const createdAt = input.project.created_at || new Date().toISOString();
     const lastScanAt = input.project.last_scan_at ?? createdAt;
+    const languagesStr = Array.isArray(input.project.languages)
+      ? JSON.stringify(input.project.languages)
+      : (input.project.languages ?? '[]');
 
     const insertProject = this.db.prepare(`
       INSERT INTO projects (id, name, created_at, size_bytes, file_count, languages, last_scan_at)
@@ -130,7 +160,7 @@ export class ProjectsRepository {
         createdAt,
         input.project.size_bytes,
         input.project.file_count,
-        input.project.languages,
+        languagesStr,
         lastScanAt
       );
 
@@ -160,15 +190,15 @@ export class ProjectsRepository {
 
     tx();
 
-    return {
+    return toProject({
       id: input.project.id,
       name: input.project.name,
       created_at: createdAt,
       size_bytes: input.project.size_bytes,
       file_count: input.project.file_count,
-      languages: input.project.languages,
+      languages: languagesStr,
       last_scan_at: lastScanAt,
-    };
+    });
   }
 
   findFiles(projectId: string, options: ListFilesOptions): ListFilesResult {
@@ -216,5 +246,28 @@ export class ProjectsRepository {
     const stmt = this.db.prepare('DELETE FROM projects WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
+  }
+
+  getTestRuns(projectId: string): {
+    items: Array<{ id: string; name: string; status: string }>;
+    counts: { pass: number; fail: number; skipped: number; not_run: number };
+    note: string;
+  } {
+    const rows = this.db
+      .prepare('SELECT id, name, status FROM test_runs WHERE project_id = ? ORDER BY name ASC')
+      .all(projectId) as Array<{ id: string; name: string; status: string }>;
+
+    const counts = { pass: 0, fail: 0, skipped: 0, not_run: 0 };
+    for (const r of rows) {
+      if (r.status in counts) {
+        counts[r.status as keyof typeof counts]++;
+      }
+    }
+
+    return {
+      items: rows,
+      counts,
+      note: 'Tests are not executed in Phase 1.',
+    };
   }
 }

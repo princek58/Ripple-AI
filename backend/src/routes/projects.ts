@@ -315,6 +315,25 @@ router.get(
   }
 );
 
+// GET /api/projects/:id/tests - list project test runs
+router.get(
+  '/projects/:id/tests',
+  validate({ params: projectIdParamsSchema }),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const db = getDatabase();
+    const repo = new ProjectsRepository(db);
+
+    const project = repo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    const testRuns = repo.getTestRuns(id);
+    return sendSuccess(res, testRuns);
+  }
+);
+
 // DELETE /api/projects/:id - delete project and its storage
 router.delete(
   '/projects/:id',

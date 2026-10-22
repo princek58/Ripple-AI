@@ -41,7 +41,7 @@ export interface Project {
   created_at: string;
   size_bytes: number;
   file_count: number;
-  languages: string;
+  languages: string[];
   last_scan_at: string | null;
 }
 
@@ -104,16 +104,19 @@ export interface Fix {
   id: string;
   finding_id: string;
   diff_text: string;
-  files_json: string | null;
+  files: string[];
   status: FixStatus;
   approved_at: string | null;
+  patch_path?: string | null;
 }
 
 export interface TestRun {
   id: string;
   project_id: string;
+  scan_id?: string | null;
   name: string;
   status: TestRunStatus;
+  created_at?: string | null;
 }
 
 export interface Report {

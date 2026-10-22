@@ -3,6 +3,8 @@ import config from './config.js';
 import healthRouter from './routes/health.js';
 import projectsRouter from './routes/projects.js';
 import findingsRouter from './routes/findings.js';
+import fixesRouter from './routes/fixes.js';
+import reportsRouter from './routes/reports.js';
 import { notFoundHandler, errorHandler } from './utils/errors.js';
 
 const app = express();
@@ -34,6 +36,8 @@ app.use((req, res, next) => {
 app.use('/api', healthRouter);
 app.use('/api', projectsRouter);
 app.use('/api', findingsRouter);
+app.use('/api', fixesRouter);
+app.use('/api', reportsRouter);
 
 // 404 Handler for undefined routes
 app.use(notFoundHandler);

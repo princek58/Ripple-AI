@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { Scan } from '../types.js';
 import type { GraphNode, GraphEdge } from '../analysis/graphBuilder/types.js';
@@ -93,6 +94,7 @@ export class ScansRepository {
     const deleteFindings = this.db.prepare('DELETE FROM findings WHERE project_id = ?');
     const deleteEdges = this.db.prepare('DELETE FROM edges WHERE project_id = ?');
     const deleteNodes = this.db.prepare('DELETE FROM nodes WHERE project_id = ?');
+    const deleteTestRuns = this.db.prepare('DELETE FROM test_runs WHERE project_id = ?');
 
     const insertNode = this.db.prepare(`
       INSERT INTO nodes (
@@ -119,6 +121,11 @@ export class ScansRepository {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    const insertTestRun = this.db.prepare(`
+      INSERT INTO test_runs (id, project_id, scan_id, name, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
     const updateScanStmt = this.db.prepare(`
       UPDATE scans
       SET status = ?, finished_at = ?, files_total = ?, files_skipped = ?, notes = ?
@@ -132,10 +139,11 @@ export class ScansRepository {
     `);
 
     const tx = this.db.transaction(() => {
-      // 1. Delete previous findings, edges, and nodes
+      // 1. Delete previous findings, edges, nodes, and test_runs
       deleteFindings.run(projectId);
       deleteEdges.run(projectId);
       deleteNodes.run(projectId);
+      deleteTestRuns.run(projectId);
 
       // 2. Insert new nodes
       for (const node of nodes) {
@@ -190,7 +198,21 @@ export class ScansRepository {
         );
       }
 
-      // 5. Update scan status
+      // 5. Insert test runs for test file nodes
+      const testNodes = nodes.filter((n) => n.type === 'test' && n.level === 3);
+      const now = new Date().toISOString();
+      for (const testNode of testNodes) {
+        insertTestRun.run(
+          crypto.randomUUID(),
+          projectId,
+          scanId,
+          testNode.path,
+          'not_run',
+          now
+        );
+      }
+
+      // 6. Update scan status
       updateScanStmt.run(
         scanUpdate.status,
         scanUpdate.finished_at,

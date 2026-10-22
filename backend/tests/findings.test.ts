@@ -169,6 +169,13 @@ describe('Step 6 Findings Model, Checks, and Summary Tests', () => {
     expect(legacyFinding.confidence).toBe('hypothesis');
     expect(legacyFinding.not_confirmed).toBeTruthy();
 
+    // Dynamic.tsx only has self/unresolved edges, so it must now be flagged as isolated_file (hypothesis)
+    const dynamicFinding = items.find((f: any) => f.title.includes('Dynamic.tsx'));
+    expect(dynamicFinding).toBeDefined();
+    expect(dynamicFinding.severity).toBe('low');
+    expect(dynamicFinding.confidence).toBe('hypothesis');
+    expect(dynamicFinding.not_confirmed).toBeTruthy();
+
     // server.js, config files, test files must NOT be flagged as isolated_file
     for (const f of items) {
       expect(f.title).not.toContain('server.js');
