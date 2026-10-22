@@ -1,0 +1,20 @@
+{
+  "name": "ripple-ai",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "test": "npm --prefix backend run test",
+    "test:backend": "npm --prefix backend run test",
+    "start:backend": "npm --prefix backend run start"
+  }
+}

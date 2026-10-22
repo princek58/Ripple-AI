@@ -1,0 +1,53 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  /* UI Brand Colours (never used for graph types or severity) */
+  --color-cream: #F6F6F1;
+  --color-forest: #0B3B2C;
+  --color-lime: #E3F57A;
+  --color-slate-green: #2B3F3A;
+  --color-near-black-green: #0F1B18;
+
+  /* Semantic Theme Variables (Light Theme) */
+  --theme-bg: #F6F6F1;
+  --theme-surface: #FFFFFF;
+  --theme-text: #0F1B18;
+  --theme-text-muted: #2B3F3A;
+  --theme-border: #E2E8F0;
+  --theme-accent: #E3F57A;
+
+  /* Graph Node Types (distinct from brand green) */
+  --node-project: #2563EB;
+  --node-module: #2563EB;
+  --node-frontend: #0E7490;
+  --node-backend: #7C3AED;
+  --node-api: #06B6D4;
+  --node-database: #64748B;
+  --node-config: #D97706;
+  --node-test: #64748B;
+
+  /* Severity Colours */
+  --severity-critical: #DC2626;
+  --severity-high: #EA580C;
+  --severity-medium: #CA8A04;
+  --severity-low: #64748B;
+  --severity-unknown: #9CA3AF;
+
+  /* Typography */
+  --font-space-grotesk: 'Space Grotesk', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+  --font-jetbrains-mono: 'JetBrains Mono', monospace;
+}
+
+[data-theme='dark'],
+.dark {
+  /* Semantic Theme Variables (Dark Theme) */
+  --theme-bg: #0F1B18;
+  --theme-surface: #16261F;
+  --theme-text: #F8FAFC;
+  --theme-text-muted: #94A3B8;
+  --theme-border: #2B3F3A;
+  --theme-accent: #E3F57A;
+}
