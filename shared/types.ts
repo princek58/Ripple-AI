@@ -174,23 +174,63 @@ export interface GraphNode extends Node {
   maxSeverity?: FindingSeverity | null;
 }
 
+export interface GraphCluster {
+  id: string;
+  label: string;
+  count: number;
+  sample_node_ids?: string[];
+}
+
 export interface GraphEdge extends Edge {
   count?: number;
   derived?: boolean;
-  evidence?: {
-    count: number;
-    strongestRelation: string;
-  };
+  evidence?: Record<string, unknown> | null;
 }
 
 export interface GraphResponseData {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  clusters: Array<{ id: string; label: string; nodeCount: number }>;
+  clusters: GraphCluster[];
   shown: number;
   total: number;
   level: NodeLevel;
   focus: string | null;
+}
+
+export interface NodeDetailsEdge {
+  id: string;
+  relation: EdgeRelation;
+  status: EdgeStatus;
+  confidence: FindingConfidence;
+  evidence?: Record<string, unknown> | null;
+  otherNode: {
+    id: string;
+    label: string;
+    type: NodeType;
+    path: string;
+  };
+}
+
+export interface NodeDetailsData {
+  node: GraphNode;
+  parentModule: {
+    id: string;
+    label: string;
+    path: string;
+  } | null;
+  incomingEdges: NodeDetailsEdge[];
+  outgoingEdges: NodeDetailsEdge[];
+  lineRange: {
+    start: number | null;
+    end: number | null;
+  } | null;
+  relatedFindings: Array<{
+    id: string;
+    title: string;
+    severity: FindingSeverity;
+    confidence: FindingConfidence;
+    verification: FindingVerification;
+  }>;
 }
 
 export interface ApiResponse<T> {

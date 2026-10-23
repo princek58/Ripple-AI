@@ -1,4 +1,4 @@
-import type { Project, Scan, ProjectSummary, GraphResponseData, Finding, Fix, TestRun, Report, ApiResponse } from '../../../shared/types.js';
+import type { Project, Scan, ProjectSummary, GraphResponseData, NodeDetailsData, Finding, Fix, TestRun, Report, ApiResponse } from '../../../shared/types.js';
 
 export class ApiClientError extends Error {
   constructor(
@@ -216,6 +216,17 @@ export const api = {
     const qs = searchParams.toString();
     return apiFetch<GraphResponseData>(
       `/api/projects/${projectId}/graph${qs ? `?${qs}` : ''}`,
+      { signal }
+    );
+  },
+
+  getNodeDetails(
+    projectId: string,
+    nodeId: string,
+    signal?: AbortSignal
+  ): Promise<NodeDetailsData> {
+    return apiFetch<NodeDetailsData>(
+      `/api/projects/${projectId}/graph/nodes/${nodeId}`,
       { signal }
     );
   },

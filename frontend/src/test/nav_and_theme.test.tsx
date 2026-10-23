@@ -142,19 +142,19 @@ describe('Navigation and Theme', () => {
       expect(screen.getAllByTestId('sample-data-tag').length).toBeGreaterThan(0);
     });
 
-    it('renders app shell and placeholder page at "/app/graph"', async () => {
+    it('renders app shell and placeholder page at "/app/investigations"', async () => {
       render(
         <ThemeProvider>
-          <MemoryRouter initialEntries={['/app/graph']}>
+          <MemoryRouter initialEntries={['/app/investigations']}>
             <AppRoutes />
           </MemoryRouter>
         </ThemeProvider>
       );
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { level: 1, name: 'Graph' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'Investigations' })).toBeInTheDocument();
       });
-      expect(screen.getByText('Coming in Step 11')).toBeInTheDocument();
+      expect(screen.getByText('Coming in Step 12')).toBeInTheDocument();
     });
 
     it('renders dev design system page at "/dev/design-system"', async () => {

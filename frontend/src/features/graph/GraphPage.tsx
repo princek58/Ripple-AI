@@ -1,0 +1,353 @@
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft } from 'lucide-react';
+import { useProjects } from '../../lib/projectContext.js';
+import { api, ApiClientError, getFriendlyErrorMessage } from '../../lib/api.js';
+import { useRescan } from '../../lib/useRescan.js';
+import { Button } from '../../components/ui/Button.js';
+import { Skeleton } from '../../components/ui/Skeleton.js';
+import { EmptyState } from '../../components/ui/EmptyState.js';
+import { ErrorState } from '../../components/ui/ErrorState.js';
+import { GraphCanvas } from './GraphCanvas.js';
+import { ShownCounter } from './ShownCounter.js';
+import { GraphLegend } from './GraphLegend.js';
+import { GraphTextAlternative } from './GraphTextAlternative.js';
+import {
+  responseToFlow,
+  parseGraphUrl,
+  resolveLevelFromNodeType,
+  type FlowTransformResult,
+} from './graphTransform.js';
+import type { GraphResponseData } from '../../../../shared/types.js';
+
+export const GraphPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { selectedProject, selectedProjectId, projects, isLoading: isProjectsLoading } =
+    useProjects();
+  const { rescan, isScanning } = useRescan();
+
+  // URL state
+  const { focus: urlFocus, level: urlLevel, depth: urlDepth } = useMemo(
+    () => parseGraphUrl(searchParams),
+    [searchParams]
+  );
+
+  // Component state
+  const [graphData, setGraphData] = useState<GraphResponseData | null>(null);
+  const [isGraphLoading, setIsGraphLoading] = useState<boolean>(true);
+  const [graphError, setGraphError] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [is404Focus, setIs404Focus] = useState<boolean>(false);
+
+  // References to handle project switching and race conditions
+  const activeAbortRef = useRef<AbortController | null>(null);
+  const previousProjectIdRef = useRef<string | null>(selectedProjectId);
+
+  // Reset URL to Level 1 and abort on project switch
+  useEffect(() => {
+    if (
+      previousProjectIdRef.current &&
+      selectedProjectId &&
+      previousProjectIdRef.current !== selectedProjectId
+    ) {
+      if (activeAbortRef.current) {
+        activeAbortRef.current.abort();
+      }
+      navigate('/app/graph', { replace: true });
+      setSelectedNodeId(null);
+      setIs404Focus(false);
+    }
+    previousProjectIdRef.current = selectedProjectId;
+  }, [selectedProjectId, navigate]);
+
+  // Fetch graph and resolve missing level if focus without level
+  const fetchGraphData = useCallback(async () => {
+    if (!selectedProjectId) return;
+
+    if (activeAbortRef.current) {
+      activeAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeAbortRef.current = controller;
+
+    setIsGraphLoading(true);
+    setGraphError(null);
+    setIs404Focus(false);
+
+    try {
+      // Case 1: Focus provided without level (e.g. from Overview screen link)
+      if (urlFocus && urlLevel === null) {
+        try {
+          const details = await api.getNodeDetails(
+            selectedProjectId,
+            urlFocus,
+            controller.signal
+          );
+          if (controller.signal.aborted) return;
+
+          const { level, depth } = resolveLevelFromNodeType(details.node.type);
+          if (level === 2) {
+            setSearchParams({ focus: urlFocus, level: '2' }, { replace: true });
+          } else {
+            setSearchParams(
+              { focus: urlFocus, level: '3', depth: String(depth) },
+              { replace: true }
+            );
+          }
+          return;
+        } catch (err: unknown) {
+          if (controller.signal.aborted) return;
+          if (err instanceof ApiClientError && err.status === 404) {
+            setIs404Focus(true);
+            setIsGraphLoading(false);
+            return;
+          }
+          throw err;
+        }
+      }
+
+      // Case 2: Standard fetch
+      const effectiveLevel = urlLevel ?? 1;
+      const queryParams: {
+        level?: number;
+        focus?: string;
+        depth?: number;
+      } = {
+        level: effectiveLevel,
+      };
+
+      if (urlFocus && effectiveLevel > 1) {
+        queryParams.focus = urlFocus;
+      }
+      if (effectiveLevel === 3) {
+        queryParams.depth = urlDepth;
+      }
+
+      const data = await api.getGraph(selectedProjectId, queryParams, controller.signal);
+      if (!controller.signal.aborted) {
+        setGraphData(data);
+        setIsGraphLoading(false);
+      }
+    } catch (err: unknown) {
+      if (controller.signal.aborted) return;
+
+      if (err instanceof ApiClientError && err.status === 404) {
+        setIs404Focus(true);
+      } else {
+        const friendly = getFriendlyErrorMessage(err);
+        setGraphError(friendly);
+      }
+      setIsGraphLoading(false);
+    }
+  }, [selectedProjectId, urlFocus, urlLevel, urlDepth, setSearchParams]);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchGraphData();
+    }
+  }, [selectedProjectId, fetchGraphData]);
+
+  // Transform graph data into React Flow nodes and edges
+  const flowResult: FlowTransformResult = useMemo(() => {
+    if (!graphData) {
+      return {
+        flowNodes: [],
+        flowEdges: [],
+        unmappedEdges: [],
+        stubsCount: 0,
+        clustersCount: 0,
+      };
+    }
+    return responseToFlow(graphData, { focusNodeId: urlFocus });
+  }, [graphData, urlFocus]);
+
+  // Node selection handler: marks selected node
+  const handleSelectNode = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+  }, []);
+
+  // 1. Projects loading state
+  if (isProjectsLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-96 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  // 2. Empty state: No projects exist
+  if (!projects || projects.length === 0) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          title="Upload your first project"
+          description="Analyze codebase dependencies, services, and architecture by uploading a project archive."
+          action={
+            <Button
+              variant="primary"
+              size="md"
+              data-testid="upload-first-project-graph-btn"
+              onClick={() => navigate('/app/projects')}
+            >
+              <FolderOpen className="w-4 h-4 mr-2" aria-hidden="true" />
+              Upload Project
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  // 3. Never scanned state
+  const isNeverScanned = selectedProject && !selectedProject.last_scan_at;
+  if (isNeverScanned) {
+    return (
+      <div className="p-6">
+        <div
+          data-testid="never-scanned-graph-state"
+          className="flex flex-col items-center justify-center text-center p-12 rounded-2xl border border-theme-border bg-theme-surface shadow-sm space-y-4 max-w-lg mx-auto mt-12"
+        >
+          <div className="w-12 h-12 rounded-full bg-theme-surface-active border border-theme-border flex items-center justify-center text-theme-text-muted">
+            <RefreshCw className="w-6 h-6" aria-hidden="true" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-heading font-semibold text-theme-text">
+              Not scanned yet
+            </h2>
+            <p className="text-sm text-theme-text-muted">
+              Project <strong className="text-theme-text font-medium">{selectedProject.name}</strong> has not been analyzed yet. Run a scan to view its dependency graph.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="md"
+            data-testid="rescan-graph-btn"
+            disabled={isScanning}
+            onClick={() => rescan(selectedProject.id, fetchGraphData)}
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${isScanning ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {isScanning ? 'Scanning...' : 'Re-scan'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. 404 Node Error State
+  if (is404Focus) {
+    return (
+      <div className="p-6">
+        <div
+          data-testid="node-404-state"
+          className="flex flex-col items-center justify-center text-center p-12 rounded-2xl border border-theme-border bg-theme-surface shadow-sm space-y-4 max-w-lg mx-auto mt-12"
+        >
+          <div className="w-12 h-12 rounded-full bg-theme-surface-active border border-theme-border flex items-center justify-center text-theme-text-muted">
+            <AlertCircle className="w-6 h-6" aria-hidden="true" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-heading font-semibold text-theme-text">
+              This node is not in the selected project
+            </h2>
+            <p className="text-sm text-theme-text-muted">
+              The requested focus node ID does not exist in project{' '}
+              <strong className="text-theme-text font-medium">{selectedProject?.name}</strong>.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="md"
+            data-testid="back-to-level1-btn"
+            onClick={() => {
+              setIs404Focus(false);
+              navigate('/app/graph');
+            }}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
+            Back to Level 1
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. General Error State
+  if (graphError) {
+    return (
+      <div className="p-6">
+        <ErrorState
+          title="Could not load dependency graph"
+          message={graphError}
+          onRetry={fetchGraphData}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-theme-background">
+      {/* Top Bar: ShownCounter */}
+      <header className="flex-shrink-0 border-b border-theme-border bg-theme-surface/80 backdrop-blur-md px-4 py-3 z-20 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="font-heading font-bold text-lg text-theme-text">
+            Dependency Graph
+          </h1>
+          <span className="text-xs text-theme-text-muted font-mono">
+            {urlLevel ? `Level ${urlLevel}` : 'Level 1'}
+          </span>
+        </div>
+
+        <ShownCounter
+          shown={graphData?.shown ?? flowResult.flowNodes.length}
+          total={graphData?.total ?? flowResult.flowNodes.length}
+          clustersCount={flowResult.clustersCount}
+        />
+      </header>
+
+      {/* Main Canvas Area */}
+      <main className="relative flex-1 w-full h-full overflow-hidden">
+        {isGraphLoading ? (
+          <div className="w-full h-full flex items-center justify-center p-8">
+            <div className="flex flex-col items-center gap-3">
+              <Skeleton className="w-64 h-8 rounded-xl" />
+              <Skeleton className="w-48 h-4 rounded-lg" />
+              <Skeleton className="w-96 h-64 rounded-2xl mt-4" />
+            </div>
+          </div>
+        ) : (
+          <>
+            <GraphCanvas
+              initialNodes={flowResult.flowNodes}
+              initialEdges={flowResult.flowEdges}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={handleSelectNode}
+              className="w-full h-full"
+            />
+
+            {/* Floating Legend */}
+            <div className="absolute bottom-4 left-4 z-20 max-w-xs">
+              <GraphLegend />
+            </div>
+          </>
+        )}
+      </main>
+
+      {/* Accessible Text Alternative (Collapsible at bottom) */}
+      <footer className="flex-shrink-0 px-4 py-2 border-t border-theme-border bg-theme-surface/90 z-10">
+        <GraphTextAlternative
+          flowNodes={flowResult.flowNodes}
+          flowEdges={flowResult.flowEdges}
+          unmappedEdges={flowResult.unmappedEdges}
+          clustersCount={flowResult.clustersCount}
+        />
+      </footer>
+    </div>
+  );
+};
+
+export default GraphPage;
