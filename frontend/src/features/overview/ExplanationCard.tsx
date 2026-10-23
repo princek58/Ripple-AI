@@ -31,8 +31,8 @@ export const ExplanationCard: React.FC<ExplanationCardProps> = ({
     summary.affectedModules.length > 0
       ? [...summary.affectedModules].sort(
           (a, b) =>
-            (SEVERITY_ORDER[b.maxSeverity] ?? 0) -
-              (SEVERITY_ORDER[a.maxSeverity] ?? 0) ||
+            ((b.maxSeverity ? SEVERITY_ORDER[b.maxSeverity] : 0) ?? 0) -
+              ((a.maxSeverity ? SEVERITY_ORDER[a.maxSeverity] : 0) ?? 0) ||
             b.findingCount - a.findingCount
         )[0]
       : null;

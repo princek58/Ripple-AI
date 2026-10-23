@@ -8,7 +8,7 @@ export interface AffectedModuleItem {
   moduleId: string;
   label: string;
   findingCount: number;
-  maxSeverity: FindingSeverity;
+  maxSeverity: FindingSeverity | null;
 }
 
 export interface AffectedModulesStripProps {
@@ -69,9 +69,11 @@ export const AffectedModulesStrip: React.FC<AffectedModulesStripProps> = ({
                   {mod.findingCount} {mod.findingCount === 1 ? 'finding' : 'findings'}
                 </span>
               </div>
-              <SeverityBadge severity={mod.maxSeverity} size="sm">
-                {mod.maxSeverity}
-              </SeverityBadge>
+              {mod.maxSeverity && (
+                <SeverityBadge severity={mod.maxSeverity} size="sm">
+                  {mod.maxSeverity}
+                </SeverityBadge>
+              )}
             </div>
           ))}
         </div>

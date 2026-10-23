@@ -165,7 +165,7 @@ export interface ProjectSummary {
     moduleId: string;
     label: string;
     findingCount: number;
-    maxSeverity: FindingSeverity;
+    maxSeverity: FindingSeverity | null;
   }>;
 }
 
