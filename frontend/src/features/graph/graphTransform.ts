@@ -344,8 +344,8 @@ export function parseGraphUrl(searchParams: URLSearchParams): ParsedGraphUrl {
   let depth = 1;
   if (rawDepth) {
     const parsed = parseInt(rawDepth, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 3) {
-      depth = parsed;
+    if (!isNaN(parsed)) {
+      depth = Math.max(1, Math.min(3, parsed));
     }
   }
 
@@ -363,14 +363,17 @@ export function buildGraphUrl(params: {
     sp.set('focus', params.focus);
   }
 
-  if (params.level !== undefined && params.level !== null) {
+  if (params.level === 1 || params.level === 2 || params.level === 3) {
     sp.set('level', String(params.level));
   } else if (!params.focus) {
     sp.set('level', '1');
   }
 
-  if (params.depth !== undefined && params.depth > 1) {
-    sp.set('depth', String(params.depth));
+  if (params.depth !== undefined && params.depth !== null) {
+    const clampedDepth = Math.max(1, Math.min(3, params.depth));
+    if (clampedDepth > 1) {
+      sp.set('depth', String(clampedDepth));
+    }
   }
 
   const qs = sp.toString();
@@ -410,7 +413,7 @@ export function buildBreadcrumb(
     {
       label: project?.name || 'Project',
       url: '/app/graph?level=1',
-      isCurrent: currentLevel === 1 && !currentNode,
+      isCurrent: currentLevel === 1,
     },
   ];
 
@@ -449,3 +452,13 @@ export function buildBreadcrumb(
 
   return crumbs;
 }
+
+/**
+ * Checks if a response object represents a valid API error envelope
+ */
+export function isGraphApiError(res: unknown): boolean {
+  if (!res || typeof res !== 'object') return false;
+  const obj = res as { data?: unknown; error?: unknown };
+  return obj.data === null && typeof obj.error === 'string' && obj.error.length > 0;
+}
+
