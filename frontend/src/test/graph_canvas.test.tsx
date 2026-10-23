@@ -92,9 +92,9 @@ describe('GraphCanvas, Layout, Legend & Interactions (Step 11a-2 Part C)', () =>
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Current module');
 
-    // Verify aria-label contains current module
+    // Verify aria-label contains Current module
     const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('aria-label', expect.stringContaining('current module'));
+    expect(button).toHaveAttribute('aria-label', expect.stringContaining('Current module'));
   });
 
   it('layout failure falls back to deterministic grid and displays "Auto-layout unavailable"', async () => {

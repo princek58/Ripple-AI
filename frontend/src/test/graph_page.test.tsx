@@ -72,7 +72,8 @@ describe('GraphPage Component & URL States (Step 11a-2 Part B)', () => {
 
     // Check accessible text alternative details
     expect(screen.getByTestId('graph-text-alternative')).toBeInTheDocument();
-    expect(screen.getByText('Accessible Graph Structure (Text Alternative)')).toBeInTheDocument();
+    expect(screen.getByText('Graph as a text list')).toBeInTheDocument();
+    expect(screen.getByText('For screen readers and keyboard users. Lists every node and edge shown above.')).toBeInTheDocument();
   });
 
   it('resolves focus without level: module resolves to level 2 and file resolves to level 3', async () => {

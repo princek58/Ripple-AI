@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft } from 'lucide-react';
+import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useProjects } from '../../lib/projectContext.js';
 import { api, ApiClientError, getFriendlyErrorMessage } from '../../lib/api.js';
 import { useRescan } from '../../lib/useRescan.js';
@@ -10,7 +10,7 @@ import { EmptyState } from '../../components/ui/EmptyState.js';
 import { ErrorState } from '../../components/ui/ErrorState.js';
 import { GraphCanvas } from './GraphCanvas.js';
 import { ShownCounter } from './ShownCounter.js';
-import { GraphLegend } from './GraphLegend.js';
+import { GraphLegendContent } from './GraphLegend.js';
 import { GraphTextAlternative } from './GraphTextAlternative.js';
 import { GraphBreadcrumb } from './GraphBreadcrumb.js';
 import { GraphSearchFilters } from './GraphSearchFilters.js';
@@ -48,6 +48,7 @@ export const GraphPage: React.FC = () => {
   const [is404Focus, setIs404Focus] = useState<boolean>(false);
   const [focusNodeDetails, setFocusNodeDetails] = useState<NodeDetailsData | null>(null);
   const [maxNodes, setMaxNodes] = useState<number>(50);
+  const [isLegendOpen, setIsLegendOpen] = useState<boolean>(false);
 
   // References to handle project switching and race conditions
   const activeAbortRef = useRef<AbortController | null>(null);
@@ -365,7 +366,7 @@ export const GraphPage: React.FC = () => {
   }
 
   return (
-    <div className="relative flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-theme-background">
+    <div className="relative flex flex-col min-h-[calc(100vh-4rem)] overflow-y-auto bg-theme-background">
       {/* Top Bar: Breadcrumb, ShownCounter, Search & Filters */}
       <header className="flex-shrink-0 border-b border-theme-border bg-theme-surface/80 backdrop-blur-md px-4 py-2.5 z-20 flex flex-col gap-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -414,19 +415,52 @@ export const GraphPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search & Filters */}
+        {/* Search & Filters and Legend Toggle */}
         {selectedProjectId && (
-          <div className="pt-0.5">
-            <GraphSearchFilters
-              projectId={selectedProjectId}
-              onSelectResult={handleSelectSearchResult}
-            />
+          <div className="pt-0.5 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex-1 min-w-[280px]">
+              <GraphSearchFilters
+                projectId={selectedProjectId}
+                onSelectResult={handleSelectSearchResult}
+              />
+            </div>
+            <button
+              type="button"
+              data-testid="toggle-legend-btn"
+              onClick={() => setIsLegendOpen((prev) => !prev)}
+              aria-expanded={isLegendOpen}
+              aria-controls="graph-legend-panel"
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors select-none ${
+                isLegendOpen
+                  ? 'bg-theme-surface-active border-theme-primary text-theme-primary'
+                  : 'bg-theme-surface border-theme-border text-theme-text hover:bg-theme-surface-active'
+              }`}
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-theme-text-muted" aria-hidden="true" />
+              <span>Legend</span>
+              {isLegendOpen ? (
+                <ChevronUp className="w-3.5 h-3.5 text-theme-text-muted" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-theme-text-muted" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Legend panel below toolbar */}
+        {isLegendOpen && (
+          <div
+            id="graph-legend-panel"
+            data-testid="graph-legend"
+            className="p-3.5 rounded-xl border border-theme-border bg-theme-surface shadow-sm text-xs mt-1"
+          >
+            <GraphLegendContent />
           </div>
         )}
       </header>
 
       {/* Main Canvas Area */}
-      <main className="relative flex-1 w-full h-full overflow-hidden">
+      <main className="relative w-full h-[clamp(420px,65vh,720px)] flex-shrink-0">
         {isGraphLoading ? (
           <div className="w-full h-full flex items-center justify-center p-8">
             <div className="flex flex-col items-center gap-3">
@@ -443,13 +477,9 @@ export const GraphPage: React.FC = () => {
               selectedNodeId={selectedNodeId}
               onSelectNode={handleSelectNode}
               onDoubleClickNode={handleDoubleClickNode}
+              isPanelOpen={Boolean(selectedNodeId || isLegendOpen)}
               className="w-full h-full"
             />
-
-            {/* Floating Legend */}
-            <div className="absolute bottom-4 left-4 z-20 max-w-xs">
-              <GraphLegend />
-            </div>
 
             {/* Node Details Panel */}
             {selectedProjectId && (
@@ -469,8 +499,8 @@ export const GraphPage: React.FC = () => {
         )}
       </main>
 
-      {/* Accessible Text Alternative (Collapsible at bottom) */}
-      <footer className="flex-shrink-0 px-4 py-2 border-t border-theme-border bg-theme-surface/90 z-10">
+      {/* Accessible Text Alternative (Collapsible card at bottom) */}
+      <footer className="flex-shrink-0 px-4 pt-4 pb-12 max-w-7xl w-full mx-auto">
         <GraphTextAlternative
           flowNodes={flowResult.flowNodes}
           flowEdges={flowResult.flowEdges}

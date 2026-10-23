@@ -21,10 +21,13 @@ export const GraphTextAlternative: React.FC<GraphTextAlternativeProps> = ({
   return (
     <details
       data-testid="graph-text-alternative"
-      className={`border border-theme-border rounded-xl p-3 bg-theme-surface text-xs text-theme-text shadow-sm ${className}`}
+      className={`border border-theme-border rounded-xl p-4 bg-theme-surface text-xs text-theme-text shadow-sm ${className}`}
     >
-      <summary className="font-semibold cursor-pointer hover:text-theme-primary focus:outline-none focus:ring-1 focus:ring-theme-primary rounded select-none py-0.5">
-        Accessible Graph Structure (Text Alternative)
+      <summary className="cursor-pointer hover:text-theme-primary focus:outline-none focus:ring-1 focus:ring-theme-primary rounded select-none py-1">
+        <span className="font-semibold text-sm text-theme-text">Graph as a text list</span>
+        <span className="block text-xs font-normal text-theme-text-muted mt-0.5">
+          For screen readers and keyboard users. Lists every node and edge shown above.
+        </span>
       </summary>
 
       <div className="mt-3 space-y-4 pt-3 border-t border-theme-border">

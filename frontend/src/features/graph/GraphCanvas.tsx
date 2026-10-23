@@ -36,6 +36,7 @@ export interface GraphCanvasProps {
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onDoubleClickNode?: (nodeId: string, nodeType?: string) => void;
+  isPanelOpen?: boolean;
   className?: string;
 }
 
@@ -45,6 +46,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
   selectedNodeId,
   onSelectNode,
   onDoubleClickNode,
+  isPanelOpen = false,
   className = '',
 }) => {
   const [isLayouting, setIsLayouting] = useState<boolean>(true);
@@ -55,6 +57,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
   const { fitView } = useReactFlow();
   const prefersReducedMotion = usePrefersReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
+  const isPanelInitialMount = useRef<boolean>(true);
 
   // Compute layout asynchronously with ELK
   useEffect(() => {
@@ -68,12 +71,16 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
           setLayoutFailed(!layoutSuccess);
           setIsLayouting(false);
 
-          // Fit view after layout computation (reduced motion duration 0, normal 200)
+          // Fit view after layout computation (duration 0 under reduced motion, padding 0.25, maxZoom 1.5)
           setTimeout(() => {
             if (!isCancelled) {
-              fitView({ duration: prefersReducedMotion ? 0 : 200, padding: 0.2 });
+              fitView({
+                padding: 0.25,
+                maxZoom: 1.5,
+                duration: prefersReducedMotion ? 0 : 200,
+              });
             }
-          }, 30);
+          }, 50);
         }
       })
       .catch(() => {
@@ -87,7 +94,25 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [initialNodes, initialEdges, fitView]);
+  }, [initialNodes, initialEdges, fitView, prefersReducedMotion]);
+
+  // Call fitView again after the panel opens or closes
+  useEffect(() => {
+    if (isPanelInitialMount.current) {
+      isPanelInitialMount.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fitView({
+        padding: 0.25,
+        maxZoom: 1.5,
+        duration: prefersReducedMotion ? 0 : 200,
+      });
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [isPanelOpen, fitView, prefersReducedMotion]);
 
   // Connected nodes & edges calculation for hover/keyboard focus highlight
   const connectedInfo = useMemo(() => {
@@ -259,8 +284,9 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
         zoomOnPinch={true}
         fitView={true}
         fitViewOptions={{
+          padding: 0.25,
+          maxZoom: 1.5,
           duration: prefersReducedMotion ? 0 : 200,
-          padding: 0.2,
         }}
         proOptions={{ hideAttribution: true }}
         aria-label="Interactive architecture dependency graph"

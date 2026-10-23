@@ -13,9 +13,11 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const findingCount = nodeData.findingCount ?? 0;
   const maxSeverity = nodeData.maxSeverity || null;
   const nodeType = (nodeData.nodeType as NodeType) || 'module';
+  const isModule = nodeType === 'module';
+  const focusLabel = isModule ? 'Current module' : 'Focus node';
 
   const ariaLabel = `${nodeData.label}, type ${nodeType}${
-    nodeData.isFocused ? ', current module' : ''
+    nodeData.isFocused ? `, ${focusLabel}` : ''
   }${
     findingCount > 0 ? `, ${findingCount} findings, severity ${maxSeverity || 'unknown'}` : ''
   }`;
@@ -26,7 +28,7 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       tabIndex={0}
       data-node-id={id}
       aria-label={ariaLabel}
-      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl bg-theme-surface border border-theme-border shadow-sm cursor-pointer select-none transition-all focus:outline-none focus:ring-2 focus:ring-theme-primary ${
+      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl min-w-[160px] bg-theme-surface border border-theme-border shadow-sm cursor-pointer select-none transition-all focus:outline-none focus:ring-2 focus:ring-theme-primary ${
         isSelected
           ? 'ring-2 ring-theme-primary border-theme-primary bg-theme-surface'
           : isHighlighted
@@ -46,30 +48,30 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
         </svg>
       </div>
 
-      <div className="flex flex-col min-w-0 max-w-[150px]">
+      <div className="flex flex-col min-w-0 flex-1">
         <div className="flex items-center gap-1.5 min-w-0">
           <span
-            className="text-xs font-medium text-theme-text truncate"
+            className="text-[13px] font-medium text-theme-text line-clamp-2 break-words"
             title={nodeData.label}
           >
             {nodeData.label}
           </span>
           {nodeData.isFocused && (
             <span
-              data-testid="current-module-badge"
-              className="flex-shrink-0 text-[9px] font-semibold text-theme-primary px-1.5 py-0.5 rounded bg-theme-surface-active border border-theme-border leading-none"
+              data-testid={isModule ? 'current-module-badge' : 'focus-node-badge'}
+              className="flex-shrink-0 text-[10px] font-semibold text-theme-primary px-1.5 py-0.5 rounded bg-theme-surface-active border border-theme-border leading-none"
             >
-              Current module
+              {focusLabel}
             </span>
           )}
         </div>
-        <span className="text-[10px] text-theme-text-muted capitalize">
+        <span className="text-[11px] text-theme-text-muted capitalize">
           {nodeType}
         </span>
       </div>
 
       {findingCount > 0 && maxSeverity && (
-        <div className="flex-shrink-0 ml-auto">
+        <div className="flex-shrink-0 ml-auto pl-1">
           <SeverityBadge
             severity={maxSeverity}
             size="sm"
@@ -87,3 +89,4 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
     </div>
   );
 };
+
