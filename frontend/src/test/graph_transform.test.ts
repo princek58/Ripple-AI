@@ -310,10 +310,10 @@ describe('Graph Pure Functions & Fixture Transformations (Step 11a-1)', () => {
       expect(crumbsL3[0].label).toBe('demo-erp');
       expect(crumbsL3[0].isCurrent).toBe(false);
       expect(crumbsL3[1].label).toBe('fees');
-      expect(crumbsL3[1].url).toBe('/app/graph?level=2&focus=57c7c9b2-7b2a-423b-a6b9-016c5a5b81cc');
+      expect(crumbsL3[1].url).toBe(`/app/graph?level=2&focus=${details.parentModule!.id}`);
       expect(crumbsL3[1].isCurrent).toBe(false);
       expect(crumbsL3[2].label).toBe('fees.js');
-      expect(crumbsL3[2].url).toBe('/app/graph?level=3&focus=fc7e7bb4-cbfb-4abc-ae1f-18d22a211945&depth=1');
+      expect(crumbsL3[2].url).toBe(`/app/graph?level=3&focus=${details.node!.id}&depth=1`);
       expect(crumbsL3[2].isCurrent).toBe(true);
     });
   });

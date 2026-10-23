@@ -22,6 +22,14 @@ Install all workspace dependencies from the root:
 npm install
 ```
 
+## Quick start for non-developers
+
+1. Double-click `start-dev.bat` in the repository root. This starts both backend and frontend development servers in separate windows and automatically opens http://localhost:3000 in your browser.
+2. Open the **Projects** page.
+3. Upload `samples/demo-erp-sample.zip`.
+4. Open **Overview** and **Graph** to explore the project architecture, dependencies, and findings.
+5. Close the two server terminal windows when you wish to stop.
+
 ## Running the Applications
 
 ### Frontend Development Server

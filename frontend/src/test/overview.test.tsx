@@ -20,6 +20,11 @@ import scannedSummaryFixture from './fixtures/api/project_summary.json';
 import scannedGraphFixture from './fixtures/api/graph_level1.json';
 import neverScannedSummaryFixture from './fixtures/api/never_scanned_summary.json';
 import neverScannedGraphFixture from './fixtures/api/never_scanned_graph_l1.json';
+import graphLevel2FeesFixture from './fixtures/api/graph_level2_fees.json';
+import graphLevel3NoticesD1Fixture from './fixtures/api/graph_level3_notices_d1.json';
+import graphSearchNoticeFixture from './fixtures/api/graph_search_notice.json';
+import nodeDetailsFeesFixture from './fixtures/api/node_details_fees.json';
+import { compareKeySets } from './contract_helpers.js';
 
 const capturedProjects: Project[] = projectsListFixture.data;
 const scannedSummary: ProjectSummary = scannedSummaryFixture.data as unknown as ProjectSummary;
@@ -510,8 +515,25 @@ describe('Overview Screen & Real Backend Data (Step 10b)', () => {
   describe('9. Extended Contract Test (RIPPLE_CONTRACT=1)', () => {
     const shouldRunContract = process.env.RIPPLE_CONTRACT === '1';
 
+    it('proves contract comparison reports differences on mutated keys (extra key and missing key), then restores', () => {
+      const sample = JSON.parse(JSON.stringify(nodeDetailsFeesFixture.data));
+      const mutated = JSON.parse(JSON.stringify(sample));
+      mutated.extraKey = 'unexpected';
+      delete mutated.relatedFindings;
+
+      const result = compareKeySets(mutated, sample);
+      expect(result.matching).toBe(false);
+      expect(result.differences.some((d) => d.includes('extraKey'))).toBe(true);
+      expect(result.differences.some((d) => d.includes('relatedFindings'))).toBe(true);
+
+      const restored = JSON.parse(JSON.stringify(sample));
+      const passResult = compareKeySets(restored, sample);
+      expect(passResult.matching).toBe(true);
+      expect(passResult.differences).toHaveLength(0);
+    });
+
     it.runIf(shouldRunContract)(
-      'contract test: verifies live backend GET summary and graph?level=1 keys match fixtures',
+      'contract test: verifies live backend GET summary, graph level 1, 2, 3, search and node details keys match fixtures',
       async () => {
         const liveProjectsRes = await fetch('http://localhost:4000/api/projects');
         expect(liveProjectsRes.ok).toBe(true);
@@ -550,6 +572,55 @@ describe('Overview Screen & Real Backend Data (Step 10b)', () => {
             Object.keys(scannedGraphFixture.data.edges[0]).sort()
           );
         }
+
+        // 3. Verify graph?level=2 keys
+        const feesModule = liveGraphJson.data.nodes.find((n: any) => n.label === 'fees') ||
+          liveGraphJson.data.nodes.find((n: any) => n.type === 'module');
+        expect(feesModule).toBeDefined();
+        const liveLevel2Res = await fetch(
+          `http://localhost:4000/api/projects/${projectId}/graph?level=2&focus=${feesModule.id}`
+        );
+        expect(liveLevel2Res.ok).toBe(true);
+        const liveLevel2Json = await liveLevel2Res.json();
+        const l2Cmp = compareKeySets(liveLevel2Json.data, graphLevel2FeesFixture.data);
+        expect(l2Cmp.differences).toEqual([]);
+        expect(l2Cmp.matching).toBe(true);
+
+        // 4. Verify search keys
+        const liveSearchRes = await fetch(
+          `http://localhost:4000/api/projects/${projectId}/graph/search?q=notice`
+        );
+        expect(liveSearchRes.ok).toBe(true);
+        const liveSearchJson = await liveSearchRes.json();
+        const searchCmp = compareKeySets(liveSearchJson.data, graphSearchNoticeFixture.data);
+        expect(searchCmp.differences).toEqual([]);
+        expect(searchCmp.matching).toBe(true);
+
+        // 5. Verify graph?level=3 keys
+        const noticePageNode = liveSearchJson.data.items.find((n: any) => n.label === 'NoticePage.tsx') ||
+          liveLevel2Json.data.nodes.find((n: any) => n.type !== 'module');
+        expect(noticePageNode).toBeDefined();
+        const liveLevel3Res = await fetch(
+          `http://localhost:4000/api/projects/${projectId}/graph?level=3&focus=${noticePageNode.id}&depth=1`
+        );
+        expect(liveLevel3Res.ok).toBe(true);
+        const liveLevel3Json = await liveLevel3Res.json();
+        const l3Cmp = compareKeySets(liveLevel3Json.data, graphLevel3NoticesD1Fixture.data);
+        expect(l3Cmp.differences).toEqual([]);
+        expect(l3Cmp.matching).toBe(true);
+
+        // 6. Verify node details keys
+        const feesNode = liveLevel2Json.data.nodes.find((n: any) => n.label === 'fees.js') ||
+          liveLevel2Json.data.nodes.find((n: any) => n.type !== 'module');
+        expect(feesNode).toBeDefined();
+        const liveDetailsRes = await fetch(
+          `http://localhost:4000/api/projects/${projectId}/graph/nodes/${feesNode.id}`
+        );
+        expect(liveDetailsRes.ok).toBe(true);
+        const liveDetailsJson = await liveDetailsRes.json();
+        const detailsCmp = compareKeySets(liveDetailsJson.data, nodeDetailsFeesFixture.data);
+        expect(detailsCmp.differences).toEqual([]);
+        expect(detailsCmp.matching).toBe(true);
       }
     );
   });
