@@ -114,7 +114,7 @@ Light-first. Reference mood only (cream, forest green, lime, grid lines); no cop
 - StickyGraphZoom: sticky section, scroll zooms graph L1 -> L2 -> L3 -> L4.
 - HowItWorks (dark slate-green): Upload, Understand, Investigate, Fix and verify + tiles: frontend, APIs, database, config, tests, CI/CD.
 - SafetyStatement: big text "Suspected is not confirmed." + statuses hypothesis, likely, confirmed, verified.
-- StatsBand: 4 graph levels · 30+ analysis capabilities · 0 code executed on upload · read-only by default (count-up once).
+- StatsBand: 4 graph levels · 6 automated checks (circular dependency, broken import, isolated file, undeclared env variable, unmatched API call, secret pattern) · 0 lines of uploaded code executed · Read-only by default (count-up once). Only claim what Phase 1 does; update the numbers when capabilities are added.
 - CtaBand, Footer: no fake testimonials, users or logos.
 Animations: fade-up on scroll, underline draw, grid parallax, count-up once; all disabled under prefers-reduced-motion.
 

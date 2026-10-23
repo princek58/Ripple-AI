@@ -135,7 +135,7 @@ describe('Navigation and Theme', () => {
         </ThemeProvider>
       );
 
-      expect(screen.getByText('Ripple AI')).toBeInTheDocument();
+      expect(screen.getAllByText('Ripple AI').length).toBeGreaterThan(0);
       expect(
         screen.getByRole('heading', { level: 1, name: /understand why it breaks, with evidence/i })
       ).toBeInTheDocument();
