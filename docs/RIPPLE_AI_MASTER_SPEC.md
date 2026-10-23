@@ -17,7 +17,7 @@ Non-negotiable principles:
 
 ## 2. Stack (fixed)
 - Monorepo: frontend/, backend/, shared/ (shared TypeScript types), docs/.
-- Frontend: React + TypeScript + Vite, Tailwind, React Router, React Flow (graph) with elkjs for auto-layout, Framer Motion (or CSS) for animation, Lucide icons.
+- Frontend: React + TypeScript + Vite, Tailwind, React Router, React Flow (graph) with elkjs for auto-layout, Framer Motion (or CSS) for animation, Lucide icons, vitest + @testing-library/react + jsdom for tests.
 - Backend: Node.js + TypeScript + Express, zod validation, better-sqlite3, multer (upload), yauzl (safe ZIP read), ts-morph (JS/TS parsing), vitest + supertest for tests.
 - DB: SQLite file in backend/data/. Uploaded ZIPs and extracted files in backend/storage/ (git-ignored).
 - Phase 1 languages: JavaScript, TypeScript, JSON, env files, package.json. Python later.
