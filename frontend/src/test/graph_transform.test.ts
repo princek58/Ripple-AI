@@ -53,12 +53,17 @@ describe('Graph Pure Functions & Fixture Transformations (Step 11a-1)', () => {
       expect(derivedEdge?.data?.status).toBe('resolved');
     });
 
-    it('handles unresolved import edges by creating dashed stub nodes', () => {
+    it('handles unresolved import edges by creating dashed stub nodes and flags focused module', () => {
       const graphData = graphLevel2FeesFixture.data as unknown as GraphResponseData;
       const result = responseToFlow(graphData);
 
       expect(result.stubsCount).toBe(1);
-      expect(result.flowNodes).toHaveLength(3); // 2 real + 1 stub
+      expect(result.flowNodes).toHaveLength(4); // 3 real (including focused module) + 1 stub
+
+      const focusedNode = result.flowNodes.find((n) => n.data.label === 'fees');
+      expect(focusedNode).toBeDefined();
+      expect(focusedNode?.data.isFocused).toBe(true);
+      expect(focusedNode?.data.nodeType).toBe('module');
 
       const stubNode = result.flowNodes.find((n) => n.type === 'stubNode');
       expect(stubNode).toBeDefined();
@@ -72,16 +77,18 @@ describe('Graph Pure Functions & Fixture Transformations (Step 11a-1)', () => {
       expect(unresolvedEdge?.target).toBe(stubNode?.id);
     });
 
-    it('isolates unmapped boundary edges without dropping them', () => {
+    it('maps boundary edges cleanly to real nodes in captured level 2', () => {
       const graphData = graphLevel2NoticesFixture.data as unknown as GraphResponseData;
       const result = responseToFlow(graphData);
 
-      // Focused module 'notices' is not in nodes, so boundary edges are unmapped
-      expect(result.unmappedEdges).toHaveLength(2);
-      expect(result.unmappedEdges[0].id).toContain('boundary:');
-      expect(result.unmappedEdges[1].id).toContain('boundary:');
+      // Focused module 'notices' and 'shared' are both present, so boundary edges are cleanly mapped
+      expect(result.unmappedEdges).toHaveLength(0);
 
-      // Internal edges between existing nodes are mapped
+      // Boundary edges between notices and shared are in flowEdges
+      const boundaryEdges = result.flowEdges.filter((e) => e.id.includes('boundary:'));
+      expect(boundaryEdges).toHaveLength(2);
+
+      // All edges connect valid flow nodes
       expect(result.flowEdges.length).toBeGreaterThan(0);
       for (const edge of result.flowEdges) {
         const sourceExists = result.flowNodes.some((n) => n.id === edge.source);
@@ -89,6 +96,52 @@ describe('Graph Pure Functions & Fixture Transformations (Step 11a-1)', () => {
         expect(sourceExists).toBe(true);
         expect(targetExists).toBe(true);
       }
+    });
+
+    it('isolates unmapped edges as a defensive fallback when endpoints are missing', () => {
+      const handmadeData: GraphResponseData = {
+        nodes: [
+          {
+            id: 'node-1',
+            project_id: 'p1',
+            scan_id: 's1',
+            type: 'module',
+            level: 2,
+            parent_id: null,
+            label: 'auth',
+            path: 'module:auth',
+            line_start: null,
+            line_end: null,
+            language: null,
+            meta_json: null,
+            findingCount: 0,
+            maxSeverity: null,
+          },
+        ],
+        edges: [
+          {
+            id: 'orphan-edge-1',
+            project_id: 'p1',
+            scan_id: 's1',
+            source_id: 'node-1',
+            target_id: 'missing-foreign-node',
+            relation: 'imports',
+            status: 'resolved',
+            confidence: 'confirmed',
+            evidence_json: null,
+          },
+        ],
+        clusters: [],
+        shown: 1,
+        total: 1,
+        level: 2,
+        focus: 'node-1',
+      };
+
+      const result = responseToFlow(handmadeData);
+      expect(result.unmappedEdges).toHaveLength(1);
+      expect(result.unmappedEdges[0].id).toBe('orphan-edge-1');
+      expect(result.flowEdges).toHaveLength(0);
     });
 
     it('transforms clusters into group nodes with node count', () => {

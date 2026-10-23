@@ -20,6 +20,7 @@ export interface FlowNodeData extends Record<string, unknown> {
   clusterCount?: number;
   sampleNodeIds?: string[];
   specifier?: string;
+  isFocused?: boolean;
   isDimmed?: boolean;
   isHighlighted?: boolean;
   isSelected?: boolean;
@@ -63,7 +64,7 @@ export function extractStubName(specifier: string): string {
  */
 export function responseToFlow(
   graphData: GraphResponseData,
-  _options?: { focusNodeId?: string | null }
+  options?: { focusNodeId?: string | null }
 ): FlowTransformResult {
   const flowNodes: FlowNode<FlowNodeData>[] = [];
   const flowEdges: FlowEdge<FlowEdgeData>[] = [];
@@ -74,6 +75,9 @@ export function responseToFlow(
   // 1. Regular Graph Nodes
   for (const node of graphData.nodes) {
     existingNodeIds.add(node.id);
+    const isFocused = Boolean(
+      node.focused || (options?.focusNodeId && node.id === options.focusNodeId)
+    );
     flowNodes.push({
       id: node.id,
       type: 'customNode',
@@ -85,6 +89,7 @@ export function responseToFlow(
         rawNode: node,
         findingCount: node.findingCount || 0,
         maxSeverity: node.maxSeverity || null,
+        isFocused,
       },
     });
   }
