@@ -54,7 +54,7 @@ RippleAI/
 - GET /api/health
 - POST /api/projects (multipart ZIP) · GET /api/projects · GET /api/projects/:id · DELETE /api/projects/:id · GET /api/projects/:id/files?page=1&pageSize=50&q= -> { items: [{ id, path, size, language, sensitive }], page, pageSize, total }
 - POST /api/projects/:id/scan -> { data: Scan, error } · GET /api/projects/:id/scans -> { data: Scan[], error } (newest first)
-- GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<1-3>&maxNodes=<n> -> { data: { nodes, edges, clusters, shown, total, level, focus }, error }
+- GET /api/projects/:id/graph?level=1|2|3&focus=<nodeId>&depth=<1-3>&maxNodes=<n> -> { data: { nodes, edges, clusters, shown, total, level, focus }, error } (for level 2, the focused module node itself is included in nodes with focused: true, counts in shown/total, and is never clustered)
 - GET /api/projects/:id/graph/search?q=&type=&severity=&verification=&limit=&offset= -> { data: { items, total }, error }
 - GET /api/projects/:id/graph/nodes/:nodeId -> { data: { node, parentModule, incomingEdges, outgoingEdges, lineRange, relatedFindings }, error }
 - GET /api/projects/:id/summary -> { data: { lastScan: { finished_at, status }, counts: { nodes, edges, unresolvedEdges, files }, kpi: { openFindings, criticalPlusHigh, fixesPendingApproval, verifiedFixes }, bySeverity, byConfidence, byVerification, affectedModules: [{ moduleId, label, findingCount, maxSeverity }] }, error }

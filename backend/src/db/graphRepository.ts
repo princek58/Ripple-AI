@@ -17,6 +17,7 @@ export interface GraphNodeRecord {
   findingCount?: number;
   maxSeverity?: string | null;
   stub?: boolean;
+  focused?: boolean;
 }
 
 export interface GraphEdgeRecord {
@@ -178,8 +179,11 @@ function applyClustering(
     };
   }
 
-  // Deterministic order: Level asc, type asc, path asc, id asc
+  // Deterministic order: focused node always comes first, then Level asc, type asc, path asc, id asc
   const sorted = [...allNodes].sort((a, b) => {
+    const aFocused = a.focused ? 1 : 0;
+    const bFocused = b.focused ? 1 : 0;
+    if (aFocused !== bFocused) return bFocused - aFocused;
     if (a.level !== b.level) return a.level - b.level;
     if (a.type !== b.type) return a.type.localeCompare(b.type);
     if (a.path !== b.path) return a.path.localeCompare(b.path);
@@ -414,7 +418,11 @@ export class GraphRepository {
       .all(projectId, focusModuleId) as GraphNodeRecord[];
 
     const childIds = new Set(children.map((c) => c.id));
-    const nodes: GraphNodeRecord[] = [...children];
+    const focusModuleNode: GraphNodeRecord = {
+      ...focusModule,
+      focused: true,
+    };
+    const nodes: GraphNodeRecord[] = [focusModuleNode, ...children];
     const edges: GraphEdgeRecord[] = [];
 
     const relatedEdges = this.db

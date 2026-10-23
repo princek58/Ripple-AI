@@ -367,4 +367,99 @@ describe('Step 5 Graph API Tests', () => {
     expect(matched).toBeDefined();
     expect(matched.matched).toBe(true);
   });
+
+  it('12. every edge endpoint is present in returned nodes across levels 1, 2, 3; level 2 focused module has focused: true and is never clustered', async () => {
+    const { projectId } = await uploadAndScanFixture();
+
+    const verifyEdgeEndpoints = (data: any) => {
+      const nodeIds = new Set(data.nodes.map((n: any) => n.id));
+      const clusterIds = new Set(data.clusters.map((c: any) => c.id));
+      const clusterSampleIds = new Set(data.clusters.flatMap((c: any) => c.sample_node_ids || []));
+
+      for (const edge of data.edges) {
+        if (edge.status === 'unresolved') {
+          expect(edge.source_id).toBe(edge.target_id);
+          expect(nodeIds.has(edge.source_id)).toBe(true);
+          continue;
+        }
+
+        const sourceValid = nodeIds.has(edge.source_id) || clusterIds.has(edge.source_id) || clusterSampleIds.has(edge.source_id);
+        const targetValid = nodeIds.has(edge.target_id) || clusterIds.has(edge.target_id) || clusterSampleIds.has(edge.target_id);
+
+        expect(sourceValid).toBe(true);
+        expect(targetValid).toBe(true);
+      }
+    };
+
+    // 1. Level 1 check
+    const l1Res = await request(app).get(`/api/projects/${projectId}/graph?level=1`);
+    expect(l1Res.status).toBe(200);
+    const l1Data = l1Res.body.data;
+    verifyEdgeEndpoints(l1Data);
+    for (const node of l1Data.nodes) {
+      expect(node.focused).toBeUndefined();
+    }
+
+    // 2. Level 2 check with focus on notices module
+    const noticesMod = l1Data.nodes.find((n: any) => n.type === 'module' && n.label === 'notices');
+    expect(noticesMod).toBeDefined();
+
+    const l2Res = await request(app).get(`/api/projects/${projectId}/graph?level=2&focus=${noticesMod.id}`);
+    expect(l2Res.status).toBe(200);
+    const l2Data = l2Res.body.data;
+    verifyEdgeEndpoints(l2Data);
+
+    // Focused module node is present in nodes with focused: true
+    const focusedModuleNode = l2Data.nodes.find((n: any) => n.id === noticesMod.id);
+    expect(focusedModuleNode).toBeDefined();
+    expect(focusedModuleNode.focused).toBe(true);
+    expect(focusedModuleNode.type).toBe('module');
+    expect(focusedModuleNode.label).toBe('notices');
+    expect(focusedModuleNode.findingCount).toBe(2);
+    expect(focusedModuleNode.maxSeverity).toBe('medium');
+
+    // All other nodes in level 2 do NOT have focused: true
+    for (const node of l2Data.nodes) {
+      if (node.id !== noticesMod.id) {
+        expect(node.focused).toBeUndefined();
+      }
+    }
+
+    // Level 2 with maxNodes=3: focused module is never clustered
+    const l2ClusteredRes = await request(app).get(
+      `/api/projects/${projectId}/graph?level=2&focus=${noticesMod.id}&maxNodes=3`
+    );
+    expect(l2ClusteredRes.status).toBe(200);
+    const l2ClusteredData = l2ClusteredRes.body.data;
+    expect(l2ClusteredData.shown).toBe(3);
+    expect(l2ClusteredData.clusters.length).toBeGreaterThan(0);
+    const clusteredFocusedNode = l2ClusteredData.nodes.find((n: any) => n.id === noticesMod.id);
+    expect(clusteredFocusedNode).toBeDefined();
+    expect(clusteredFocusedNode.focused).toBe(true);
+    for (const cluster of l2ClusteredData.clusters) {
+      expect(cluster.sample_node_ids).not.toContain(noticesMod.id);
+    }
+
+    // 3. Level 3 check with focus on NoticePage.tsx (depth 1 and depth 2)
+    const noticePageNode = l2Data.nodes.find((n: any) => n.label === 'NoticePage.tsx');
+    expect(noticePageNode).toBeDefined();
+
+    const l3d1Res = await request(app).get(
+      `/api/projects/${projectId}/graph?level=3&focus=${noticePageNode.id}&depth=1`
+    );
+    expect(l3d1Res.status).toBe(200);
+    verifyEdgeEndpoints(l3d1Res.body.data);
+    for (const node of l3d1Res.body.data.nodes) {
+      expect(node.focused).toBeUndefined();
+    }
+
+    const l3d2Res = await request(app).get(
+      `/api/projects/${projectId}/graph?level=3&focus=${noticePageNode.id}&depth=2`
+    );
+    expect(l3d2Res.status).toBe(200);
+    verifyEdgeEndpoints(l3d2Res.body.data);
+    for (const node of l3d2Res.body.data.nodes) {
+      expect(node.focused).toBeUndefined();
+    }
+  });
 });

@@ -172,6 +172,7 @@ export interface ProjectSummary {
 export interface GraphNode extends Node {
   findingCount?: number;
   maxSeverity?: FindingSeverity | null;
+  focused?: boolean;
 }
 
 export interface GraphCluster {
