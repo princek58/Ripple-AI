@@ -6,7 +6,9 @@ import type {
   NodeDetailsData,
   GraphSearchResponseData,
   GraphSearchParams,
-  Finding,
+  FindingDetailData,
+  PaginatedFindings,
+  FindingsQueryParams,
   Fix,
   TestRun,
   Report,
@@ -270,7 +272,15 @@ export const api = {
     });
   },
 
-  getFindings(projectId: string, query?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<{ items: Finding[]; total: number }> {
+  getScans(projectId: string, signal?: AbortSignal): Promise<Scan[]> {
+    return apiFetch<Scan[]>(`/api/projects/${projectId}/scans`, { signal });
+  },
+
+  getFindings(
+    projectId: string,
+    query?: FindingsQueryParams | Record<string, string | number | undefined>,
+    signal?: AbortSignal
+  ): Promise<PaginatedFindings> {
     const searchParams = new URLSearchParams();
     if (query) {
       for (const [key, value] of Object.entries(query)) {
@@ -280,7 +290,11 @@ export const api = {
       }
     }
     const qs = searchParams.toString();
-    return apiFetch<{ items: Finding[]; total: number }>(`/api/projects/${projectId}/findings${qs ? `?${qs}` : ''}`, { signal });
+    return apiFetch<PaginatedFindings>(`/api/projects/${projectId}/findings${qs ? `?${qs}` : ''}`, { signal });
+  },
+
+  getFinding(findingId: string, signal?: AbortSignal): Promise<FindingDetailData> {
+    return apiFetch<FindingDetailData>(`/api/findings/${findingId}`, { signal });
   },
 
   getFixes(projectId: string, status?: string, signal?: AbortSignal): Promise<{ items: Fix[]; total: number }> {

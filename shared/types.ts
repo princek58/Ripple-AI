@@ -83,6 +83,23 @@ export interface Edge {
   evidence_json: string | null;
 }
 
+export interface FindingEvidenceItem {
+  file?: string;
+  line_start?: number;
+  line_end?: number;
+  line?: number;
+  specifier?: string;
+  pattern?: string;
+  [key: string]: unknown;
+}
+
+export interface FindingNode {
+  id: string;
+  label: string;
+  type: NodeType | string;
+  path: string;
+}
+
 export interface Finding {
   id: string;
   project_id: string;
@@ -93,12 +110,36 @@ export interface Finding {
   severity: FindingSeverity;
   confidence: FindingConfidence;
   verification: FindingVerification;
-  evidence_json: string | null;
-  node_ids_json: string | null;
+  evidence: FindingEvidenceItem[];
+  node_ids: string[];
   likely_cause: string | null;
   not_confirmed: string | null;
   created_at: string;
+  evidence_json?: string | null;
+  node_ids_json?: string | null;
 }
+
+export interface FindingDetailData extends Finding {
+  nodes: FindingNode[];
+}
+
+export interface PaginatedFindings {
+  items: Finding[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface FindingsQueryParams {
+  severity?: FindingSeverity;
+  confidence?: FindingConfidence;
+  verification?: FindingVerification;
+  rule_id?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 
 export interface Fix {
   id: string;

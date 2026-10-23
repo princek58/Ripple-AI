@@ -101,11 +101,17 @@ describe('API Client', () => {
     await api.getProject('test-id');
     expect(global.fetch).toHaveBeenCalledWith('/api/projects/test-id', expect.anything());
 
+    await api.getScans('test-id');
+    expect(global.fetch).toHaveBeenCalledWith('/api/projects/test-id/scans', expect.anything());
+
     await api.getFindings('test-id', { severity: 'critical' });
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/projects/test-id/findings?severity=critical',
       expect.anything()
     );
+
+    await api.getFinding('finding-123');
+    expect(global.fetch).toHaveBeenCalledWith('/api/findings/finding-123', expect.anything());
 
     await api.getFixes('test-id', 'proposed');
     expect(global.fetch).toHaveBeenCalledWith(
