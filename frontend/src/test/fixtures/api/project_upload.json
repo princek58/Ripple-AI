@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "0a98e8ea-c335-425e-94b9-c4bb7dd3a058",
+    "name": "demo-erp",
+    "created_at": "2026-10-23T09:51:50.351Z",
+    "size_bytes": 4506,
+    "file_count": 17,
+    "languages": [
+      "Environment",
+      "JavaScript",
+      "TypeScript (TSX)"
+    ],
+    "last_scan_at": "2026-10-23T09:51:50.351Z"
+  },
+  "error": null
+}

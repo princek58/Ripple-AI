@@ -1,0 +1,65 @@
+{
+  "data": {
+    "lastScan": {
+      "finished_at": "2026-10-23T09:52:02.855Z",
+      "status": "completed"
+    },
+    "counts": {
+      "nodes": 30,
+      "edges": 25,
+      "unresolvedEdges": 3,
+      "files": 17
+    },
+    "kpi": {
+      "openFindings": 9,
+      "criticalPlusHigh": 1,
+      "fixesPendingApproval": 0,
+      "verifiedFixes": 0
+    },
+    "bySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 2,
+      "low": 6,
+      "unknown": 0
+    },
+    "byConfidence": {
+      "confirmed": 2,
+      "likely": 2,
+      "hypothesis": 5
+    },
+    "byVerification": {
+      "not_tested": 9,
+      "reproduced": 0,
+      "fix_proposed": 0,
+      "fix_verified": 0
+    },
+    "affectedModules": [
+      {
+        "moduleId": "77ad1152-ca72-4459-afae-7c4caf0adb95",
+        "label": "shared",
+        "findingCount": 4,
+        "maxSeverity": "medium"
+      },
+      {
+        "moduleId": "57c7c9b2-7b2a-423b-a6b9-016c5a5b81cc",
+        "label": "fees",
+        "findingCount": 2,
+        "maxSeverity": "high"
+      },
+      {
+        "moduleId": "5bb24cac-cbf2-4f0e-820d-ae64ea9fbc8b",
+        "label": "notices",
+        "findingCount": 2,
+        "maxSeverity": "medium"
+      },
+      {
+        "moduleId": "8377c5f1-f479-4a06-8c72-0d90fdfcbc12",
+        "label": "marks",
+        "findingCount": 1,
+        "maxSeverity": "low"
+      }
+    ]
+  },
+  "error": null
+}

@@ -1,16 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './lib/theme.js';
+import { ProjectProvider } from './lib/projectContext.js';
 import { AppShell } from './components/layout/AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
 import {
   OverviewPage,
-  ProjectsPage,
   GraphPage,
   InvestigationsPage,
   FixesPage,
   TestsPage,
   ReportsPage,
 } from './pages/AppPlaceholders.js';
+import { ProjectsPage } from './features/projects/ProjectsPage.js';
 import { DesignSystemPage } from './pages/DesignSystemPage.js';
 import { NotFoundPage } from './pages/NotFoundPage.js';
 
@@ -44,9 +45,12 @@ export function AppRoutes() {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <ProjectProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </ProjectProvider>
     </ThemeProvider>
   );
 }
+

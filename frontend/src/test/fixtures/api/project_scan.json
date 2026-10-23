@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "19a65c66-0e97-4683-b285-760083f34dcd",
+    "project_id": "0a98e8ea-c335-425e-94b9-c4bb7dd3a058",
+    "started_at": "2026-10-23T09:52:02.615Z",
+    "finished_at": "2026-10-23T09:52:02.855Z",
+    "status": "completed",
+    "files_total": 17,
+    "files_skipped": 0,
+    "notes": "Analyzed 17 files: 30 nodes, 25 edges (3 unresolved). Findings: 1 high, 2 medium, 6 low."
+  },
+  "error": null
+}

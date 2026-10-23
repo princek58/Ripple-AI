@@ -126,7 +126,55 @@ export interface Report {
   markdown: string;
 }
 
+export interface ProjectSummary {
+  lastScan: {
+    finished_at: string | null;
+    status: string;
+  } | null;
+  counts: {
+    nodes: number;
+    edges: number;
+    unresolvedEdges: number;
+    files: number;
+  };
+  kpi: {
+    openFindings: number;
+    criticalPlusHigh: number;
+    fixesPendingApproval: number;
+    verifiedFixes: number;
+  };
+  bySeverity: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    unknown: number;
+  };
+  byConfidence: {
+    confirmed: number;
+    likely: number;
+    hypothesis: number;
+  };
+  byVerification: {
+    not_tested: number;
+    reproduced: number;
+    fix_proposed: number;
+    fix_verified: number;
+  };
+  affectedModules: Array<{
+    moduleId: string;
+    label: string;
+    findingCount: number;
+    maxSeverity: FindingSeverity;
+  }>;
+}
+
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
+}
+
+export interface ApiError {
+  data: null;
+  error: string;
 }

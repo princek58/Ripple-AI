@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ChevronsUpDown, Check, FolderGit2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api.js';
+import { useProjectsOptional } from '../../lib/projectContext.js';
 import type { Project } from '../../../../shared/types.js';
 
 export interface ProjectSwitcherProps {
@@ -14,46 +15,62 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
   onSelectProject,
   className = '',
 }) => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selected, setSelected] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const context = useProjectsOptional();
+
+  // Local state fallback if not inside ProjectProvider
+  const [localProjects, setLocalProjects] = useState<Project[]>([]);
+  const [localSelected, setLocalSelected] = useState<Project | null>(null);
+  const [localLoading, setLocalLoading] = useState(true);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchLocalProjects = async () => {
+    setLocalLoading(true);
+    setLocalError(null);
     try {
       const data = await api.getProjects();
-      setProjects(data);
+      setLocalProjects(data);
       if (data.length > 0) {
         const found = selectedProjectId
           ? data.find((p) => p.id === selectedProjectId) || data[0]
           : data[0];
-        setSelected(found);
+        setLocalSelected(found);
         if (onSelectProject && !selectedProjectId) {
           onSelectProject(found);
         }
       } else {
-        setSelected(null);
+        setLocalSelected(null);
       }
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
-        setError(err.message);
+        setLocalError(err.message);
       } else if (err instanceof Error) {
-        setError(err.message);
+        setLocalError(err.message);
       } else {
-        setError('Failed to load projects');
+        setLocalError('Failed to load projects');
       }
     } finally {
-      setIsLoading(false);
+      setLocalLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProjects();
-  }, [selectedProjectId]);
+    if (!context) {
+      fetchLocalProjects();
+    }
+  }, [context, selectedProjectId]);
+
+  const projects = context ? context.projects : localProjects;
+  const isLoading = context ? context.isLoading : localLoading;
+  const error = context ? context.error : localError;
+  const refresh = context ? context.refresh : fetchLocalProjects;
+
+  const selected = context
+    ? selectedProjectId
+      ? context.projects.find((p) => p.id === selectedProjectId) || null
+      : context.selectedProject
+    : localSelected;
 
   // Click outside listener
   useEffect(() => {
@@ -101,7 +118,7 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
         <span className="truncate max-w-[120px]">Backend error</span>
         <button
           type="button"
-          onClick={fetchProjects}
+          onClick={refresh}
           aria-label="Retry loading projects"
           className="p-1 rounded hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-forest dark:focus-visible:ring-lime"
         >
@@ -165,7 +182,11 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
                   role="option"
                   aria-selected={isCurrent}
                   onClick={() => {
-                    setSelected(proj);
+                    if (context) {
+                      context.setSelectedProjectId(proj.id);
+                    } else {
+                      setLocalSelected(proj);
+                    }
                     if (onSelectProject) {
                       onSelectProject(proj);
                     }
