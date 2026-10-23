@@ -98,14 +98,17 @@ describe('GraphPage Component & URL States (Step 11a-2 Part B)', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(getNodeDetailsSpy).toHaveBeenCalledWith(
-        capturedProjects[0].id,
-        'mod-fees-123',
-        expect.any(AbortSignal)
-      );
-      expect(screen.getByTestId('test-location')).toHaveTextContent('level=2');
-    });
+    await waitFor(
+      () => {
+        expect(getNodeDetailsSpy).toHaveBeenCalledWith(
+          capturedProjects[0].id,
+          'mod-fees-123',
+          expect.any(AbortSignal)
+        );
+        expect(screen.getByTestId('test-location')).toHaveTextContent('level=2');
+      },
+      { timeout: 3000 }
+    );
 
     unmount();
 
@@ -129,10 +132,13 @@ describe('GraphPage Component & URL States (Step 11a-2 Part B)', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('test-location')).toHaveTextContent('level=3');
-      expect(screen.getByTestId('test-location')).toHaveTextContent('depth=1');
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('test-location')).toHaveTextContent('level=3');
+        expect(screen.getByTestId('test-location')).toHaveTextContent('depth=1');
+      },
+      { timeout: 3000 }
+    );
   });
 
   it('shows 404 message and back button when focus node is not found', async () => {

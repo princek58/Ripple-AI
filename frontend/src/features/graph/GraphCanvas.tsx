@@ -66,10 +66,10 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
           setLayoutFailed(!layoutSuccess);
           setIsLayouting(false);
 
-          // Fit view after layout computation (reduced motion duration 0)
+          // Fit view after layout computation (reduced motion duration 0, normal 200)
           setTimeout(() => {
             if (!isCancelled) {
-              fitView({ duration: 0, padding: 0.2 });
+              fitView({ duration: prefersReducedMotion ? 0 : 200, padding: 0.2 });
             }
           }, 30);
         }
@@ -204,6 +204,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
       onKeyDown={handleKeyDown}
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
+      data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
       className={`relative w-full h-full min-h-[400px] select-none ${className}`}
     >
       {/* Fallback layout alert banner */}
@@ -248,7 +249,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
         zoomOnPinch={true}
         fitView={true}
         fitViewOptions={{
-          duration: prefersReducedMotion ? 0 : 0,
+          duration: prefersReducedMotion ? 0 : 200,
           padding: 0.2,
         }}
         proOptions={{ hideAttribution: true }}

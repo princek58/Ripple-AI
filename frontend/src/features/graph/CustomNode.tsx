@@ -15,6 +15,8 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const nodeType = (nodeData.nodeType as NodeType) || 'module';
 
   const ariaLabel = `${nodeData.label}, type ${nodeType}${
+    nodeData.isFocused ? ', current module' : ''
+  }${
     findingCount > 0 ? `, ${findingCount} findings, severity ${maxSeverity || 'unknown'}` : ''
   }`;
 
@@ -44,13 +46,23 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
         </svg>
       </div>
 
-      <div className="flex flex-col min-w-0 max-w-[140px]">
-        <span
-          className="text-xs font-medium text-theme-text truncate"
-          title={nodeData.label}
-        >
-          {nodeData.label}
-        </span>
+      <div className="flex flex-col min-w-0 max-w-[150px]">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            className="text-xs font-medium text-theme-text truncate"
+            title={nodeData.label}
+          >
+            {nodeData.label}
+          </span>
+          {nodeData.isFocused && (
+            <span
+              data-testid="current-module-badge"
+              className="flex-shrink-0 text-[9px] font-semibold text-theme-primary px-1.5 py-0.5 rounded bg-theme-surface-active border border-theme-border leading-none"
+            >
+              Current module
+            </span>
+          )}
+        </div>
         <span className="text-[10px] text-theme-text-muted capitalize">
           {nodeType}
         </span>
