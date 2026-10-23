@@ -5,6 +5,8 @@ import type { FindingSeverity } from '../../../../shared/types.js';
 export interface SeverityBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   severity: FindingSeverity;
   size?: 'sm' | 'md';
+  label?: string;
+  children?: React.ReactNode;
 }
 
 const SEVERITY_CONFIG: Record<
@@ -41,11 +43,14 @@ const SEVERITY_CONFIG: Record<
 export const SeverityBadge: React.FC<SeverityBadgeProps> = ({
   severity,
   size = 'md',
+  label,
+  children,
   className = '',
   ...props
 }) => {
   const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.unknown;
   const Icon = config.icon;
+  const displayText = label ?? children ?? config.label;
 
   const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-xs gap-1' : 'px-2.5 py-1 text-xs gap-1.5';
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
@@ -57,7 +62,7 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({
       {...props}
     >
       <Icon className={`${iconSize} shrink-0`} aria-hidden="true" />
-      <span>{config.label}</span>
+      <span>{displayText}</span>
     </span>
   );
 };

@@ -126,7 +126,7 @@ describe('Navigation and Theme', () => {
   });
 
   describe('Routing (React Router)', () => {
-    it('renders landing page at "/" with "Ripple AI" heading and Sample data tag', () => {
+    it('renders landing page at "/" with "Ripple AI" brand, hero heading, and Sample data tag', () => {
       render(
         <ThemeProvider>
           <MemoryRouter initialEntries={['/']}>
@@ -135,8 +135,11 @@ describe('Navigation and Theme', () => {
         </ThemeProvider>
       );
 
-      expect(screen.getByRole('heading', { level: 1, name: 'Ripple AI' })).toBeInTheDocument();
-      expect(screen.getByTestId('sample-data-tag')).toBeInTheDocument();
+      expect(screen.getByText('Ripple AI')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: /understand why it breaks, with evidence/i })
+      ).toBeInTheDocument();
+      expect(screen.getAllByTestId('sample-data-tag').length).toBeGreaterThan(0);
     });
 
     it('renders app shell and placeholder page at "/app/overview"', async () => {

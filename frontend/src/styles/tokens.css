@@ -51,3 +51,27 @@
   --theme-border: #2B3F3A;
   --theme-accent: #E3F57A;
 }
+
+@keyframes drawUnderline {
+  from {
+    stroke-dashoffset: 180;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-underline-draw {
+  stroke-dasharray: 180;
+  stroke-dashoffset: 0;
+  animation: drawUnderline 0.9s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-underline-draw {
+    animation: none !important;
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
