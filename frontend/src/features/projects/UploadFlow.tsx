@@ -244,7 +244,7 @@ export const UploadFlow: React.FC<UploadFlowProps> = ({
             type="button"
             onClick={handleCancel}
             aria-label="Close upload dialog"
-            className="p-1.5 rounded-lg text-theme-text-muted hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
+            className="p-1.5 rounded-lg text-theme-text-muted hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>

@@ -31,13 +31,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       primary:
         'bg-forest text-cream dark:bg-lime dark:text-forest hover:bg-forest/90 dark:hover:bg-lime/90 shadow-sm',
       secondary:
-        'bg-theme-surface text-theme-text border border-theme-border hover:bg-cream dark:hover:bg-slate-green/20 shadow-sm',
+        'bg-theme-surface text-theme-text border border-theme-border hover:bg-theme-surface-active shadow-sm',
       ghost:
-        'bg-transparent text-theme-text hover:bg-cream dark:hover:bg-slate-green/20',
+        'bg-transparent text-theme-text hover:bg-theme-surface-active',
       danger:
         'bg-severity-critical text-cream hover:bg-severity-critical/90 shadow-sm',
       outline:
-        'bg-transparent border border-theme-border text-theme-text hover:bg-cream dark:hover:bg-slate-green/20',
+        'bg-transparent border border-theme-border text-theme-text hover:bg-theme-surface-active',
     };
 
     return (

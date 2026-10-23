@@ -181,7 +181,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               aria-haspopup="true"
               aria-expanded={isMenuOpen}
               onClick={() => setIsMenuOpen((prev) => !prev)}
-              className="p-1.5 rounded-lg text-theme-text-muted hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
+              className="p-1.5 rounded-lg text-theme-text-muted hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
             >
               <MoreVertical className="w-4 h-4" aria-hidden="true" />
             </button>

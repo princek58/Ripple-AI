@@ -19,10 +19,13 @@ export default {
         theme: {
           bg: 'var(--theme-bg)',
           surface: 'var(--theme-surface)',
+          'surface-active': 'var(--theme-surface-active)',
           text: 'var(--theme-text)',
           'text-muted': 'var(--theme-text-muted)',
           border: 'var(--theme-border)',
           accent: 'var(--theme-accent)',
+          'nav-active-bg': 'var(--theme-nav-active-bg)',
+          'nav-active-text': 'var(--theme-nav-active-text)',
         },
 
         // Graph node types

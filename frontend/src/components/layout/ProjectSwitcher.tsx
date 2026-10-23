@@ -120,7 +120,7 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
           type="button"
           onClick={refresh}
           aria-label="Retry loading projects"
-          className="p-1 rounded hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-forest dark:focus-visible:ring-lime"
+          className="p-1 rounded hover:bg-theme-surface-active focus:outline-none focus-visible:ring-1 focus-visible:ring-forest dark:focus-visible:ring-lime"
         >
           <RefreshCw className="w-3 h-3" aria-hidden="true" />
         </button>
@@ -154,7 +154,7 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme-border bg-theme-surface text-theme-text text-xs sm:text-sm font-medium hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme-border bg-theme-surface text-theme-text text-xs sm:text-sm font-medium hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none"
       >
         <FolderGit2 className="w-4 h-4 text-theme-text-muted shrink-0" aria-hidden="true" />
         <span className="truncate max-w-[140px] sm:max-w-[200px]" data-testid="selected-project-name">
@@ -192,8 +192,8 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
                     }
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none ${
-                    isCurrent ? 'font-semibold text-theme-text bg-cream/60 dark:bg-slate-green/30' : 'text-theme-text-muted'
+                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-theme-surface-active focus:outline-none focus-visible:ring-1 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none ${
+                    isCurrent ? 'font-semibold text-theme-text bg-theme-surface-active' : 'text-theme-text-muted'
                   }`}
                 >
                   <span className="truncate mr-2">{proj.name}</span>

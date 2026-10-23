@@ -10,13 +10,18 @@
   --color-slate-green: #2B3F3A;
   --color-near-black-green: #0F1B18;
 
+  color-scheme: light;
+
   /* Semantic Theme Variables (Light Theme) */
   --theme-bg: #F6F6F1;
   --theme-surface: #FFFFFF;
+  --theme-surface-active: #EAEAE2;
   --theme-text: #0F1B18;
   --theme-text-muted: #2B3F3A;
   --theme-border: #E2E8F0;
   --theme-accent: #E3F57A;
+  --theme-nav-active-bg: #EAEAE2;
+  --theme-nav-active-text: #0F1B18;
 
   /* Graph Node Types (distinct from brand green) */
   --node-project: #2563EB;
@@ -28,12 +33,12 @@
   --node-config: #D97706;
   --node-test: #64748B;
 
-  /* Severity Colours */
-  --severity-critical: #DC2626;
-  --severity-high: #EA580C;
-  --severity-medium: #CA8A04;
-  --severity-low: #64748B;
-  --severity-unknown: #9CA3AF;
+  /* Severity Colours - Light Theme (WCAG AA >= 4.5 on 10% tint over #FFFFFF and solid surface) */
+  --severity-critical: #B91C1C;
+  --severity-high: #9A3412;
+  --severity-medium: #854D0E;
+  --severity-low: #475569;
+  --severity-unknown: #4B5563;
 
   /* Typography */
   --font-space-grotesk: 'Space Grotesk', sans-serif;
@@ -43,13 +48,42 @@
 
 [data-theme='dark'],
 .dark {
+  color-scheme: dark;
+
   /* Semantic Theme Variables (Dark Theme) */
   --theme-bg: #0F1B18;
   --theme-surface: #16261F;
+  --theme-surface-active: #243831;
   --theme-text: #F8FAFC;
   --theme-text-muted: #94A3B8;
   --theme-border: #2B3F3A;
   --theme-accent: #E3F57A;
+  --theme-nav-active-bg: #2B3F3A;
+  --theme-nav-active-text: #F8FAFC;
+
+  /* Severity Colours - Dark Theme (WCAG AA >= 4.5 on 10% tint over #16261F and solid surface) */
+  --severity-critical: #F87171;
+  --severity-high: #FB923C;
+  --severity-medium: #FACC15;
+  --severity-low: #CBD5E1;
+  --severity-unknown: #CBD5E1;
+}
+
+/* Native select & option elements styled with tokens for dark/light readability */
+select,
+option {
+  color-scheme: light;
+  background-color: var(--theme-surface);
+  color: var(--theme-text);
+}
+
+[data-theme='dark'] select,
+.dark select,
+[data-theme='dark'] option,
+.dark option {
+  color-scheme: dark;
+  background-color: var(--theme-surface);
+  color: var(--theme-text);
 }
 
 @keyframes drawUnderline {

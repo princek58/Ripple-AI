@@ -35,8 +35,8 @@ export const TopPillNav: React.FC<TopPillNavProps> = ({ className = '' }) => {
               const base =
                 'relative px-3 py-1.5 text-xs sm:text-sm rounded-full transition-all duration-150 motion-reduce:transition-none flex items-center gap-1.5 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime';
               const activeStyle = isActive
-                ? 'font-bold bg-cream dark:bg-slate-green/40 text-theme-text border border-theme-border shadow-xs'
-                : 'font-normal text-theme-text-muted hover:text-theme-text hover:bg-cream/50 dark:hover:bg-slate-green/20';
+                ? 'font-bold bg-theme-nav-active-bg text-theme-nav-active-text border border-theme-border shadow-xs'
+                : 'font-normal text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active';
               return `${base} ${activeStyle}`;
             }}
           >
@@ -45,7 +45,7 @@ export const TopPillNav: React.FC<TopPillNavProps> = ({ className = '' }) => {
                 {/* Active indicator dot ensures active state is not conveyed by color alone */}
                 {isActive && (
                   <span
-                    className="w-1.5 h-1.5 rounded-full bg-theme-text"
+                    className="w-1.5 h-1.5 rounded-full bg-theme-nav-active-text"
                     aria-hidden="true"
                   />
                 )}

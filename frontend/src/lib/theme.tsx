@@ -40,6 +40,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
+    root.style.colorScheme = theme;
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
@@ -85,7 +86,7 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
       onClick={toggleTheme}
       data-testid="theme-toggle"
       aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-      className={`p-2 rounded-lg border border-theme-border bg-theme-surface text-theme-text hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none ${className}`}
+      className={`p-2 rounded-lg border border-theme-border bg-theme-surface text-theme-text hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none ${className}`}
     >
       {theme === 'light' ? (
         <Moon className="w-4 h-4 text-theme-text" aria-hidden="true" />

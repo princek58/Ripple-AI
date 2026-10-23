@@ -55,7 +55,7 @@ export const AppShell: React.FC = () => {
               <button
                 type="button"
                 aria-label="Notifications (UI only)"
-                className="p-2 rounded-lg border border-theme-border bg-theme-surface text-theme-text-muted hover:text-theme-text hover:bg-cream dark:hover:bg-slate-green/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none"
+                className="p-2 rounded-lg border border-theme-border bg-theme-surface text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none"
               >
                 <Bell className="w-4 h-4" aria-hidden="true" />
               </button>
