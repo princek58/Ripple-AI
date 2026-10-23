@@ -57,6 +57,13 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({
     setStoredId(id);
   }, []);
 
+  useEffect(() => {
+    if (initialProjectId !== undefined) {
+      setSelectedProjectIdState(initialProjectId);
+      setStoredId(initialProjectId);
+    }
+  }, [initialProjectId]);
+
   const refresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);

@@ -4,52 +4,52 @@ import { ProjectProvider } from './lib/projectContext.js';
 import { AppShell } from './components/layout/AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
 import {
-  OverviewPage,
   GraphPage,
   InvestigationsPage,
   FixesPage,
   TestsPage,
   ReportsPage,
 } from './pages/AppPlaceholders.js';
+import { OverviewPage } from './features/overview/OverviewPage.js';
 import { ProjectsPage } from './features/projects/ProjectsPage.js';
 import { DesignSystemPage } from './pages/DesignSystemPage.js';
 import { NotFoundPage } from './pages/NotFoundPage.js';
 
 export function AppRoutes() {
   return (
-    <Routes>
-      {/* Landing Page */}
-      <Route path="/" element={<LandingPage />} />
+    <ProjectProvider>
+      <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
 
-      {/* App Shell and Section Routes */}
-      <Route path="/app" element={<AppShell />}>
-        <Route index element={<Navigate to="/app/overview" replace />} />
-        <Route path="overview" element={<OverviewPage />} />
-        <Route path="projects" element={<ProjectsPage />} />
-        <Route path="graph" element={<GraphPage />} />
-        <Route path="investigations" element={<InvestigationsPage />} />
-        <Route path="fixes" element={<FixesPage />} />
-        <Route path="tests" element={<TestsPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-      </Route>
+        {/* App Shell and Section Routes */}
+        <Route path="/app" element={<AppShell />}>
+          <Route index element={<Navigate to="/app/overview" replace />} />
+          <Route path="overview" element={<OverviewPage />} />
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="graph" element={<GraphPage />} />
+          <Route path="investigations" element={<InvestigationsPage />} />
+          <Route path="fixes" element={<FixesPage />} />
+          <Route path="tests" element={<TestsPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+        </Route>
 
-      {/* Dev Design System Preview */}
-      <Route path="/dev/design-system" element={<DesignSystemPage />} />
+        {/* Dev Design System Preview */}
+        <Route path="/dev/design-system" element={<DesignSystemPage />} />
 
-      {/* 404 Not Found */}
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        {/* 404 Not Found */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </ProjectProvider>
   );
 }
 
 export default function App() {
   return (
     <ThemeProvider>
-      <ProjectProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </ProjectProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

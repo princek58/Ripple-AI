@@ -1,4 +1,4 @@
-import type { Project, Scan, ProjectSummary, Finding, Fix, TestRun, Report, ApiResponse } from '../../../shared/types.js';
+import type { Project, Scan, ProjectSummary, GraphResponseData, Finding, Fix, TestRun, Report, ApiResponse } from '../../../shared/types.js';
 
 export class ApiClientError extends Error {
   constructor(
@@ -199,6 +199,25 @@ export const api = {
 
   getSummary(id: string, signal?: AbortSignal): Promise<ProjectSummary> {
     return apiFetch<ProjectSummary>(`/api/projects/${id}/summary`, { signal });
+  },
+
+  getGraph(
+    projectId: string,
+    query?: { level?: number; focus?: string; depth?: number; maxNodes?: number },
+    signal?: AbortSignal
+  ): Promise<GraphResponseData> {
+    const searchParams = new URLSearchParams();
+    if (query) {
+      if (query.level !== undefined) searchParams.set('level', String(query.level));
+      if (query.focus !== undefined) searchParams.set('focus', query.focus);
+      if (query.depth !== undefined) searchParams.set('depth', String(query.depth));
+      if (query.maxNodes !== undefined) searchParams.set('maxNodes', String(query.maxNodes));
+    }
+    const qs = searchParams.toString();
+    return apiFetch<GraphResponseData>(
+      `/api/projects/${projectId}/graph${qs ? `?${qs}` : ''}`,
+      { signal }
+    );
   },
 
   deleteProject(id: string, signal?: AbortSignal): Promise<void> {

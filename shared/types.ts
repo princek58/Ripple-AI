@@ -169,6 +169,30 @@ export interface ProjectSummary {
   }>;
 }
 
+export interface GraphNode extends Node {
+  findingCount?: number;
+  maxSeverity?: FindingSeverity | null;
+}
+
+export interface GraphEdge extends Edge {
+  count?: number;
+  derived?: boolean;
+  evidence?: {
+    count: number;
+    strongestRelation: string;
+  };
+}
+
+export interface GraphResponseData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  clusters: Array<{ id: string; label: string; nodeCount: number }>;
+  shown: number;
+  total: number;
+  level: NodeLevel;
+  focus: string | null;
+}
+
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
@@ -178,3 +202,4 @@ export interface ApiError {
   data: null;
   error: string;
 }
+
