@@ -142,17 +142,17 @@ describe('Navigation and Theme', () => {
       expect(screen.getAllByTestId('sample-data-tag').length).toBeGreaterThan(0);
     });
 
-    it('renders app shell and placeholder page at "/app/investigations"', async () => {
+    it('renders app shell and placeholder page at "/app/fixes"', async () => {
       render(
         <ThemeProvider>
-          <MemoryRouter initialEntries={['/app/investigations']}>
+          <MemoryRouter initialEntries={['/app/fixes']}>
             <AppRoutes />
           </MemoryRouter>
         </ThemeProvider>
       );
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { level: 1, name: 'Investigations' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'Fixes' })).toBeInTheDocument();
       });
       expect(screen.getByText('Coming in Step 12')).toBeInTheDocument();
     });
