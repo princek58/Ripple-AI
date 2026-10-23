@@ -1,10 +1,10 @@
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './lib/theme.js';
 import { ProjectProvider } from './lib/projectContext.js';
 import { AppShell } from './components/layout/AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
 import {
-  GraphPage,
   InvestigationsPage,
   FixesPage,
   TestsPage,
@@ -14,6 +14,9 @@ import { OverviewPage } from './features/overview/OverviewPage.js';
 import { ProjectsPage } from './features/projects/ProjectsPage.js';
 import { DesignSystemPage } from './pages/DesignSystemPage.js';
 import { NotFoundPage } from './pages/NotFoundPage.js';
+import { Skeleton } from './components/ui/Skeleton.js';
+
+const GraphPage = React.lazy(() => import('./features/graph/GraphPage.js'));
 
 export function AppRoutes() {
   return (
@@ -27,7 +30,21 @@ export function AppRoutes() {
           <Route index element={<Navigate to="/app/overview" replace />} />
           <Route path="overview" element={<OverviewPage />} />
           <Route path="projects" element={<ProjectsPage />} />
-          <Route path="graph" element={<GraphPage />} />
+          <Route
+            path="graph"
+            element={
+              <Suspense
+                fallback={
+                  <div className="p-6 space-y-4" data-testid="graph-lazy-fallback">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-96 w-full rounded-2xl" />
+                  </div>
+                }
+              >
+                <GraphPage />
+              </Suspense>
+            }
+          />
           <Route path="investigations" element={<InvestigationsPage />} />
           <Route path="fixes" element={<FixesPage />} />
           <Route path="tests" element={<TestsPage />} />

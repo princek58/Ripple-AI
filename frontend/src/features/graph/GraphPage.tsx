@@ -65,6 +65,11 @@ export const GraphPage: React.FC = () => {
   const fetchGraphData = useCallback(async () => {
     if (!selectedProjectId) return;
 
+    if (selectedProject && !selectedProject.last_scan_at) {
+      setIsGraphLoading(false);
+      return;
+    }
+
     if (activeAbortRef.current) {
       activeAbortRef.current.abort();
     }
@@ -140,7 +145,7 @@ export const GraphPage: React.FC = () => {
       }
       setIsGraphLoading(false);
     }
-  }, [selectedProjectId, urlFocus, urlLevel, urlDepth, setSearchParams]);
+  }, [selectedProjectId, selectedProject, urlFocus, urlLevel, urlDepth, setSearchParams]);
 
   useEffect(() => {
     if (selectedProjectId) {
