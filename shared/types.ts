@@ -234,6 +234,20 @@ export interface NodeDetailsData {
   }>;
 }
 
+export interface GraphSearchResponseData {
+  items: GraphNode[];
+  total: number;
+}
+
+export interface GraphSearchParams {
+  q?: string;
+  type?: NodeType;
+  severity?: FindingSeverity;
+  verification?: FindingVerification;
+  limit?: number;
+  offset?: number;
+}
+
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;

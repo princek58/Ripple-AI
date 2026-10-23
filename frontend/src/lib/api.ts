@@ -1,4 +1,17 @@
-import type { Project, Scan, ProjectSummary, GraphResponseData, NodeDetailsData, Finding, Fix, TestRun, Report, ApiResponse } from '../../../shared/types.js';
+import type {
+  Project,
+  Scan,
+  ProjectSummary,
+  GraphResponseData,
+  NodeDetailsData,
+  GraphSearchResponseData,
+  GraphSearchParams,
+  Finding,
+  Fix,
+  TestRun,
+  Report,
+  ApiResponse,
+} from '../../../shared/types.js';
 
 export class ApiClientError extends Error {
   constructor(
@@ -227,6 +240,25 @@ export const api = {
   ): Promise<NodeDetailsData> {
     return apiFetch<NodeDetailsData>(
       `/api/projects/${projectId}/graph/nodes/${nodeId}`,
+      { signal }
+    );
+  },
+
+  searchGraph(
+    projectId: string,
+    params: GraphSearchParams,
+    signal?: AbortSignal
+  ): Promise<GraphSearchResponseData> {
+    const searchParams = new URLSearchParams();
+    if (params.q) searchParams.set('q', params.q);
+    if (params.type) searchParams.set('type', params.type);
+    if (params.severity) searchParams.set('severity', params.severity);
+    if (params.verification) searchParams.set('verification', params.verification);
+    if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+    const qs = searchParams.toString();
+    return apiFetch<GraphSearchResponseData>(
+      `/api/projects/${projectId}/graph/search${qs ? `?${qs}` : ''}`,
       { signal }
     );
   },

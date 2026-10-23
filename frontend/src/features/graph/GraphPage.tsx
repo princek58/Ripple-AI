@@ -12,13 +12,19 @@ import { GraphCanvas } from './GraphCanvas.js';
 import { ShownCounter } from './ShownCounter.js';
 import { GraphLegend } from './GraphLegend.js';
 import { GraphTextAlternative } from './GraphTextAlternative.js';
+import { GraphBreadcrumb } from './GraphBreadcrumb.js';
+import { GraphSearchFilters } from './GraphSearchFilters.js';
 import {
   responseToFlow,
   parseGraphUrl,
   resolveLevelFromNodeType,
   type FlowTransformResult,
 } from './graphTransform.js';
-import type { GraphResponseData } from '../../../../shared/types.js';
+import type {
+  GraphResponseData,
+  NodeDetailsData,
+  GraphNode,
+} from '../../../../shared/types.js';
 
 export const GraphPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -39,6 +45,7 @@ export const GraphPage: React.FC = () => {
   const [graphError, setGraphError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [is404Focus, setIs404Focus] = useState<boolean>(false);
+  const [focusNodeDetails, setFocusNodeDetails] = useState<NodeDetailsData | null>(null);
 
   // References to handle project switching and race conditions
   const activeAbortRef = useRef<AbortController | null>(null);
@@ -57,6 +64,7 @@ export const GraphPage: React.FC = () => {
       navigate('/app/graph', { replace: true });
       setSelectedNodeId(null);
       setIs404Focus(false);
+      setFocusNodeDetails(null);
     }
     previousProjectIdRef.current = selectedProjectId;
   }, [selectedProjectId, navigate]);
@@ -134,6 +142,24 @@ export const GraphPage: React.FC = () => {
         setGraphData(data);
         setIsGraphLoading(false);
       }
+
+      // Fetch node details for focus node to populate breadcrumb
+      if (urlFocus && effectiveLevel > 1) {
+        try {
+          const details = await api.getNodeDetails(
+            selectedProjectId,
+            urlFocus,
+            controller.signal
+          );
+          if (!controller.signal.aborted) {
+            setFocusNodeDetails(details);
+          }
+        } catch {
+          // Ignore breadcrumb detail fetch failure
+        }
+      } else {
+        setFocusNodeDetails(null);
+      }
     } catch (err: unknown) {
       if (controller.signal.aborted) return;
 
@@ -166,6 +192,19 @@ export const GraphPage: React.FC = () => {
     }
     return responseToFlow(graphData, { focusNodeId: urlFocus });
   }, [graphData, urlFocus]);
+
+  // Search result selection handler
+  const handleSelectSearchResult = useCallback(
+    (node: GraphNode) => {
+      const { level, depth } = resolveLevelFromNodeType(node.type);
+      if (level === 2) {
+        navigate(`/app/graph?level=2&focus=${node.id}`);
+      } else {
+        navigate(`/app/graph?level=3&focus=${node.id}&depth=${depth}`);
+      }
+    },
+    [navigate]
+  );
 
   // Node selection handler: marks selected node
   const handleSelectNode = useCallback((nodeId: string) => {
@@ -296,22 +335,40 @@ export const GraphPage: React.FC = () => {
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-theme-background">
-      {/* Top Bar: ShownCounter */}
-      <header className="flex-shrink-0 border-b border-theme-border bg-theme-surface/80 backdrop-blur-md px-4 py-3 z-20 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="font-heading font-bold text-lg text-theme-text">
-            Dependency Graph
-          </h1>
-          <span className="text-xs text-theme-text-muted font-mono">
-            {urlLevel ? `Level ${urlLevel}` : 'Level 1'}
-          </span>
+      {/* Top Bar: Breadcrumb, ShownCounter, Search & Filters */}
+      <header className="flex-shrink-0 border-b border-theme-border bg-theme-surface/80 backdrop-blur-md px-4 py-2.5 z-20 flex flex-col gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="font-heading font-bold text-lg text-theme-text">
+              Dependency Graph
+            </h1>
+            <span className="text-xs text-theme-text-muted font-mono">
+              {urlLevel ? `Level ${urlLevel}` : 'Level 1'}
+            </span>
+            <GraphBreadcrumb
+              project={selectedProject}
+              parentModule={focusNodeDetails?.parentModule ?? null}
+              currentNode={focusNodeDetails?.node ?? null}
+              currentLevel={urlLevel ?? 1}
+            />
+          </div>
+
+          <ShownCounter
+            shown={graphData?.shown ?? flowResult.flowNodes.length}
+            total={graphData?.total ?? flowResult.flowNodes.length}
+            clustersCount={flowResult.clustersCount}
+          />
         </div>
 
-        <ShownCounter
-          shown={graphData?.shown ?? flowResult.flowNodes.length}
-          total={graphData?.total ?? flowResult.flowNodes.length}
-          clustersCount={flowResult.clustersCount}
-        />
+        {/* Search & Filters */}
+        {selectedProjectId && (
+          <div className="pt-0.5">
+            <GraphSearchFilters
+              projectId={selectedProjectId}
+              onSelectResult={handleSelectSearchResult}
+            />
+          </div>
+        )}
       </header>
 
       {/* Main Canvas Area */}
