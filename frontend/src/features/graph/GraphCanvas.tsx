@@ -35,6 +35,7 @@ export interface GraphCanvasProps {
   initialEdges: FlowEdge<FlowEdgeData>[];
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
+  onDoubleClickNode?: (nodeId: string, nodeType?: string) => void;
   className?: string;
 }
 
@@ -43,6 +44,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
   initialEdges,
   selectedNodeId,
   onSelectNode,
+  onDoubleClickNode,
   className = '',
 }) => {
   const [isLayouting, setIsLayouting] = useState<boolean>(true);
@@ -161,6 +163,13 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
     [onSelectNode]
   );
 
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      onDoubleClickNode?.(node.id, (node.data as any)?.nodeType);
+    },
+    [onDoubleClickNode]
+  );
+
   const onNodeMouseEnter: NodeMouseHandler = useCallback((_event, node) => {
     setHoveredNodeId(node.id);
   }, []);
@@ -238,6 +247,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
         nodeTypes={NODE_TYPES}
         edgeTypes={EDGE_TYPES}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}
         nodesDraggable={false}

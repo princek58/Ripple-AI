@@ -14,6 +14,7 @@ import { GraphLegend } from './GraphLegend.js';
 import { GraphTextAlternative } from './GraphTextAlternative.js';
 import { GraphBreadcrumb } from './GraphBreadcrumb.js';
 import { GraphSearchFilters } from './GraphSearchFilters.js';
+import { NodeDetailsPanel } from './NodeDetailsPanel.js';
 import {
   responseToFlow,
   parseGraphUrl,
@@ -46,6 +47,7 @@ export const GraphPage: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [is404Focus, setIs404Focus] = useState<boolean>(false);
   const [focusNodeDetails, setFocusNodeDetails] = useState<NodeDetailsData | null>(null);
+  const [maxNodes, setMaxNodes] = useState<number>(50);
 
   // References to handle project switching and race conditions
   const activeAbortRef = useRef<AbortController | null>(null);
@@ -65,6 +67,7 @@ export const GraphPage: React.FC = () => {
       setSelectedNodeId(null);
       setIs404Focus(false);
       setFocusNodeDetails(null);
+      setMaxNodes(50);
     }
     previousProjectIdRef.current = selectedProjectId;
   }, [selectedProjectId, navigate]);
@@ -126,8 +129,10 @@ export const GraphPage: React.FC = () => {
         level?: number;
         focus?: string;
         depth?: number;
+        maxNodes?: number;
       } = {
         level: effectiveLevel,
+        maxNodes,
       };
 
       if (urlFocus && effectiveLevel > 1) {
@@ -171,7 +176,7 @@ export const GraphPage: React.FC = () => {
       }
       setIsGraphLoading(false);
     }
-  }, [selectedProjectId, selectedProject, urlFocus, urlLevel, urlDepth, setSearchParams]);
+  }, [selectedProjectId, selectedProject, urlFocus, urlLevel, urlDepth, maxNodes, setSearchParams]);
 
   useEffect(() => {
     if (selectedProjectId) {
@@ -210,6 +215,32 @@ export const GraphPage: React.FC = () => {
   const handleSelectNode = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
   }, []);
+
+  // Node expand handler
+  const handleExpandNode = useCallback(
+    (nodeId: string, nodeType: string, depth = 1) => {
+      setSelectedNodeId(null);
+      if (nodeType === 'module') {
+        navigate(`/app/graph?level=2&focus=${nodeId}`);
+      } else {
+        const clampedDepth = Math.max(1, Math.min(3, depth));
+        navigate(`/app/graph?level=3&focus=${nodeId}&depth=${clampedDepth}`);
+      }
+    },
+    [navigate]
+  );
+
+  // Double click handler on canvas node
+  const handleDoubleClickNode = useCallback(
+    (nodeId: string, nodeType?: string) => {
+      if (nodeType === 'module') {
+        navigate(`/app/graph?level=2&focus=${nodeId}`);
+      } else {
+        navigate(`/app/graph?level=3&focus=${nodeId}&depth=1`);
+      }
+    },
+    [navigate]
+  );
 
   // 1. Projects loading state
   if (isProjectsLoading) {
@@ -353,11 +384,34 @@ export const GraphPage: React.FC = () => {
             />
           </div>
 
-          <ShownCounter
-            shown={graphData?.shown ?? flowResult.flowNodes.length}
-            total={graphData?.total ?? flowResult.flowNodes.length}
-            clustersCount={flowResult.clustersCount}
-          />
+          <div className="flex items-center gap-2">
+            {flowResult.clustersCount > 0 && (
+              <div className="flex items-center gap-2">
+                {maxNodes < 500 ? (
+                  <button
+                    type="button"
+                    data-testid="show-more-clusters-btn"
+                    onClick={() => setMaxNodes((prev) => Math.min(500, prev + 50))}
+                    className="px-2.5 py-1 rounded-lg border border-theme-border bg-theme-surface hover:bg-theme-surface-active text-theme-text font-medium text-xs transition-colors"
+                  >
+                    Show more
+                  </button>
+                ) : (
+                  <span
+                    data-testid="max-nodes-reached-note"
+                    className="text-theme-text-muted text-[11px]"
+                  >
+                    Maximum nodes reached (500). Clusters retained for remaining nodes.
+                  </span>
+                )}
+              </div>
+            )}
+            <ShownCounter
+              shown={graphData?.shown ?? flowResult.flowNodes.length}
+              total={graphData?.total ?? flowResult.flowNodes.length}
+              clustersCount={flowResult.clustersCount}
+            />
+          </div>
         </div>
 
         {/* Search & Filters */}
@@ -388,6 +442,7 @@ export const GraphPage: React.FC = () => {
               initialEdges={flowResult.flowEdges}
               selectedNodeId={selectedNodeId}
               onSelectNode={handleSelectNode}
+              onDoubleClickNode={handleDoubleClickNode}
               className="w-full h-full"
             />
 
@@ -395,6 +450,21 @@ export const GraphPage: React.FC = () => {
             <div className="absolute bottom-4 left-4 z-20 max-w-xs">
               <GraphLegend />
             </div>
+
+            {/* Node Details Panel */}
+            {selectedProjectId && (
+              <NodeDetailsPanel
+                projectId={selectedProjectId}
+                nodeId={selectedNodeId}
+                onClose={() => setSelectedNodeId(null)}
+                onNavigateNode={(id) => setSelectedNodeId(id)}
+                onExpand={handleExpandNode}
+                onBackToLevel1={() => {
+                  setSelectedNodeId(null);
+                  navigate('/app/graph');
+                }}
+              />
+            )}
           </>
         )}
       </main>
