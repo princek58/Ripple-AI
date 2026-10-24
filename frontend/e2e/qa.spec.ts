@@ -11,6 +11,7 @@ interface RouteDef {
   slug: string;
   pathBuilder: (seed: SeedData) => string;
   projectType: 'scanned' | 'unscanned';
+  variantsOnly?: Array<{ device: 'desktop' | 'phone'; theme: 'light' | 'dark' }>;
 }
 
 const routes: RouteDef[] = [
@@ -34,6 +35,52 @@ const routes: RouteDef[] = [
   { slug: 'app-reports', pathBuilder: () => '/app/reports', projectType: 'scanned' },
   { slug: 'app-overview-unscanned', pathBuilder: () => '/app/overview', projectType: 'unscanned' },
   { slug: 'app-graph-unscanned', pathBuilder: () => '/app/graph', projectType: 'unscanned' },
+  // Extended unscanned captures in two variants only (desktop light and phone dark)
+  {
+    slug: 'app-projects-unscanned',
+    pathBuilder: () => '/app/projects',
+    projectType: 'unscanned',
+    variantsOnly: [
+      { device: 'desktop', theme: 'light' },
+      { device: 'phone', theme: 'dark' },
+    ],
+  },
+  {
+    slug: 'app-investigations-unscanned',
+    pathBuilder: () => '/app/investigations',
+    projectType: 'unscanned',
+    variantsOnly: [
+      { device: 'desktop', theme: 'light' },
+      { device: 'phone', theme: 'dark' },
+    ],
+  },
+  {
+    slug: 'app-fixes-unscanned',
+    pathBuilder: () => '/app/fixes',
+    projectType: 'unscanned',
+    variantsOnly: [
+      { device: 'desktop', theme: 'light' },
+      { device: 'phone', theme: 'dark' },
+    ],
+  },
+  {
+    slug: 'app-tests-unscanned',
+    pathBuilder: () => '/app/tests',
+    projectType: 'unscanned',
+    variantsOnly: [
+      { device: 'desktop', theme: 'light' },
+      { device: 'phone', theme: 'dark' },
+    ],
+  },
+  {
+    slug: 'app-reports-unscanned',
+    pathBuilder: () => '/app/reports',
+    projectType: 'unscanned',
+    variantsOnly: [
+      { device: 'desktop', theme: 'light' },
+      { device: 'phone', theme: 'dark' },
+    ],
+  },
 ];
 
 interface VariantDef {
@@ -42,7 +89,7 @@ interface VariantDef {
   theme: 'light' | 'dark';
 }
 
-const variants: VariantDef[] = [
+const allVariants: VariantDef[] = [
   { device: 'desktop', viewport: { width: 1280, height: 800 }, theme: 'light' },
   { device: 'desktop', viewport: { width: 1280, height: 800 }, theme: 'dark' },
   { device: 'phone', viewport: { width: 390, height: 844 }, theme: 'light' },
@@ -50,9 +97,9 @@ const variants: VariantDef[] = [
 ];
 
 test.describe('Automated Visual QA Suite', () => {
-  test.setTimeout(300000); // 5 minutes for full 48 screenshots run
+  test.setTimeout(300000); // 5 minutes for full run
 
-  test('captures screenshots and runs automated checks across 12 routes and 4 variants', async ({
+  test('captures screenshots and runs automated checks across routes and variants', async ({
     page,
     baseURL,
   }) => {
@@ -63,20 +110,28 @@ test.describe('Automated Visual QA Suite', () => {
     }
     const seed: SeedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
 
-    const allChecks: Record<string, PageCheckResult & {
-      file: string;
-      route: string;
-      viewport: string;
-      theme: string;
-      isAppRoute: boolean;
-    }> = {};
+    // Load existing checks if present so partial/grep runs preserve other recorded results
+    const checksJsonPath = path.join(screenshotsDir, 'checks.json');
+    let allChecks: Record<string, any> = {};
+    if (fs.existsSync(checksJsonPath)) {
+      try {
+        allChecks = JSON.parse(fs.readFileSync(checksJsonPath, 'utf8'));
+      } catch {}
+    }
 
     for (const r of routes) {
       const targetPath = r.pathBuilder(seed);
       const isAppRoute = targetPath.startsWith('/app');
       const targetProjectId = r.projectType === 'scanned' ? seed.scannedProjectId : seed.unscannedProjectId;
 
-      for (const v of variants) {
+      // Filter variants if route specifies variantsOnly
+      const activeVariants = r.variantsOnly
+        ? allVariants.filter((v) =>
+            r.variantsOnly!.some((o) => o.device === v.device && o.theme === v.theme)
+          )
+        : allVariants;
+
+      for (const v of activeVariants) {
         const fileKey = `${r.slug}__${v.device}__${v.theme}`;
         const screenshotFileName = `${fileKey}.png`;
         const screenshotFilePath = path.join(screenshotsDir, screenshotFileName);
@@ -141,6 +196,22 @@ test.describe('Automated Visual QA Suite', () => {
           await page.waitForTimeout(300);
         }
 
+        // Landing counters scroll trigger: scroll slowly from top to bottom and back
+        // so count-up animation runs and finishes before screenshot
+        if (r.slug === 'landing') {
+          await page.evaluate(async () => {
+            const docEl = document.documentElement;
+            const scrollHeight = Math.max(docEl.scrollHeight, document.body ? document.body.scrollHeight : 0);
+            for (let y = 0; y < scrollHeight; y += 400) {
+              window.scrollTo(0, y);
+              await new Promise((resolve) => setTimeout(resolve, 80));
+            }
+            window.scrollTo(0, 0);
+          });
+          // Wait 1000ms for 800ms count-up animation to complete
+          await page.waitForTimeout(1000);
+        }
+
         // Take full-page screenshot
         await page.screenshot({ path: screenshotFilePath, fullPage: true });
 
@@ -159,7 +230,6 @@ test.describe('Automated Visual QA Suite', () => {
     }
 
     // Write checks.json
-    const checksJsonPath = path.join(screenshotsDir, 'checks.json');
     fs.writeFileSync(checksJsonPath, JSON.stringify(allChecks, null, 2), 'utf8');
     console.log(`[qa-capture] Successfully written ${Object.keys(allChecks).length} checks to ${checksJsonPath}`);
   });

@@ -1,5 +1,7 @@
 # Ripple AI — Visual QA Report (Step 13a)
 
+> **Note on Landing Page Counters**: The earlier reference to "SSR / static fallback" for the landing counters was inaccurate — the application is entirely client-side rendered with no server-side rendering. The counter zeros observed in Step 13a screenshots occurred because the full-page screenshots were taken before the scroll-triggered `IntersectionObserver` count-up animation had run.
+
 Generated: October 25, 2026  
 Environment: Automated Visual QA Runner with Host Microsoft Edge (`msedge`), Isolated Backend (port 4100), Isolated Frontend (port 3100 via `e2e/qa.vite.config.ts`).  
 Test Scope: 12 routes across 4 viewport & theme variants (Desktop 1280x800 and Mobile Phone 390x844; Light and Dark themes) = 48 total screenshots.  

@@ -24,6 +24,11 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
     { slug: 'app-reports', title: 'Reports Screen', path: '/app/reports' },
     { slug: 'app-overview-unscanned', title: 'Overview Screen (Unscanned Project)', path: '/app/overview' },
     { slug: 'app-graph-unscanned', title: 'Graph Screen (Unscanned Project)', path: '/app/graph' },
+    { slug: 'app-projects-unscanned', title: 'Projects Screen (Unscanned Project)', path: '/app/projects' },
+    { slug: 'app-investigations-unscanned', title: 'Investigations Screen (Unscanned Project)', path: '/app/investigations' },
+    { slug: 'app-fixes-unscanned', title: 'Fixes Screen (Unscanned Project)', path: '/app/fixes' },
+    { slug: 'app-tests-unscanned', title: 'Tests Screen (Unscanned Project)', path: '/app/tests' },
+    { slug: 'app-reports-unscanned', title: 'Reports Screen (Unscanned Project)', path: '/app/reports' },
   ];
 
   function formatChecks(check: any) {
@@ -34,6 +39,8 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
       (check.pageErrors && check.pageErrors.length > 0) ||
       (check.failedRequests && check.failedRequests.length > 0) ||
       check.horizontalOverflow ||
+      (check.nodeOverlaps && check.nodeOverlaps.length > 0) ||
+      (check.landingCounters && !check.landingCounters.valid) ||
       (check.unlabeledElements && check.unlabeledElements.count > 0) ||
       (check.imagesWithoutAlt && check.imagesWithoutAlt > 0) ||
       (check.forbiddenText && check.forbiddenText.length > 0) ||
@@ -64,11 +71,47 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
       details.push(`<div class="item ok-item">Failed Network Requests: 0</div>`);
     }
 
-    // Horizontal Overflow
+    // Horizontal Overflow & Offending Elements
     if (check.horizontalOverflow) {
-      details.push(`<div class="item warn-item"><strong>Horizontal Overflow:</strong> YES (scrollWidth: ${check.scrollWidth}px, clientWidth: ${check.clientWidth}px)</div>`);
+      let elementsHtml = '';
+      if (check.overflowElements && check.overflowElements.length > 0) {
+        const items = check.overflowElements
+          .map((e: any) => `<li><code>${escapeHtml(e.selector)}</code>: width ${e.width}px, right edge ${e.rightEdge}px</li>`)
+          .join('');
+        elementsHtml = `<ul>${items}</ul>`;
+      }
+      details.push(`<div class="item warn-item"><strong>Horizontal Overflow:</strong> YES (scrollWidth: ${check.scrollWidth}px, clientWidth: ${check.clientWidth}px)${elementsHtml}</div>`);
     } else {
       details.push(`<div class="item ok-item">Horizontal Overflow: None</div>`);
+    }
+
+    // Node Overlaps
+    if (check.nodeOverlaps && check.nodeOverlaps.length > 0) {
+      const overlaps = check.nodeOverlaps
+        .map((o: any) => `<li>Overlap ${escapeHtml(o.overlapSize)} between <code>${escapeHtml(o.nodeA)}</code> and <code>${escapeHtml(o.nodeB)}</code></li>`)
+        .join('');
+      details.push(`<div class="item warn-item"><strong>Node Overlaps (${check.nodeOverlaps.length}):</strong><ul>${overlaps}</ul></div>`);
+    } else {
+      details.push(`<div class="item ok-item">Node Overlaps: 0</div>`);
+    }
+
+    // Clipping Warnings (Warning level, not marking overall check as failed)
+    if (check.clippingWarnings && check.clippingWarnings.length > 0) {
+      const warnings = check.clippingWarnings
+        .map((w: any) => `<li><code>${escapeHtml(w.selector)}</code>: scroll ${escapeHtml(w.scroll)} vs client ${escapeHtml(w.client)} ("${escapeHtml(w.text)}")</li>`)
+        .join('');
+      details.push(`<div class="item clip-warn-item"><strong>Clipping Warnings (${check.clippingWarnings.length}):</strong><ul>${warnings}</ul></div>`);
+    } else {
+      details.push(`<div class="item ok-item">Clipping Warnings: 0</div>`);
+    }
+
+    // Landing Counters
+    if (check.landingCounters) {
+      if (check.landingCounters.valid) {
+        details.push(`<div class="item ok-item">Landing Counters: Valid (4, 6, 0, Read-only)</div>`);
+      } else {
+        details.push(`<div class="item warn-item"><strong>Landing Counters: Invalid</strong> (Levels: ${check.landingCounters.levels}, Checks: ${check.landingCounters.checks}, Executed: ${check.landingCounters.executed}, Read-only: ${check.landingCounters.readonly})</div>`);
+      }
     }
 
     // Unlabeled interactives
@@ -111,11 +154,42 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
     `;
   }
 
+  function renderCard(fileName: string, label: string, isPhone = false) {
+    const fullPath = path.join(screenshotsDir, fileName);
+    const key = fileName.replace('.png', '');
+    const check = checksData[key];
+
+    if (!fs.existsSync(fullPath)) {
+      return `
+        <div class="card ${isPhone ? 'phone-card' : ''} not-captured">
+          <div class="card-header">${escapeHtml(label)}</div>
+          <div class="card-empty-msg">
+            <span>Not captured</span>
+            <small>(Variant excluded by test scope)</small>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="card ${isPhone ? 'phone-card' : ''}">
+        <div class="card-header">${escapeHtml(label)}</div>
+        <a href="./${fileName}" target="_blank">
+          <img src="./${fileName}" alt="${fileName}" loading="lazy" />
+        </a>
+        <div class="card-footer">
+          <a href="./${fileName}" target="_blank" class="view-link">View Full Size (${fileName})</a>
+          ${formatChecks(check)}
+        </div>
+      </div>
+    `;
+  }
+
   function escapeHtml(str: string): string {
     return str
       .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+      .replace(/&lt;/g, '&lt;')
+      .replace(/&gt;/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
@@ -128,11 +202,6 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
     const pLightName = `${r.slug}__phone__light.png`;
     const pDarkName = `${r.slug}__phone__dark.png`;
 
-    const dLightCheck = checksData[dLightName.replace('.png', '')];
-    const dDarkCheck = checksData[dDarkName.replace('.png', '')];
-    const pLightCheck = checksData[pLightName.replace('.png', '')];
-    const pDarkCheck = checksData[pDarkName.replace('.png', '')];
-
     sectionsHtml += `
       <section class="route-section" id="${r.slug}">
         <div class="route-header">
@@ -143,52 +212,16 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
         <div class="variant-group">
           <h3>Desktop (1280 &times; 800)</h3>
           <div class="desktop-row">
-            <div class="card">
-              <div class="card-header">Light Theme</div>
-              <a href="./${dLightName}" target="_blank">
-                <img src="./${dLightName}" alt="${r.slug} desktop light" loading="lazy" />
-              </a>
-              <div class="card-footer">
-                <a href="./${dLightName}" target="_blank" class="view-link">View Full Size (${dLightName})</a>
-                ${formatChecks(dLightCheck)}
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">Dark Theme</div>
-              <a href="./${dDarkName}" target="_blank">
-                <img src="./${dDarkName}" alt="${r.slug} desktop dark" loading="lazy" />
-              </a>
-              <div class="card-footer">
-                <a href="./${dDarkName}" target="_blank" class="view-link">View Full Size (${dDarkName})</a>
-                ${formatChecks(dDarkCheck)}
-              </div>
-            </div>
+            ${renderCard(dLightName, 'Light Theme', false)}
+            ${renderCard(dDarkName, 'Dark Theme', false)}
           </div>
         </div>
 
         <div class="variant-group">
           <h3>Phone (390 &times; 844)</h3>
           <div class="phone-row">
-            <div class="card phone-card">
-              <div class="card-header">Light Theme</div>
-              <a href="./${pLightName}" target="_blank">
-                <img src="./${pLightName}" alt="${r.slug} phone light" loading="lazy" />
-              </a>
-              <div class="card-footer">
-                <a href="./${pLightName}" target="_blank" class="view-link">View Full Size (${pLightName})</a>
-                ${formatChecks(pLightCheck)}
-              </div>
-            </div>
-            <div class="card phone-card">
-              <div class="card-header">Dark Theme</div>
-              <a href="./${pDarkName}" target="_blank">
-                <img src="./${pDarkName}" alt="${r.slug} phone dark" loading="lazy" />
-              </a>
-              <div class="card-footer">
-                <a href="./${pDarkName}" target="_blank" class="view-link">View Full Size (${pDarkName})</a>
-                ${formatChecks(pDarkCheck)}
-              </div>
-            </div>
+            ${renderCard(pLightName, 'Light Theme', true)}
+            ${renderCard(pDarkName, 'Dark Theme', true)}
           </div>
         </div>
       </section>
@@ -199,158 +232,232 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ripple AI - Visual QA Contact Sheet (Step 13a)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ripple AI — Automated Visual QA Contact Sheet</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent: #38bdf8;
-      --good: #4ade80;
-      --bad: #f87171;
+      --bg: #0F1B18;
+      --surface: #16261F;
+      --surface-card: #1C3028;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --border: #2B3F3A;
+      --accent: #E3F57A;
+      --good: #10B981;
+      --bad: #EF4444;
+      --warn: #F59E0B;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 32px 24px;
       line-height: 1.5;
     }
-    header {
-      margin-bottom: 32px;
-      padding-bottom: 16px;
+    header.main-header {
+      max-width: 1600px;
+      margin: 0 auto 36px;
+      padding-bottom: 24px;
       border-bottom: 1px solid var(--border);
     }
-    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
-    .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 12px; }
-    .nav-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    .nav-link {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
       color: var(--text);
-      text-decoration: none;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    nav.toc {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    nav.toc a {
+      color: var(--accent);
+      background: var(--surface);
+      border: 1px solid var(--border);
       padding: 4px 10px;
       border-radius: 6px;
+      text-decoration: none;
       font-size: 12px;
+      font-family: monospace;
     }
-    .nav-link:hover { border-color: var(--accent); color: var(--accent); }
+    nav.toc a:hover {
+      background: var(--surface-card);
+    }
     .route-section {
-      background: rgba(30, 41, 59, 0.5);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      max-width: 1600px;
+      margin: 0 auto 48px;
       padding: 24px;
-      margin-bottom: 36px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
     }
     .route-header {
-      margin-bottom: 20px;
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 8px;
     }
-    .route-header h2 { font-size: 20px; color: var(--text); }
-    .route-slug { font-size: 13px; color: var(--text-muted); }
-    .variant-group { margin-top: 20px; }
-    .variant-group h3 { font-size: 15px; color: var(--accent); margin-bottom: 12px; }
+    .route-header h2 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .route-slug {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .variant-group {
+      margin-bottom: 28px;
+    }
+    .variant-group:last-child {
+      margin-bottom: 0;
+    }
+    .variant-group h3 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
     .desktop-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
       gap: 20px;
     }
     .phone-row {
       display: grid;
-      grid-template-columns: 390px 390px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 20px;
     }
     .card {
-      background: var(--card-bg);
+      background: var(--surface-card);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 12px;
       overflow: hidden;
       display: flex;
+      flex-col;
       flex-direction: column;
     }
-    .phone-card { max-width: 390px; }
-    .card-header {
-      padding: 8px 12px;
-      background: rgba(0, 0, 0, 0.2);
-      font-weight: 600;
+    .card.not-captured {
+      opacity: 0.45;
+      border-style: dashed;
+      min-height: 180px;
+      justify-content: space-between;
+    }
+    .card-empty-msg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+      color: var(--text-muted);
       font-size: 13px;
+    }
+    .card-header {
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(0,0,0,0.25);
       border-bottom: 1px solid var(--border);
     }
     .card img {
       width: 100%;
       height: auto;
       display: block;
-      border-bottom: 1px solid var(--border);
       background: #000;
+      border-bottom: 1px solid var(--border);
     }
     .card-footer {
-      padding: 12px;
-      font-size: 12px;
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      font-size: 12px;
+      flex: 1;
     }
     .view-link {
       color: var(--accent);
       text-decoration: none;
-      font-size: 12px;
-      font-weight: 500;
+      font-family: monospace;
+      font-size: 11px;
     }
-    .view-link:hover { text-decoration: underline; }
+    .view-link:hover {
+      text-decoration: underline;
+    }
     .check-box {
-      border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       padding: 8px 10px;
-      background: rgba(0,0,0,0.25);
+      font-size: 11px;
     }
-    .check-box.flagged { border-color: rgba(248, 113, 113, 0.4); }
-    .check-box.passed { border-color: rgba(74, 222, 128, 0.3); }
+    .check-box.passed {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .check-box.flagged {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .check-box.warn {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
     .badge {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 2px 6px;
       border-radius: 4px;
-      font-size: 11px;
       font-weight: 600;
-      margin-bottom: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
     }
-    .badge.good { background: rgba(74, 222, 128, 0.2); color: var(--good); }
-    .badge.bad { background: rgba(248, 113, 113, 0.2); color: var(--bad); }
-    .check-details { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
-    .item.ok-item { color: #86efac; }
-    .item.warn-item { color: #fca5a5; }
-    .warn-item ul { margin-left: 16px; margin-top: 2px; }
-    code { font-family: monospace; background: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 3px; }
-    @media (max-width: 900px) {
-      .desktop-row, .phone-row { grid-template-columns: 1fr; }
-      .phone-card { max-width: 100%; }
+    .badge.good { background: var(--good); color: #000; }
+    .badge.bad { background: var(--bad); color: #fff; }
+    .check-details {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .item.ok-item { color: #A7F3D0; }
+    .item.warn-item { color: #FCA5A5; font-weight: 500; }
+    .item.clip-warn-item { color: #FDE047; }
+    .item ul {
+      margin-left: 16px;
+      margin-top: 2px;
+    }
+    code {
+      font-family: monospace;
+      font-size: 10px;
+      background: rgba(0,0,0,0.3);
+      padding: 1px 4px;
+      border-radius: 3px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Ripple AI Visual QA Contact Sheet</h1>
-    <p class="subtitle">Step 13a Automated Visual Verification &middot; 12 routes &middot; 48 variants (Desktop &amp; Phone, Light &amp; Dark)</p>
-    <div class="nav-bar">
-      ${routes.map((r) => `<a href="#${r.slug}" class="nav-link">${escapeHtml(r.title)}</a>`).join('')}
-    </div>
+  <header class="main-header">
+    <h1>Ripple AI — Automated Visual QA Contact Sheet</h1>
+    <div class="subtitle">Complete Visual Audit across Desktop and Phone Viewports (Light and Dark Themes)</div>
+    <nav class="toc">
+      ${routes.map((r) => `<a href="#${r.slug}">${r.slug}</a>`).join('')}
+    </nav>
   </header>
-
   <main>
     ${sectionsHtml}
   </main>
 </body>
 </html>`;
 
-  fs.writeFileSync(path.join(screenshotsDir, 'index.html'), html, 'utf8');
-  console.log(`[contact-sheet] Generated contact sheet at ${path.join(screenshotsDir, 'index.html')}`);
-}
-
-// Allow direct CLI invocation
-if (process.argv[1] && process.argv[1].endsWith('generateContactSheet.ts')) {
-  generateContactSheet();
+  const outputPath = path.join(screenshotsDir, 'index.html');
+  fs.writeFileSync(outputPath, html, 'utf8');
+  console.log(`[contact-sheet] Generated contact sheet at ${outputPath}`);
 }

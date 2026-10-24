@@ -41,9 +41,11 @@ describe('Mobile Phone Viewport Overflow Prevention (Step 13b-1 Fix 2)', () => {
     expect(nameEl).toBeInTheDocument();
     expect(nameEl.textContent).toBe('demo-erp-unscanned');
 
-    // Structural CSS check: text must have truncate and mobile max-w constraint <= 120px
+    // Structural CSS check: text must have truncate, phone max-w-[90px], no undefined xs: breakpoint, and title attribute
     expect(nameEl.className).toContain('truncate');
-    expect(nameEl.className).toMatch(/max-w-\[(?:90|100)px\]/);
+    expect(nameEl.className).toContain('max-w-[90px]');
+    expect(nameEl.className).not.toContain('xs:');
+    expect(nameEl).toHaveAttribute('title', 'demo-erp-unscanned');
 
     const buttonEl = screen.getByTestId('project-switcher-button');
     expect(buttonEl.className).toContain('min-w-0');
