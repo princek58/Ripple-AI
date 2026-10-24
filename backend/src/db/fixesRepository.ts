@@ -6,8 +6,6 @@ export interface ProjectFixItem {
   finding_id: string;
   finding_title: string;
   finding_severity: string;
-  findingTitle: string;
-  findingSeverity: string;
   diff_text: string;
   files: string[];
   status: FixStatus;
@@ -124,8 +122,6 @@ export class FixesRepository {
         finding_id: r.finding_id,
         finding_title: r.finding_title,
         finding_severity: r.finding_severity,
-        findingTitle: r.finding_title,
-        findingSeverity: r.finding_severity,
         diff_text: r.diff_text,
         files,
         status: r.status as FixStatus,

@@ -87,7 +87,6 @@ export interface FindingEvidenceItem {
   file?: string;
   line_start?: number;
   line_end?: number;
-  line?: number;
   specifier?: string;
   pattern?: string;
   [key: string]: unknown;
@@ -140,7 +139,6 @@ export interface FindingsQueryParams {
   pageSize?: number;
 }
 
-
 export interface Fix {
   id: string;
   finding_id: string;
@@ -149,6 +147,25 @@ export interface Fix {
   status: FixStatus;
   approved_at: string | null;
   patch_path?: string | null;
+}
+
+export interface ProjectFixItem {
+  id: string;
+  finding_id: string;
+  finding_title: string;
+  finding_severity: FindingSeverity;
+  diff_text: string;
+  files: string[];
+  status: FixStatus;
+  approved_at: string | null;
+  patch_path?: string | null;
+}
+
+export interface ProjectFixesResult {
+  items: ProjectFixItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface TestRun {
@@ -165,6 +182,19 @@ export interface Report {
   project_id: string;
   created_at: string;
   markdown: string;
+}
+
+export interface ReportListItem {
+  id: string;
+  project_id: string;
+  created_at: string;
+}
+
+export interface PaginatedReportsResult {
+  items: ReportListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface ProjectSummary {

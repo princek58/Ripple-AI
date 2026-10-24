@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import yazl from 'yazl';
-import crc32 from 'buffer-crc32';
+import zlib from 'node:zlib';
 
 export interface RawZipEntry {
   name: string;
@@ -34,7 +34,7 @@ export function createRawZipBuffer(entries: RawZipEntry[]): Buffer {
       method = entry.compressionMethod ?? 8;
     }
 
-    const crc = entry.crc !== undefined ? entry.crc : crc32.unsigned(rawData);
+    const crc = entry.crc !== undefined ? entry.crc : zlib.crc32(rawData);
     const compSize = entry.compressedSize !== undefined ? entry.compressedSize : bodyBuf.length;
     const uncompSize = entry.uncompressedSize !== undefined ? entry.uncompressedSize : rawData.length;
     const extAttrs = entry.externalFileAttributes !== undefined ? entry.externalFileAttributes : 0;

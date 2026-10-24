@@ -17,6 +17,11 @@ const getReportQuerySchema = z.object({
   format: z.string().optional(),
 });
 
+const listReportsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+
 // POST /api/projects/:id/reports - Generate and save a markdown report
 router.post(
   '/projects/:id/reports',
@@ -32,6 +37,16 @@ router.post(
       return sendError(res, 'Project not found', 404);
     }
 
+    // Check if project has undergone a real analysis scan:
+    // Exactly as summary endpoint calculates node count from nodes table:
+    const { nodeCount } = db
+      .prepare('SELECT COUNT(*) as nodeCount FROM nodes WHERE project_id = ?')
+      .get(id) as { nodeCount: number };
+
+    if (nodeCount === 0) {
+      return sendError(res, 'Scan the project first [SCAN_REQUIRED]', 409, 'SCAN_REQUIRED');
+    }
+
     const markdown = generateMarkdownReport(db, id);
     const report = reportsRepo.create(id, markdown);
 
@@ -39,12 +54,13 @@ router.post(
   }
 );
 
-// GET /api/projects/:id/reports - List reports for a project, newest first
+// GET /api/projects/:id/reports - List reports for a project, newest first (paginated, no markdown)
 router.get(
   '/projects/:id/reports',
-  validate({ params: uuidParamSchema }),
+  validate({ params: uuidParamSchema, query: listReportsQuerySchema }),
   (req: Request, res: Response) => {
     const { id } = req.params;
+    const { page, pageSize } = req.query as unknown as { page: number; pageSize: number };
     const db = getDatabase();
     const projectsRepo = new ProjectsRepository(db);
     const reportsRepo = new ReportsRepository(db);
@@ -54,8 +70,8 @@ router.get(
       return sendError(res, 'Project not found', 404);
     }
 
-    const reports = reportsRepo.findByProjectId(id);
-    return sendSuccess(res, reports);
+    const result = reportsRepo.findByProjectId(id, { page, pageSize });
+    return sendSuccess(res, result);
   }
 );
 

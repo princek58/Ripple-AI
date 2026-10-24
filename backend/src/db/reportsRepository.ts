@@ -2,6 +2,24 @@ import crypto from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { Report } from '../types.js';
 
+export interface ReportListItem {
+  id: string;
+  project_id: string;
+  created_at: string;
+}
+
+export interface ListReportsOptions {
+  page: number;
+  pageSize: number;
+}
+
+export interface ListReportsResult {
+  items: ReportListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export class ReportsRepository {
   constructor(private db: Database.Database) {}
 
@@ -29,10 +47,26 @@ export class ReportsRepository {
     return stmt.get(id) as Report | undefined;
   }
 
-  findByProjectId(projectId: string): Report[] {
+  findByProjectId(
+    projectId: string,
+    options: ListReportsOptions = { page: 1, pageSize: 25 }
+  ): ListReportsResult {
+    const countRow = this.db
+      .prepare('SELECT COUNT(*) as total FROM reports WHERE project_id = ?')
+      .get(projectId) as { total: number } | undefined;
+    const total = countRow?.total ?? 0;
+
+    const offset = (options.page - 1) * options.pageSize;
     const stmt = this.db.prepare(
-      'SELECT * FROM reports WHERE project_id = ? ORDER BY created_at DESC'
+      'SELECT id, project_id, created_at FROM reports WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
     );
-    return stmt.all(projectId) as Report[];
+    const rows = stmt.all(projectId, options.pageSize, offset) as ReportListItem[];
+
+    return {
+      items: rows,
+      total,
+      page: options.page,
+      pageSize: options.pageSize,
+    };
   }
 }

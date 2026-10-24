@@ -61,7 +61,7 @@ RippleAI/
 - GET /api/projects/:id/findings?severity=&confidence=&verification=&rule_id=&q=&page=&pageSize= -> { data: { items, page, pageSize, total }, error } · GET /api/findings/:id -> { data: { ...finding, nodes: [{ id, label, type, path }] }, error }
 - GET/POST /api/findings/:id/fixes · GET /api/projects/:id/fixes?status=&page=&pageSize= · POST /api/fixes/:id/approve · POST /api/fixes/:id/reject
 - GET /api/projects/:id/tests -> { data: { items: [{ id, name, status }], counts: { pass, fail, skipped, not_run }, note }, error }
-- POST /api/projects/:id/reports -> { data: Report, error } · GET /api/projects/:id/reports -> { data: Report[], error } · GET /api/reports/:id?format=md -> JSON or raw Markdown
+- POST /api/projects/:id/reports -> { data: Report, error } (fails with 409 SCAN_REQUIRED if project has no analysis scan; scanned project with 0 findings still produces a report) · GET /api/projects/:id/reports?page=1&pageSize=25 -> { data: { items: [{ id, project_id, created_at }], total, page, pageSize }, error } (newest first, without markdown, zod validated, bad values return 400) · GET /api/reports/:id?format=md -> JSON or raw Markdown
 Every response uses { data, error } shape. Validate all input with zod.
 
 ## 6. ZIP safety (implement in the upload step)

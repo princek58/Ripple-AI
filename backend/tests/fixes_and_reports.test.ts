@@ -368,6 +368,10 @@ describe('Step 7 Fixes, Tests, Reports and Cleanups', () => {
     for (const item of allFixesRes.body.data.items) {
       expect(item.files_json).toBeUndefined();
       expect(Array.isArray(item.files)).toBe(true);
+      expect(item.finding_title).toBeDefined();
+      expect(item.finding_severity).toBeDefined();
+      expect(item.findingTitle).toBeUndefined();
+      expect(item.findingSeverity).toBeUndefined();
     }
   });
 
@@ -433,11 +437,15 @@ describe('Step 7 Fixes, Tests, Reports and Cleanups', () => {
     expect(getRawMdRes.headers['content-type']).toContain('text/markdown');
     expect(getRawMdRes.text).toBe(md);
 
-    // GET /api/projects/:id/reports lists reports newest first
+    // GET /api/projects/:id/reports lists reports newest first (paginated, items omit markdown)
     const listReportsRes = await request(app).get(`/api/projects/${projectId}/reports`);
     expect(listReportsRes.status).toBe(200);
-    expect(listReportsRes.body.data).toHaveLength(1);
-    expect(listReportsRes.body.data[0].id).toBe(report.id);
+    expect(listReportsRes.body.data.items).toHaveLength(1);
+    expect(listReportsRes.body.data.total).toBe(1);
+    expect(listReportsRes.body.data.page).toBe(1);
+    expect(listReportsRes.body.data.pageSize).toBe(25);
+    expect(listReportsRes.body.data.items[0].id).toBe(report.id);
+    expect(listReportsRes.body.data.items[0].markdown).toBeUndefined();
   });
 
   it('13. cross-project access gives 404', async () => {
@@ -515,5 +523,107 @@ describe('Step 7 Fixes, Tests, Reports and Cleanups', () => {
     expect(dynamicFinding.severity).toBe('low');
     expect(dynamicFinding.confidence).toBe('hypothesis');
     expect(dynamicFinding.not_confirmed).toBeTruthy();
+  });
+
+  it('16. GET /api/projects/:id/fixes items contain only snake_case finding fields (no camelCase duplicates)', async () => {
+    const { projectId } = await uploadAndScanFixture();
+
+    const findingsRes = await request(app).get(`/api/projects/${projectId}/findings?rule_id=env_undeclared`);
+    const jwtFinding = findingsRes.body.data.items[0];
+    await request(app).post(`/api/findings/${jwtFinding.id}/fixes`);
+
+    const res = await request(app).get(`/api/projects/${projectId}/fixes`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.items.length).toBeGreaterThan(0);
+
+    for (const item of res.body.data.items) {
+      expect(item).toHaveProperty('finding_title');
+      expect(item).toHaveProperty('finding_severity');
+      expect(item).not.toHaveProperty('findingTitle');
+      expect(item).not.toHaveProperty('findingSeverity');
+    }
+  });
+
+  it('17. POST /api/projects/:id/reports on unscanned project fails with 409 SCAN_REQUIRED; scanned project with 0 findings produces report', async () => {
+    // 1. Unscanned project (uploaded but never scanned)
+    const zipPathNever = path.join(TEST_DIR, 'unscanned-report-test.zip');
+    await createYazlZip([{ name: 'server.js', content: 'console.log("unscanned");' }], zipPathNever);
+    const uploadRes = await request(app).post('/api/projects').attach('file', zipPathNever);
+    expect(uploadRes.status).toBe(201);
+    const unscannedId = uploadRes.body.data.id;
+
+    const reportUnscannedRes = await request(app).post(`/api/projects/${unscannedId}/reports`);
+    expect(reportUnscannedRes.status).toBe(409);
+    expect(reportUnscannedRes.body).toEqual({
+      data: null,
+      error: 'Scan the project first [SCAN_REQUIRED]',
+    });
+
+    // 2. Scanned project with 0 findings
+    const zipPathClean = path.join(TEST_DIR, 'clean-project.zip');
+    await createYazlZip([{ name: 'src/main.js', content: 'const a = 1;\nconsole.log(a);\n' }], zipPathClean);
+    const uploadCleanRes = await request(app).post('/api/projects').attach('file', zipPathClean);
+    expect(uploadCleanRes.status).toBe(201);
+    const cleanId = uploadCleanRes.body.data.id;
+
+    const scanCleanRes = await request(app).post(`/api/projects/${cleanId}/scan`);
+    expect(scanCleanRes.status).toBe(200);
+
+    const findingsCleanRes = await request(app).get(`/api/projects/${cleanId}/findings`);
+    expect(findingsCleanRes.status).toBe(200);
+    expect(findingsCleanRes.body.data.items).toHaveLength(0);
+
+    const reportCleanRes = await request(app).post(`/api/projects/${cleanId}/reports`);
+    expect(reportCleanRes.status).toBe(201);
+    expect(reportCleanRes.body.data.markdown).toContain('## Summary');
+    expect(reportCleanRes.body.data.markdown).toContain('No findings detected');
+    expect(reportCleanRes.body.data.markdown).toContain('## What was not checked');
+  });
+
+  it('18. GET /api/projects/:id/reports pagination (page, pageSize, total), items omit markdown, bad query values give 400', async () => {
+    const { projectId } = await uploadAndScanFixture();
+
+    // Create 3 reports
+    const rep1 = (await request(app).post(`/api/projects/${projectId}/reports`)).body.data;
+    const rep2 = (await request(app).post(`/api/projects/${projectId}/reports`)).body.data;
+    const rep3 = (await request(app).post(`/api/projects/${projectId}/reports`)).body.data;
+
+    // Page 1, pageSize 2 -> should return 2 newest reports
+    const page1Res = await request(app).get(`/api/projects/${projectId}/reports?page=1&pageSize=2`);
+    expect(page1Res.status).toBe(200);
+    expect(page1Res.body.data.total).toBe(3);
+    expect(page1Res.body.data.page).toBe(1);
+    expect(page1Res.body.data.pageSize).toBe(2);
+    expect(page1Res.body.data.items).toHaveLength(2);
+    expect(page1Res.body.data.items[0].id).toBe(rep3.id);
+    expect(page1Res.body.data.items[1].id).toBe(rep2.id);
+    expect(page1Res.body.data.items[0].markdown).toBeUndefined();
+    expect(page1Res.body.data.items[1].markdown).toBeUndefined();
+
+    // Page 2, pageSize 2 -> should return 1 remaining report
+    const page2Res = await request(app).get(`/api/projects/${projectId}/reports?page=2&pageSize=2`);
+    expect(page2Res.status).toBe(200);
+    expect(page2Res.body.data.total).toBe(3);
+    expect(page2Res.body.data.page).toBe(2);
+    expect(page2Res.body.data.pageSize).toBe(2);
+    expect(page2Res.body.data.items).toHaveLength(1);
+    expect(page2Res.body.data.items[0].id).toBe(rep1.id);
+    expect(page2Res.body.data.items[0].markdown).toBeUndefined();
+
+    // Bad query values return 400
+    const badPage = await request(app).get(`/api/projects/${projectId}/reports?page=0`);
+    expect(badPage.status).toBe(400);
+
+    const badPageNegative = await request(app).get(`/api/projects/${projectId}/reports?page=-1`);
+    expect(badPageNegative.status).toBe(400);
+
+    const badPageSizeZero = await request(app).get(`/api/projects/${projectId}/reports?pageSize=0`);
+    expect(badPageSizeZero.status).toBe(400);
+
+    const badPageSizeHigh = await request(app).get(`/api/projects/${projectId}/reports?pageSize=101`);
+    expect(badPageSizeHigh.status).toBe(400);
+
+    const badPageString = await request(app).get(`/api/projects/${projectId}/reports?page=invalid`);
+    expect(badPageString.status).toBe(400);
   });
 });
