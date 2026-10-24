@@ -12,6 +12,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useProjects } from '../../lib/projectContext.js';
+import { isNeverScanned } from '../../lib/scanState.js';
 import { api, getFriendlyErrorMessage } from '../../lib/api.js';
 import { useRescan } from '../../lib/useRescan.js';
 import { LastScanLabel } from './LastScanLabel.js';
@@ -154,15 +155,10 @@ export const OverviewPage: React.FC = () => {
   }
 
   // Check if project is never scanned
-  const isNeverScanned =
-    Boolean(summaryState.data &&
-    summaryState.data.counts.nodes === 0 &&
-    summaryState.data.counts.edges === 0 &&
-    graphState.data &&
-    graphState.data.total === 0);
+  const neverScanned = isNeverScanned(selectedProject, summaryState.data);
 
   // 3. Never-scanned State: Project uploaded but not yet scanned
-  if (isNeverScanned && !summaryState.loading && !graphState.loading) {
+  if (neverScanned && !summaryState.loading && !graphState.loading) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -226,7 +222,7 @@ export const OverviewPage: React.FC = () => {
             <LastScanLabel
               finishedAt={summaryState.data?.lastScan?.finished_at}
               status={summaryState.data?.lastScan?.status}
-              isNeverScanned={isNeverScanned}
+              isNeverScanned={neverScanned}
             />
           </div>
         </div>

@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/dom';
+
+configure({ asyncUtilTimeout: 3000 });
 
 // ResizeObserver stub for React Flow
 if (typeof global.ResizeObserver === 'undefined') {

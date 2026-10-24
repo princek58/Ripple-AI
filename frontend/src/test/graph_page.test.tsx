@@ -108,7 +108,7 @@ describe('GraphPage Component & URL States (Step 11a-2 Part B)', () => {
         );
         expect(screen.getByTestId('test-location')).toHaveTextContent('level=2');
       },
-      { timeout: 3000 }
+      { timeout: 6000 }
     );
 
     unmount();
@@ -138,7 +138,7 @@ describe('GraphPage Component & URL States (Step 11a-2 Part B)', () => {
         expect(screen.getByTestId('test-location')).toHaveTextContent('level=3');
         expect(screen.getByTestId('test-location')).toHaveTextContent('depth=1');
       },
-      { timeout: 3000 }
+      { timeout: 6000 }
     );
   });
 

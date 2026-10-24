@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Project, ProjectSummary } from '../../../../shared/types.js';
 import { formatBytes, formatDate } from '../../lib/format.js';
+import { isNeverScanned } from '../../lib/scanState.js';
 import { SeverityBadge } from '../../components/ui/SeverityBadge.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { Button } from '../../components/ui/Button.js';
@@ -40,6 +41,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onRescan,
   onDelete,
 }) => {
+  const neverScanned = isNeverScanned(project, summaryState?.data);
   const [isScanning, setIsScanning] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -172,7 +174,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         {/* Last scan status */}
         <div className="flex items-center gap-1.5 text-xs text-theme-text-muted">
           <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span>Last scan: {project.last_scan_at ? formatDate(project.last_scan_at) : 'Not scanned yet'}</span>
+          <span>Last scan: {neverScanned || !project.last_scan_at ? 'Not scanned yet' : formatDate(project.last_scan_at)}</span>
         </div>
 
         {/* Findings / Severity Badges from Summary */}
@@ -187,6 +189,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           ) : summaryState?.error ? (
             <div data-testid="summary-unavailable" className="py-1">
               <span className="text-xs text-theme-text-muted italic">Summary unavailable</span>
+            </div>
+          ) : neverScanned ? (
+            <div data-testid="summary-never-scanned" className="py-1">
+              <span className="text-xs text-theme-text-muted italic">Not scanned yet</span>
             </div>
           ) : summaryState?.data ? (
             <div data-testid="summary-badges" className="flex flex-wrap items-center gap-1.5" aria-label="Findings severity">

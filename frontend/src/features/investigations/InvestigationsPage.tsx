@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft } from 'lucide-react';
 import { useProjects } from '../../lib/projectContext.js';
+import { isNeverScanned } from '../../lib/scanState.js';
 import { api, ApiClientError, getFriendlyErrorMessage } from '../../lib/api.js';
 import { useRescan } from '../../lib/useRescan.js';
 import { Button } from '../../components/ui/Button.js';
@@ -101,7 +102,7 @@ export const InvestigationsPage: React.FC = () => {
     if (!selectedProjectId) return;
 
     // Never scanned project
-    if (selectedProject && !selectedProject.last_scan_at) {
+    if (isNeverScanned(selectedProject)) {
       setIsFindingsLoading(false);
       setFindings([]);
       setTotalFindings(0);
@@ -289,7 +290,7 @@ export const InvestigationsPage: React.FC = () => {
   }
 
   // State 3: Project exists but never scanned (NO ZEROS)
-  if (selectedProject && !selectedProject.last_scan_at) {
+  if (isNeverScanned(selectedProject)) {
     return (
       <div className="p-6">
         <div

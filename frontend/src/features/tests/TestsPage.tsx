@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useProjects } from '../../lib/projectContext.js';
+import { isNeverScanned } from '../../lib/scanState.js';
 import { useRescan } from '../../lib/useRescan.js';
 import { api, getFriendlyErrorMessage } from '../../lib/api.js';
 import { EmptyState } from '../../components/ui/EmptyState.js';
@@ -81,7 +82,7 @@ export const TestsPage: React.FC = () => {
     }
 
     // Never-scanned project
-    if (selectedProject && !selectedProject.last_scan_at) {
+    if (isNeverScanned(selectedProject)) {
       setIsLoading(false);
       setItems([]);
       setCounts(null);
@@ -214,7 +215,7 @@ export const TestsPage: React.FC = () => {
   }
 
   // State 3: Project never scanned (NEVER show zeros here)
-  if (selectedProject && !selectedProject.last_scan_at) {
+  if (isNeverScanned(selectedProject)) {
     return (
       <div className="h-full flex items-center justify-center p-6" data-testid="tests-never-scanned">
         <div className="flex flex-col items-center justify-center text-center p-8 bg-theme-surface border border-theme-border rounded-xl max-w-md space-y-4">

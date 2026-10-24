@@ -19,6 +19,8 @@ import { EmptyState } from '../../components/ui/EmptyState.js';
 import { ErrorState } from '../../components/ui/ErrorState.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { Button } from '../../components/ui/Button.js';
+import type { ProjectSummary } from '../../../../shared/types.js';
+import { isNeverScanned } from '../../lib/scanState.js';
 import { Report, ReportListItem } from './reportsTypes.js';
 import { ReportPreview } from './ReportPreview.js';
 import { buildReportFileName } from './reportsPure.js';
@@ -35,6 +37,9 @@ export const ReportsPage: React.FC = () => {
   const previousProjectIdRef = useRef<string | null>(selectedProjectId ?? null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isGeneratingRef = useRef<boolean>(false);
+
+  const [summary, setSummary] = useState<ProjectSummary | null>(null);
+  const neverScanned = isNeverScanned(selectedProject, summary);
 
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [totalReports, setTotalReports] = useState<number>(0);
@@ -87,14 +92,31 @@ export const ReportsPage: React.FC = () => {
       setListError(null);
 
       try {
-        const res = await api.getReports(
-          selectedProjectId,
-          { page: targetPage, pageSize },
-          abortController.signal
-        );
+        const [reportsRes, summaryRes] = await Promise.allSettled([
+          api.getReports(
+            selectedProjectId,
+            { page: targetPage, pageSize },
+            abortController.signal
+          ),
+          api.getSummary(selectedProjectId, abortController.signal),
+        ]);
         if (!abortController.signal.aborted) {
-          setReports(res.items || []);
-          setTotalReports(res.total || 0);
+          if (summaryRes.status === 'fulfilled') {
+            setSummary(summaryRes.value);
+            if (isNeverScanned(selectedProject, summaryRes.value)) {
+              setIsLoadingList(false);
+              setReports([]);
+              setTotalReports(0);
+              setSelectedReport(null);
+              return;
+            }
+          }
+          if (reportsRes.status === 'fulfilled') {
+            setReports(reportsRes.value.items || []);
+            setTotalReports(reportsRes.value.total || 0);
+          } else {
+            setListError(getFriendlyErrorMessage(reportsRes.reason));
+          }
         }
       } catch (err: unknown) {
         if (!abortController.signal.aborted) {
@@ -119,6 +141,7 @@ export const ReportsPage: React.FC = () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      setSummary(null);
       setReports([]);
       setTotalReports(0);
       setSelectedReport(null);
@@ -197,7 +220,7 @@ export const ReportsPage: React.FC = () => {
 
   // Generate Report action: POST once per click, disabled while running, double-click protected
   const handleGenerateReport = async () => {
-    if (!selectedProjectId || isGeneratingRef.current || isGenerating) {
+    if (!selectedProjectId || isGeneratingRef.current || isGenerating || neverScanned) {
       return;
     }
 
@@ -308,31 +331,62 @@ export const ReportsPage: React.FC = () => {
   }
 
   // State 3: Project Never Scanned
-  if (selectedProject && !selectedProject.last_scan_at) {
+  if (neverScanned) {
     return (
-      <div className="h-full flex items-center justify-center p-6" data-testid="reports-never-scanned">
-        <div className="flex flex-col items-center justify-center text-center p-8 bg-theme-surface border border-theme-border rounded-xl max-w-md space-y-4">
-          <div className="w-12 h-12 rounded-full bg-severity-medium/10 flex items-center justify-center text-severity-medium">
-            <AlertCircle className="w-6 h-6" aria-hidden="true" />
+      <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+        {/* Header & Toolbar */}
+        <div
+          data-testid="reports-toolbar"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-theme-border no-print"
+        >
+          <div>
+            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-theme-text tracking-tight">
+              Reports
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm text-theme-text-muted">
+              Generate and export analysis reports containing findings, coverage, and notes.
+            </p>
           </div>
-          <h2 className="font-heading font-semibold text-lg text-theme-text">Not scanned yet</h2>
-          <p className="text-xs text-theme-text-muted">
-            This project has not been scanned yet. Run a scan before generating an analysis report.
-          </p>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => {
-              if (selectedProjectId) {
-                rescan(selectedProjectId);
-              }
-            }}
-            disabled={isScanning}
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-            <span>{isScanning ? 'Scanning...' : 'Re-scan'}</span>
-          </Button>
+
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleGenerateReport}
+              disabled={true}
+              className="gap-2"
+              data-testid="generate-report-button"
+            >
+              <Sparkles className="w-4 h-4" aria-hidden="true" />
+              <span>Generate report</span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="h-full flex items-center justify-center p-6" data-testid="reports-never-scanned">
+          <div className="flex flex-col items-center justify-center text-center p-8 bg-theme-surface border border-theme-border rounded-xl max-w-md space-y-4">
+            <div className="w-12 h-12 rounded-full bg-severity-medium/10 flex items-center justify-center text-severity-medium">
+              <AlertCircle className="w-6 h-6" aria-hidden="true" />
+            </div>
+            <h2 className="font-heading font-semibold text-lg text-theme-text">Not scanned yet</h2>
+            <p className="text-xs text-theme-text-muted">
+              This project has not been scanned yet. Run a scan before generating an analysis report.
+            </p>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => {
+                if (selectedProjectId) {
+                  rescan(selectedProjectId, () => fetchReportsList());
+                }
+              }}
+              disabled={isScanning}
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+              <span>{isScanning ? 'Scanning...' : 'Re-scan'}</span>
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -433,7 +487,7 @@ export const ReportsPage: React.FC = () => {
             variant="primary"
             size="md"
             onClick={handleGenerateReport}
-            disabled={isGenerating || !selectedProject?.last_scan_at}
+            disabled={isGenerating || neverScanned}
             className="gap-2"
             data-testid="generate-report-button"
           >

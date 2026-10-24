@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useProjects } from '../../lib/projectContext.js';
+import { isNeverScanned } from '../../lib/scanState.js';
 import { api, ApiClientError, getFriendlyErrorMessage } from '../../lib/api.js';
 import { useRescan } from '../../lib/useRescan.js';
 import { Button } from '../../components/ui/Button.js';
@@ -77,7 +78,7 @@ export const GraphPage: React.FC = () => {
   const fetchGraphData = useCallback(async () => {
     if (!selectedProjectId) return;
 
-    if (selectedProject && !selectedProject.last_scan_at) {
+    if (isNeverScanned(selectedProject)) {
       setIsGraphLoading(false);
       return;
     }
@@ -278,8 +279,8 @@ export const GraphPage: React.FC = () => {
   }
 
   // 3. Never scanned state
-  const isNeverScanned = selectedProject && !selectedProject.last_scan_at;
-  if (isNeverScanned) {
+  const neverScanned = isNeverScanned(selectedProject);
+  if (neverScanned && selectedProject) {
     return (
       <div className="p-6">
         <div
