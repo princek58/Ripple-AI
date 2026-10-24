@@ -14,6 +14,11 @@ import projectScansFixture from './fixtures/api/project_scans_list.json';
 import reportsListFixture from './fixtures/api/reports_get_project_reports_list.json';
 import reportDetailFixture from './fixtures/api/reports_get_report_detail.json';
 import reports404Fixture from './fixtures/api/reports_get_report_404.json';
+import reports400Fixture from './fixtures/api/reports_get_report_400.json';
+import testsScannedFixture from './fixtures/api/tests_get_project_tests_scanned.json';
+import { compareKeySets } from './contract_helpers.js';
+
+const realFetch = globalThis.fetch;
 
 const scannedProjectId = projectsListFixture.data[0].id;
 const realReportId = reportDetailFixture.data.id;
@@ -485,5 +490,87 @@ describe('Reports Screen (Step 12c Part 3)', () => {
 
     unmount();
     expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  describe('Extended Contract Test (RIPPLE_CONTRACT=1)', () => {
+    const shouldRunContract = process.env.RIPPLE_CONTRACT === '1';
+
+    it('proves contract comparison detects extra and missing keys on test and report objects', () => {
+      const sample = JSON.parse(JSON.stringify(testsScannedFixture.data));
+      const mutated = JSON.parse(JSON.stringify(sample));
+      mutated.unexpectedExtra = 'extra';
+      delete mutated.note;
+
+      const diff = compareKeySets(mutated, sample);
+      expect(diff.matching).toBe(false);
+      expect(diff.differences.some((d) => d.includes('unexpectedExtra'))).toBe(true);
+      expect(diff.differences.some((d) => d.includes('note'))).toBe(true);
+
+      const restored = compareKeySets(sample, sample);
+      expect(restored.matching).toBe(true);
+      expect(restored.differences).toHaveLength(0);
+    });
+
+    it.runIf(shouldRunContract)(
+      'contract test: verifies live backend tests response, report object, reports list item and 404/400 bodies match captures',
+      async () => {
+        // Fetch projects to get target projectId
+        const liveProjectsRes = await realFetch('http://localhost:4000/api/projects');
+        let targetProjectId = scannedProjectId;
+        if (liveProjectsRes.ok) {
+          const liveProjectsJson = (await liveProjectsRes.json()) as any;
+          if (liveProjectsJson.data && liveProjectsJson.data.length > 0) {
+            const matched =
+              liveProjectsJson.data.find(
+                (p: any) => p.id === '04a16442-a011-4076-8d00-1f67c25b69a2'
+              ) ||
+              liveProjectsJson.data.find(
+                (p: any) => p.id === scannedProjectId
+              ) ||
+              liveProjectsJson.data.find((p: any) => p.last_scan_at) ||
+              liveProjectsJson.data[0];
+            targetProjectId = matched.id;
+          }
+        }
+
+        // 1. Tests response key sets
+        const liveTestsRes = await realFetch(`http://localhost:4000/api/projects/${targetProjectId}/tests`);
+        expect(liveTestsRes.ok).toBe(true);
+        const liveTestsJson = await liveTestsRes.json();
+        const testsCmp = compareKeySets(liveTestsJson, testsScannedFixture);
+        expect(testsCmp.matching).toBe(true);
+
+        // 2. Reports list key sets and report item
+        const liveReportsRes = await realFetch(`http://localhost:4000/api/projects/${targetProjectId}/reports`);
+        expect(liveReportsRes.ok).toBe(true);
+        const liveReportsJson = (await liveReportsRes.json()) as any;
+        const reportsListCmp = compareKeySets(liveReportsJson, reportsListFixture);
+        expect(reportsListCmp.matching).toBe(true);
+
+        // 3. Single report detail object key sets
+        if (liveReportsJson.data && liveReportsJson.data.length > 0) {
+          const firstReportId = liveReportsJson.data[0].id;
+          const liveReportDetailRes = await realFetch(`http://localhost:4000/api/reports/${firstReportId}`);
+          expect(liveReportDetailRes.ok).toBe(true);
+          const liveReportDetailJson = await liveReportDetailRes.json();
+          const detailCmp = compareKeySets(liveReportDetailJson, reportDetailFixture);
+          expect(detailCmp.matching).toBe(true);
+        }
+
+        // 4. 404 bodies key sets
+        const live404Res = await realFetch('http://localhost:4000/api/reports/00000000-0000-0000-0000-000000000000');
+        expect(live404Res.status).toBe(404);
+        const live404Json = await live404Res.json();
+        const cmp404 = compareKeySets(live404Json, reports404Fixture);
+        expect(cmp404.matching).toBe(true);
+
+        // 5. 400 bodies key sets
+        const live400Res = await realFetch('http://localhost:4000/api/reports/invalid-uuid');
+        expect(live400Res.status).toBe(400);
+        const live400Json = await live400Res.json();
+        const cmp400 = compareKeySets(live400Json, reports400Fixture);
+        expect(cmp400.matching).toBe(true);
+      }
+    );
   });
 });
