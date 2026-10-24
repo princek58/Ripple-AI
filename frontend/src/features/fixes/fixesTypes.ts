@@ -1,5 +1,3 @@
-import type { FindingSeverity } from '../../../../shared/types.js';
-
 export type FixStatus = 'proposed' | 'approved' | 'rejected';
 
 export interface Fix {
@@ -12,26 +10,7 @@ export interface Fix {
   patch_path?: string | null;
 }
 
-export interface ProjectFixItem {
-  id: string;
-  finding_id: string;
-  finding_title: string;
-  finding_severity: FindingSeverity;
-  findingTitle: string;
-  findingSeverity: FindingSeverity;
-  diff_text: string;
-  files: string[];
-  status: FixStatus;
-  approved_at: string | null;
-  patch_path?: string | null;
-}
-
-export interface ProjectFixesResult {
-  items: ProjectFixItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type { FindingSeverity, ProjectFixItem, ProjectFixesResult } from '../../../../shared/types.js';
 
 export type DiffLineKind = 'add' | 'del' | 'context' | 'meta';
 

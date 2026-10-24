@@ -122,8 +122,8 @@ export const FixList: React.FC<FixListProps> = ({
         ) : (
           items.map((item) => {
             const isSelected = item.id === selectedFixId;
-            const findingTitle = item.finding_title || item.findingTitle || 'Suggested change';
-            const severity = (item.finding_severity || item.findingSeverity || 'unknown') as FindingSeverity;
+            const findingTitle = item.finding_title || 'Suggested change';
+            const severity = (item.finding_severity || 'unknown') as FindingSeverity;
             const statusInfo = statusLabel(item.status);
 
             return (

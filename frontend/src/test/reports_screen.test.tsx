@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ReportsPage } from '../features/reports/ReportsPage.js';
@@ -15,6 +15,8 @@ import reportsListFixture from './fixtures/api/reports_get_project_reports_list.
 import reportDetailFixture from './fixtures/api/reports_get_report_detail.json';
 import reports404Fixture from './fixtures/api/reports_get_report_404.json';
 import reports400Fixture from './fixtures/api/reports_get_report_400.json';
+import reportsNeverScannedFixture from './fixtures/api/reports_post_project_reports_never_scanned.json';
+import reportsEmptyFixture from './fixtures/api/reports_get_project_reports_empty.json';
 import testsScannedFixture from './fixtures/api/tests_get_project_tests_scanned.json';
 import { compareKeySets } from './contract_helpers.js';
 
@@ -23,11 +25,17 @@ const realFetch = globalThis.fetch;
 const scannedProjectId = projectsListFixture.data[0].id;
 const realReportId = reportDetailFixture.data.id;
 
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location-display">{location.pathname}{location.search}</div>;
+}
+
 function renderWithProviders(initialEntries: string[] = ['/app/reports']) {
   return render(
     <ThemeProvider>
       <MemoryRouter initialEntries={initialEntries}>
         <ProjectProvider>
+          <LocationDisplay />
           <Routes>
             <Route path="/app/reports" element={<ReportsPage />} />
             <Route path="/app/overview" element={<div data-testid="overview-page">Overview</div>} />
@@ -93,7 +101,10 @@ describe('Reports Screen (Step 12c Part 3)', () => {
       }
 
       // 5. GET Single Report
-      if (urlStr.includes(`/api/reports/${realReportId}`)) {
+      if (
+        urlStr.includes(`/api/reports/${realReportId}`) ||
+        (reportsListFixture.data as any).items?.some((it: any) => urlStr.includes(it.id))
+      ) {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -313,7 +324,9 @@ describe('Reports Screen (Step 12c Part 3)', () => {
     expect(screen.getByTestId('latest-report-badge')).toHaveTextContent('Latest');
 
     // First item in reports list has the Latest label
-    const firstReportId = reportsListFixture.data[0].id;
+    const firstReportId = (reportsListFixture.data as any).items
+      ? (reportsListFixture.data as any).items[0].id
+      : (reportsListFixture.data as any)[0].id;
     const firstReportItem = screen.getByTestId(`report-item-${firstReportId}`);
     expect(firstReportItem).toContainElement(screen.getByTestId('latest-report-badge'));
   });
@@ -492,6 +505,221 @@ describe('Reports Screen (Step 12c Part 3)', () => {
     expect(capturedSignal?.aborted).toBe(true);
   });
 
+  it('reports list items omit markdown and selecting an item loads preview by id', async () => {
+    // Check empty reports fixture shape
+    expect(reportsEmptyFixture.data.items).toHaveLength(0);
+    expect(reportsEmptyFixture.data.total).toBe(0);
+
+    const firstItem = reportsListFixture.data.items[0];
+    expect((firstItem as any).markdown).toBeUndefined();
+    expect(firstItem.id).toBeDefined();
+    expect(firstItem.project_id).toBeDefined();
+    expect(firstItem.created_at).toBeDefined();
+
+    renderWithProviders();
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`report-item-${firstItem.id}`)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('report-preview')).toBeInTheDocument();
+    });
+
+    // Assert second request URL fetched preview by id
+    const reportDetailCalls = (global.fetch as any).mock.calls.filter((c: any[]) =>
+      c[0]?.toString().includes(`/api/reports/${firstItem.id}`)
+    );
+    expect(reportDetailCalls.length).toBeGreaterThan(0);
+    expect(reportDetailCalls[0][0].toString()).toContain(`/api/reports/${firstItem.id}`);
+  });
+
+  it('pagination displays "Showing X to Y of Z reports" and navigates with Previous/Next when total > pageSize', async () => {
+    const mockPage1 = {
+      data: {
+        items: Array.from({ length: 25 }, (_, i) => ({
+          id: `rep-p1-${i + 1}`,
+          project_id: scannedProjectId,
+          created_at: new Date(Date.now() - i * 1000).toISOString(),
+        })),
+        total: 30,
+        page: 1,
+        pageSize: 25,
+      },
+      error: null,
+    };
+
+    const mockPage2 = {
+      data: {
+        items: Array.from({ length: 5 }, (_, i) => ({
+          id: `rep-p2-${i + 1}`,
+          project_id: scannedProjectId,
+          created_at: new Date(Date.now() - (25 + i) * 1000).toISOString(),
+        })),
+        total: 30,
+        page: 2,
+        pageSize: 25,
+      },
+      error: null,
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string | URL) => {
+      const urlStr = url.toString();
+      if (urlStr.endsWith('/api/projects')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => projectsListFixture,
+        });
+      }
+      if (urlStr.includes('/scans')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => projectScansFixture,
+        });
+      }
+      if (urlStr.includes('/reports') && !urlStr.includes('/api/reports/')) {
+        const isPage2 = urlStr.includes('page=2');
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => (isPage2 ? mockPage2 : mockPage1),
+        });
+      }
+      if (urlStr.includes('/api/reports/')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => reportDetailFixture,
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ data: {}, error: null }),
+      });
+    });
+
+    renderWithProviders();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reports-pagination-text')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('reports-pagination-text')).toHaveTextContent('Showing 1 to 25 of 30 reports');
+
+    const prevBtn = screen.getByTestId('reports-prev-page');
+    const nextBtn = screen.getByTestId('reports-next-page');
+    expect(prevBtn).toBeDisabled();
+    expect(nextBtn).toBeEnabled();
+    expect(screen.getByTestId('latest-report-badge')).toBeInTheDocument();
+
+    fireEvent.click(nextBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reports-pagination-text')).toHaveTextContent('Showing 26 to 30 of 30 reports');
+    });
+
+    expect(screen.getByTestId('reports-prev-page')).toBeEnabled();
+    expect(screen.getByTestId('reports-next-page')).toBeDisabled();
+    expect(screen.getByTestId('location-display')).toHaveTextContent('page=2');
+    // On page 2, Latest label must NOT be rendered
+    expect(screen.queryByTestId('latest-report-badge')).not.toBeInTheDocument();
+
+    // Navigate back to Previous page
+    fireEvent.click(screen.getByTestId('reports-prev-page'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reports-pagination-text')).toHaveTextContent('Showing 1 to 25 of 30 reports');
+    });
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('page=1');
+    expect(screen.getByTestId('latest-report-badge')).toBeInTheDocument();
+  });
+
+  it('clamps invalid or zero ?page= in URL to minimum 1', async () => {
+    renderWithProviders(['/app/reports?page=0']);
+    await waitFor(() => {
+      expect(screen.getByTestId('reports-pagination-text')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('reports-pagination-text')).toHaveTextContent('Showing 1 to 2 of 2 reports');
+  });
+
+  it('shows "Scan the project first" and Re-scan button on 409 SCAN_REQUIRED from POST reports', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string | URL, init?: RequestInit) => {
+      const urlStr = url.toString();
+      const method = init?.method || 'GET';
+
+      if (urlStr.endsWith('/api/projects')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => projectsListFixture,
+        });
+      }
+      if (urlStr.includes('/scans')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => projectScansFixture,
+        });
+      }
+      if (method === 'POST' && urlStr.includes('/reports')) {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => reportsNeverScannedFixture,
+        });
+      }
+      if (method === 'GET' && urlStr.includes('/reports')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => reportsListFixture,
+        });
+      }
+      if (urlStr.includes('/api/reports/')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => reportDetailFixture,
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ data: {}, error: null }),
+      });
+    });
+
+    renderWithProviders();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generate-report-button')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('generate-report-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reports-error-banner')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Scan the project first')).toBeInTheDocument();
+    expect(screen.getByTestId('reports-scan-first-rescan-btn')).toBeInTheDocument();
+  });
+
   describe('Extended Contract Test (RIPPLE_CONTRACT=1)', () => {
     const shouldRunContract = process.env.RIPPLE_CONTRACT === '1';
 
@@ -548,8 +776,9 @@ describe('Reports Screen (Step 12c Part 3)', () => {
         expect(reportsListCmp.matching).toBe(true);
 
         // 3. Single report detail object key sets
-        if (liveReportsJson.data && liveReportsJson.data.length > 0) {
-          const firstReportId = liveReportsJson.data[0].id;
+        const reportsItems = liveReportsJson.data?.items || (Array.isArray(liveReportsJson.data) ? liveReportsJson.data : []);
+        if (reportsItems.length > 0) {
+          const firstReportId = reportsItems[0].id;
           const liveReportDetailRes = await realFetch(`http://localhost:4000/api/reports/${firstReportId}`);
           expect(liveReportDetailRes.ok).toBe(true);
           const liveReportDetailJson = await liveReportDetailRes.json();

@@ -19,7 +19,7 @@ import { EmptyState } from '../../components/ui/EmptyState.js';
 import { ErrorState } from '../../components/ui/ErrorState.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { Button } from '../../components/ui/Button.js';
-import { Report } from './reportsTypes.js';
+import { Report, ReportListItem } from './reportsTypes.js';
 import { ReportPreview } from './ReportPreview.js';
 import { buildReportFileName } from './reportsPure.js';
 
@@ -30,11 +30,16 @@ export const ReportsPage: React.FC = () => {
   const { rescan, isScanning } = useRescan();
 
   const reportIdFromUrl = searchParams.get('report');
+  const pageFromUrl = searchParams.get('page');
+  const page = pageFromUrl ? Math.max(1, parseInt(pageFromUrl, 10) || 1) : 1;
   const previousProjectIdRef = useRef<string | null>(selectedProjectId ?? null);
-  const activeAbortRef = useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const isGeneratingRef = useRef<boolean>(false);
 
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<ReportListItem[]>([]);
+  const [totalReports, setTotalReports] = useState<number>(0);
+  const pageSize = 25;
+
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isLoadingList, setIsLoadingList] = useState<boolean>(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
@@ -43,49 +48,66 @@ export const ReportsPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      const validPage = Math.max(1, newPage);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('page', String(validPage));
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
   // Fetch reports list for current project
-  const fetchReportsList = useCallback(async () => {
-    if (!selectedProjectId) {
-      setIsLoadingList(false);
-      return;
-    }
-
-    if (selectedProject && !selectedProject.last_scan_at) {
-      setIsLoadingList(false);
-      setReports([]);
-      setSelectedReport(null);
-      setListError(null);
-      return;
-    }
-
-    if (activeAbortRef.current) {
-      activeAbortRef.current.abort();
-    }
-    const abortController = new AbortController();
-    activeAbortRef.current = abortController;
-
-    setIsLoadingList(true);
-    setListError(null);
-
-    try {
-      const res = await api.getReports(selectedProjectId, abortController.signal);
-      if (!abortController.signal.aborted) {
-        // Sort newest first
-        const sorted = [...(res || [])].sort((a, b) => {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-        setReports(sorted);
-      }
-    } catch (err: unknown) {
-      if (!abortController.signal.aborted) {
-        setListError(getFriendlyErrorMessage(err));
-      }
-    } finally {
-      if (!abortController.signal.aborted) {
+  const fetchReportsList = useCallback(
+    async (targetPage = page) => {
+      if (!selectedProjectId) {
         setIsLoadingList(false);
+        return;
       }
-    }
-  }, [selectedProjectId, selectedProject]);
+
+      if (selectedProject && !selectedProject.last_scan_at) {
+        setIsLoadingList(false);
+        setReports([]);
+        setTotalReports(0);
+        setSelectedReport(null);
+        setListError(null);
+        return;
+      }
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      setIsLoadingList(true);
+      setListError(null);
+
+      try {
+        const res = await api.getReports(
+          selectedProjectId,
+          { page: targetPage, pageSize },
+          abortController.signal
+        );
+        if (!abortController.signal.aborted) {
+          setReports(res.items || []);
+          setTotalReports(res.total || 0);
+        }
+      } catch (err: unknown) {
+        if (!abortController.signal.aborted) {
+          setListError(getFriendlyErrorMessage(err));
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingList(false);
+        }
+      }
+    },
+    [selectedProjectId, selectedProject, page]
+  );
 
   // Project switch cleanup
   useEffect(() => {
@@ -94,9 +116,11 @@ export const ReportsPage: React.FC = () => {
       selectedProjectId &&
       previousProjectIdRef.current !== selectedProjectId
     ) {
-      if (activeAbortRef.current) {
-        activeAbortRef.current.abort();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
+      setReports([]);
+      setTotalReports(0);
       setSelectedReport(null);
       setReport404(false);
       setSearchParams(new URLSearchParams(), { replace: true });
@@ -107,21 +131,24 @@ export const ReportsPage: React.FC = () => {
   }, [selectedProjectId, setSearchParams]);
 
   useEffect(() => {
-    fetchReportsList();
+    fetchReportsList(page);
     return () => {
-      if (activeAbortRef.current) {
-        activeAbortRef.current.abort();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
-  }, [fetchReportsList]);
+  }, [fetchReportsList, page]);
 
-  // Load selected report whenever URL or reports list changes
+  // Load selected report detail whenever URL or reports list changes
   useEffect(() => {
     if (!reportIdFromUrl) {
       if (reports.length > 0) {
         // Auto-select latest report if none in URL
-        setSelectedReport(reports[0]);
-        setReport404(false);
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('report', reports[0].id);
+          return next;
+        }, { replace: true });
       } else {
         setSelectedReport(null);
         setReport404(false);
@@ -129,24 +156,21 @@ export const ReportsPage: React.FC = () => {
       return;
     }
 
-    // Try finding in current reports list first
-    const found = reports.find((r) => r.id === reportIdFromUrl);
-    if (found) {
-      setSelectedReport(found);
-      setReport404(false);
+    // If selectedReport already matches reportIdFromUrl and has markdown, no need to refetch
+    if (selectedReport && selectedReport.id === reportIdFromUrl && selectedReport.markdown) {
       return;
     }
 
-    // If not found in loaded list and list is not loading, attempt direct fetch or mark 404
     if (!isLoadingList) {
       let isSubscribed = true;
       setIsLoadingDetail(true);
+      setReport404(false);
       api
         .getReport(reportIdFromUrl)
         .then((res) => {
           if (!isSubscribed) return;
           const reportObj = typeof res === 'string' ? null : res;
-          if (reportObj && reportObj.project_id === selectedProjectId) {
+          if (reportObj && reportObj.id) {
             setSelectedReport(reportObj);
             setReport404(false);
           } else {
@@ -169,7 +193,7 @@ export const ReportsPage: React.FC = () => {
         isSubscribed = false;
       };
     }
-  }, [reportIdFromUrl, reports, isLoadingList, selectedProjectId]);
+  }, [reportIdFromUrl, reports, isLoadingList, selectedProjectId, selectedReport, setSearchParams]);
 
   // Generate Report action: POST once per click, disabled while running, double-click protected
   const handleGenerateReport = async () => {
@@ -182,10 +206,15 @@ export const ReportsPage: React.FC = () => {
 
     try {
       const newReport = await api.createReport(selectedProjectId);
-      await fetchReportsList();
+      await fetchReportsList(1);
       setSelectedReport(newReport);
       setReport404(false);
-      setSearchParams({ report: newReport.id });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('report', newReport.id);
+        next.set('page', '1');
+        return next;
+      });
     } catch (err: unknown) {
       setListError(getFriendlyErrorMessage(err));
     } finally {
@@ -195,7 +224,11 @@ export const ReportsPage: React.FC = () => {
   };
 
   const handleSelectReport = (id: string) => {
-    setSearchParams({ report: id });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('report', id);
+      return next;
+    });
   };
 
   // Export actions
@@ -319,20 +352,68 @@ export const ReportsPage: React.FC = () => {
   }
 
   // State 5: Reports List Error
-  if (listError) {
+  if (listError && !reports.length) {
+    const isScanRequired =
+      listError.includes('Scan the project first') || listError.includes('SCAN_REQUIRED');
     return (
-      <div className="p-4 sm:p-6">
+      <div className="p-4 sm:p-6 space-y-4">
         <ErrorState
-          title="Failed to load reports"
+          title={isScanRequired ? 'Scan required' : 'Failed to load reports'}
           message={listError}
           onRetry={fetchReportsList}
         />
+        {isScanRequired && (
+          <div className="flex justify-center">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => selectedProjectId && rescan(selectedProjectId)}
+              disabled={isScanning}
+              className="gap-2"
+              data-testid="reports-scan-first-rescan-btn"
+            >
+              <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+              <span>{isScanning ? 'Scanning...' : 'Re-scan'}</span>
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Inline Error Banner (e.g. from failed generate action) */}
+      {listError && (
+        <div
+          data-testid="reports-error-banner"
+          className="p-3.5 rounded-lg bg-severity-high/10 border border-severity-high/30 flex items-center justify-between text-xs text-severity-high"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>{listError}</span>
+          </div>
+          {(listError.includes('Scan the project first') ||
+            listError.includes('SCAN_REQUIRED')) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (selectedProjectId) {
+                  rescan(selectedProjectId);
+                }
+              }}
+              disabled={isScanning}
+              className="gap-1.5"
+              data-testid="reports-scan-first-rescan-btn"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+              <span>{isScanning ? 'Scanning...' : 'Re-scan'}</span>
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Header & Toolbar */}
       <div
         data-testid="reports-toolbar"
@@ -352,7 +433,7 @@ export const ReportsPage: React.FC = () => {
             variant="primary"
             size="md"
             onClick={handleGenerateReport}
-            disabled={isGenerating}
+            disabled={isGenerating || !selectedProject?.last_scan_at}
             className="gap-2"
             data-testid="generate-report-button"
           >
@@ -378,7 +459,7 @@ export const ReportsPage: React.FC = () => {
               Past Reports
             </h2>
             <span className="text-xs text-theme-text-muted">
-              {reports.length} {reports.length === 1 ? 'report' : 'reports'}
+              {totalReports} {totalReports === 1 ? 'report' : 'reports'}
             </span>
           </div>
 
@@ -392,44 +473,79 @@ export const ReportsPage: React.FC = () => {
               <p>Click &quot;Generate report&quot; to create your first report.</p>
             </div>
           ) : (
-            <div className="space-y-1.5 max-h-[calc(100vh-16rem)] overflow-y-auto">
-              {reports.map((r, index) => {
-                const isSelected = selectedReport?.id === r.id;
-                const dateStr = new Date(r.created_at).toLocaleString();
-                const shortId = r.id.slice(0, 8);
+            <>
+              <div className="space-y-1.5 max-h-[calc(100vh-20rem)] overflow-y-auto">
+                {reports.map((r, index) => {
+                  const isSelected = selectedReport?.id === r.id;
+                  const dateStr = new Date(r.created_at).toLocaleString();
+                  const shortId = r.id.slice(0, 8);
 
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => handleSelectReport(r.id)}
-                    className={`w-full p-3 rounded-lg text-left transition-colors border flex flex-col gap-1 ${
-                      isSelected
-                        ? 'bg-theme-bg border-brand-primary/50 text-theme-text shadow-sm'
-                        : 'bg-theme-surface border-theme-border/60 hover:bg-theme-bg/60 text-theme-text'
-                    }`}
-                    data-testid={`report-item-${r.id}`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-mono text-xs text-theme-text font-medium">
-                        {shortId}
-                      </span>
-                      {index === 0 && (
-                        <span
-                          data-testid="latest-report-badge"
-                          className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-severity-medium/15 text-severity-medium border border-severity-medium/30"
-                        >
-                          Latest
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => handleSelectReport(r.id)}
+                      className={`w-full p-3 rounded-lg text-left transition-colors border flex flex-col gap-1 ${
+                        isSelected
+                          ? 'bg-theme-bg border-brand-primary/50 text-theme-text shadow-sm'
+                          : 'bg-theme-surface border-theme-border/60 hover:bg-theme-bg/60 text-theme-text'
+                      }`}
+                      data-testid={`report-item-${r.id}`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-mono text-xs text-theme-text font-medium">
+                          {shortId}
                         </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-theme-text-muted">
-                      {dateStr}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                        {index === 0 && page === 1 && (
+                          <span
+                            data-testid="latest-report-badge"
+                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-severity-medium/15 text-severity-medium border border-severity-medium/30"
+                          >
+                            Latest
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-theme-text-muted">
+                        {dateStr}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Pagination text and buttons */}
+              <div className="pt-3 border-t border-theme-border flex flex-col gap-2">
+                <div
+                  className="text-xs text-theme-text-muted"
+                  data-testid="reports-pagination-text"
+                >
+                  Showing {totalReports === 0 ? 0 : (page - 1) * pageSize + 1} to{' '}
+                  {Math.min(page * pageSize, totalReports)} of {totalReports} reports
+                </div>
+                {totalReports > pageSize && (
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => handlePageChange(page - 1)}
+                      data-testid="reports-prev-page"
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page * pageSize >= totalReports}
+                      onClick={() => handlePageChange(page + 1)}
+                      data-testid="reports-next-page"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </aside>
 
@@ -454,7 +570,14 @@ export const ReportsPage: React.FC = () => {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setSearchParams({})}
+                onClick={() => {
+                  setReport404(false);
+                  if (reports.length > 0) {
+                    setSearchParams({ report: reports[0].id });
+                  } else {
+                    setSearchParams({});
+                  }
+                }}
                 className="gap-2 mx-auto"
                 data-testid="back-to-reports-button"
               >

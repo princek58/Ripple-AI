@@ -62,13 +62,11 @@ export const FixDetail: React.FC<FixDetailProps> = ({
   const findingTitle =
     finding?.title ||
     ('finding_title' in fix && fix.finding_title) ||
-    ('findingTitle' in fix && fix.findingTitle) ||
     'Suggested change';
 
   const severity: FindingSeverity =
     finding?.severity ||
     ('finding_severity' in fix && (fix.finding_severity as FindingSeverity)) ||
-    ('findingSeverity' in fix && (fix.findingSeverity as FindingSeverity)) ||
     'unknown';
 
   const confidence: FindingConfidence = finding?.confidence || 'likely';
@@ -185,6 +183,11 @@ export const FixDetail: React.FC<FixDetailProps> = ({
       <div className="p-3.5 rounded-lg bg-theme-bg border border-theme-border space-y-1">
         <div className="text-xs font-semibold text-theme-text">{statusInfo.label}</div>
         <div className="text-xs text-theme-text-muted">{statusInfo.description}</div>
+        {fix.status === 'approved' && (
+          <div className="text-xs text-theme-text-muted font-mono" data-testid="fix-patch-path">
+            Patch: {fix.patch_path || 'Patch saved on server'}
+          </div>
+        )}
       </div>
 
       {/* Feedback / Error Alerts */}

@@ -42,6 +42,8 @@ export interface ReportParsed {
   truncated: boolean;
 }
 
+export type { ReportListItem, PaginatedReportsResult } from '../../../../shared/types.js';
+
 export interface Report {
   id: string;
   project_id: string;

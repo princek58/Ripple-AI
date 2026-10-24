@@ -11,6 +11,7 @@ import type {
   FindingsQueryParams,
   Fix,
   Report,
+  PaginatedReportsResult,
   ApiResponse,
 } from '../../../shared/types.js';
 import type { ProjectFixesResult } from '../features/fixes/fixesTypes.js';
@@ -49,6 +50,9 @@ export function getFriendlyErrorMessage(err: unknown): string {
       return 'File is too large';
     }
     if (err.status === 409) {
+      if (err.code === 'SCAN_REQUIRED' || err.message?.includes('SCAN_REQUIRED')) {
+        return 'Scan the project first';
+      }
       return 'This fix was already approved or rejected';
     }
     if (err.status === 422) {
@@ -355,8 +359,19 @@ export const api = {
     return apiFetch<ProjectTestsData>(`/api/projects/${projectId}/tests`, { signal });
   },
 
-  getReports(projectId: string, signal?: AbortSignal): Promise<Report[]> {
-    return apiFetch<Report[]>(`/api/projects/${projectId}/reports`, { signal });
+  getReports(
+    projectId: string,
+    query?: { page?: number; pageSize?: number },
+    signal?: AbortSignal
+  ): Promise<PaginatedReportsResult> {
+    const searchParams = new URLSearchParams();
+    if (query?.page !== undefined) searchParams.set('page', String(query.page));
+    if (query?.pageSize !== undefined) searchParams.set('pageSize', String(query.pageSize));
+    const qs = searchParams.toString();
+    return apiFetch<PaginatedReportsResult>(
+      `/api/projects/${projectId}/reports${qs ? `?${qs}` : ''}`,
+      { signal }
+    );
   },
 
   createReport(projectId: string, signal?: AbortSignal): Promise<Report> {

@@ -626,4 +626,40 @@ describe('Step 7 Fixes, Tests, Reports and Cleanups', () => {
     const badPageString = await request(app).get(`/api/projects/${projectId}/reports?page=invalid`);
     expect(badPageString.status).toBe(400);
   });
+
+  it('19. GET /api/projects/:id/fixes items include patch_path (string for approved, null for proposed)', async () => {
+    const { projectId } = await uploadAndScanFixture();
+    const envFindingRes = await request(app).get(`/api/projects/${projectId}/findings?rule_id=env_undeclared`);
+    const envFinding = envFindingRes.body.data.items[0];
+
+    const apiFindingRes = await request(app).get(`/api/projects/${projectId}/findings?rule_id=api_unmatched_call`);
+    const apiFinding = apiFindingRes.body.data.items[0];
+
+    const fix1Res = await request(app).post(`/api/findings/${envFinding.id}/fixes`);
+    expect(fix1Res.status).toBe(201);
+    const fix1 = fix1Res.body.data;
+
+    const fix2Res = await request(app).post(`/api/findings/${apiFinding.id}/fixes`);
+    expect(fix2Res.status).toBe(201);
+    const fix2 = fix2Res.body.data;
+
+    // Approve fix1
+    const approveRes = await request(app).post(`/api/fixes/${fix1.id}/approve`);
+    expect(approveRes.status).toBe(200);
+
+    // Fetch project fixes
+    const fixesListRes = await request(app).get(`/api/projects/${projectId}/fixes`);
+    expect(fixesListRes.status).toBe(200);
+    const items = fixesListRes.body.data.items;
+    const approvedItem = items.find((it: any) => it.id === fix1.id);
+    const proposedItem = items.find((it: any) => it.id === fix2.id);
+
+    expect(approvedItem).toBeDefined();
+    expect(approvedItem.status).toBe('approved');
+    expect(approvedItem.patch_path).toBe(`patches/${fix1.id}.patch`);
+
+    expect(proposedItem).toBeDefined();
+    expect(proposedItem.status).toBe('proposed');
+    expect(proposedItem.patch_path).toBeNull();
+  });
 });

@@ -10,6 +10,7 @@ export interface ProjectFixItem {
   files: string[];
   status: FixStatus;
   approved_at: string | null;
+  patch_path: string | null;
 }
 
 export interface ListProjectFixesOptions {
@@ -126,6 +127,7 @@ export class FixesRepository {
         files,
         status: r.status as FixStatus,
         approved_at: r.approved_at ?? null,
+        patch_path: r.status === 'approved' ? `patches/${r.id}.patch` : null,
       };
     });
 

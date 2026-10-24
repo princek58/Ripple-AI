@@ -253,6 +253,36 @@ describe('Fixes Screen (Step 12b Part 2)', () => {
     expect(screen.getByText(/Showing 1 to 2 of 2/i)).toBeInTheDocument();
   });
 
+  it('Fixes screen shows title and severity exclusively from snake_case keys', async () => {
+    const firstItem = fixesGetProjectAllFixture.data.items[0];
+    expect((firstItem as any).findingTitle).toBeUndefined();
+    expect((firstItem as any).findingSeverity).toBeUndefined();
+    expect(firstItem.finding_title).toBeDefined();
+    expect(firstItem.finding_severity).toBeDefined();
+
+    renderWithProviders();
+
+    await waitFor(() => {
+      expect(screen.getByText(firstItem.finding_title)).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByTestId(`severity-badge-${firstItem.finding_severity}`).length).toBeGreaterThan(0);
+  });
+
+  it('an approved fix opened from the list shows its patch path or the agreed fallback text', async () => {
+    const approvedItem = fixesGetProjectAllFixture.data.items.find((it) => it.status === 'approved')!;
+    expect(approvedItem).toBeDefined();
+    expect(approvedItem.patch_path).toBeDefined();
+
+    renderWithProviders([`/app/fixes?fix=${approvedItem.id}`]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('fix-patch-path')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('fix-patch-path')).toHaveTextContent(approvedItem.patch_path!);
+  });
+
   it('shows empty state when no projects exist', async () => {
     (global.fetch as any).mockImplementation((url: string | URL) => {
       if (url.toString().endsWith('/api/projects')) {
@@ -515,7 +545,7 @@ describe('Fixes Screen (Step 12b Part 2)', () => {
   });
 
   it('Approve flow: opens ConfirmDialog, Escape/Cancel cancels, confirming calls POST approve once, shows patch path and disclaimers', async () => {
-    const fixItem = fixesGetProjectAllFixture.data.items[0]; // Proposed fix
+    const fixItem = fixesGetProjectAllFixture.data.items.find((it) => it.status === 'proposed')!;
 
     renderWithProviders([`/app/fixes?fix=${fixItem.id}`]);
 
@@ -580,7 +610,7 @@ describe('Fixes Screen (Step 12b Part 2)', () => {
 
   it('Approve flow: 409 conflict displays friendly error message', async () => {
     mockApprove409 = true;
-    const fixItem = fixesGetProjectAllFixture.data.items[0];
+    const fixItem = fixesGetProjectAllFixture.data.items.find((it) => it.status === 'proposed')!;
 
     renderWithProviders([`/app/fixes?fix=${fixItem.id}`]);
 
@@ -597,7 +627,7 @@ describe('Fixes Screen (Step 12b Part 2)', () => {
   });
 
   it('Reject flow: opens ConfirmDialog, confirms and calls POST reject once', async () => {
-    const fixItem = fixesGetProjectAllFixture.data.items[0];
+    const fixItem = fixesGetProjectAllFixture.data.items.find((it) => it.status === 'proposed')!;
 
     renderWithProviders([`/app/fixes?fix=${fixItem.id}`]);
 
@@ -646,7 +676,7 @@ describe('Fixes Screen (Step 12b Part 2)', () => {
 
   it('Reject flow: 409 conflict displays friendly error message', async () => {
     mockReject409 = true;
-    const fixItem = fixesGetProjectAllFixture.data.items[0];
+    const fixItem = fixesGetProjectAllFixture.data.items.find((it) => it.status === 'proposed')!;
 
     renderWithProviders([`/app/fixes?fix=${fixItem.id}`]);
 
