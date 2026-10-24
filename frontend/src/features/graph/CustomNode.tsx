@@ -28,7 +28,7 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       tabIndex={0}
       data-node-id={id}
       aria-label={ariaLabel}
-      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl min-w-[160px] bg-theme-surface border border-theme-border shadow-sm cursor-pointer select-none transition-all focus:outline-none focus:ring-2 focus:ring-theme-primary ${
+      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl w-[220px] min-w-[160px] max-w-[220px] bg-theme-surface border border-theme-border shadow-sm cursor-pointer select-none transition-all focus:outline-none focus:ring-2 focus:ring-theme-primary ${
         isSelected
           ? 'ring-2 ring-theme-primary border-theme-primary bg-theme-surface'
           : isHighlighted
@@ -56,6 +56,11 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           >
             {nodeData.label}
           </span>
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0 mt-0.5 flex-wrap">
+          <span className="text-[11px] text-theme-text-muted capitalize">
+            {nodeType}
+          </span>
           {nodeData.isFocused && (
             <span
               data-testid={isModule ? 'current-module-badge' : 'focus-node-badge'}
@@ -65,9 +70,6 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
             </span>
           )}
         </div>
-        <span className="text-[11px] text-theme-text-muted capitalize">
-          {nodeType}
-        </span>
       </div>
 
       {findingCount > 0 && maxSeverity && (

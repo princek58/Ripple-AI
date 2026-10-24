@@ -218,18 +218,22 @@ export function buildElkInput(
       'elk.direction': 'RIGHT',
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
       'elk.spacing.nodeNode': '60',
+      'elk.spacing.componentComponent': '80',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '40',
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'SPLINES',
     },
     children: flowNodes.map((n) => {
-      let width = 160;
-      let height = 64;
+      let width = 220;
+      let height = 72;
       if (n.type === 'clusterNode') {
         width = 220;
         height = 80;
       } else if (n.type === 'stubNode') {
         width = 180;
         height = 56;
+      } else if (n.data?.isFocused) {
+        height = 80;
       }
       return {
         id: n.id,

@@ -361,7 +361,7 @@ export const InvestigationsPage: React.FC = () => {
   const showMobileDetail = isMobile && Boolean(urlState.findingId);
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col overflow-x-hidden p-4 sm:p-6">
+    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col overflow-x-hidden p-4 sm:p-6">
       {/* Two Column Layout on Desktop, Single Column Stack on Phone */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
         {/* Left Column: Finding List (hidden on phone when viewing detail) */}
@@ -410,7 +410,7 @@ export const InvestigationsPage: React.FC = () => {
         {/* Right Column: Finding Detail (hidden on phone when no finding selected) */}
         <section
           aria-label="Finding detail"
-          className={`h-full min-h-0 lg:col-span-7 ${
+          className={`min-h-0 lg:h-full lg:col-span-7 ${
             !urlState.findingId && isMobile ? 'hidden' : 'block'
           }`}
         >

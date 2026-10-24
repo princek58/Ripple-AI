@@ -11,13 +11,13 @@ export const AppShell: React.FC = () => {
       {/* Top Header / App Shell */}
       <header className="sticky top-0 z-40 w-full border-b border-theme-border bg-theme-surface/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-3">
+          <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
             {/* Left: Brand Logo & Project Switcher */}
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <Link
                 to="/"
                 aria-label="Ripple AI Home"
-                className="flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime rounded-lg p-1"
+                className="flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime rounded-lg p-1 shrink-0"
               >
                 <div className="w-8 h-8 rounded-lg bg-forest text-cream dark:bg-lime dark:text-forest flex items-center justify-center font-bold shadow-xs">
                   <Layers className="w-4 h-4" aria-hidden="true" />
@@ -27,7 +27,7 @@ export const AppShell: React.FC = () => {
                 </span>
               </Link>
 
-              <div className="h-5 w-px bg-theme-border hidden sm:block" aria-hidden="true" />
+              <div className="h-5 w-px bg-theme-border hidden sm:block shrink-0" aria-hidden="true" />
 
               <ProjectSwitcher />
             </div>

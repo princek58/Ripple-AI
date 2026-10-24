@@ -198,7 +198,7 @@ export const GraphSearchFilters: React.FC<GraphSearchFiltersProps> = ({
       {/* Search Input and Filter Controls */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Text Search Input */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-[150px] sm:min-w-[200px] max-w-sm">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted"
             aria-hidden="true"

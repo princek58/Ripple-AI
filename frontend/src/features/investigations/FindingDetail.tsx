@@ -54,7 +54,7 @@ export const FindingDetail: React.FC<FindingDetailProps> = ({
 
   return (
     <article
-      className="h-full overflow-y-auto p-5 sm:p-6 bg-theme-surface border border-theme-border rounded-xl shadow-sm space-y-6"
+      className="min-h-0 lg:h-full lg:overflow-y-auto p-5 sm:p-6 pb-12 bg-theme-surface border border-theme-border rounded-xl shadow-sm space-y-6"
       data-testid="finding-detail-container"
     >
       {/* Top Header Row with Optional Back Button */}

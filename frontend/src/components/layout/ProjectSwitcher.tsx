@@ -146,7 +146,7 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
     <div
       ref={dropdownRef}
       onKeyDown={handleKeyDown}
-      className={`relative inline-block text-left ${className}`}
+      className={`relative inline-block text-left min-w-0 ${className}`}
     >
       <button
         type="button"
@@ -154,10 +154,10 @@ export const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme-border bg-theme-surface text-theme-text text-xs sm:text-sm font-medium hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none"
+        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border border-theme-border bg-theme-surface text-theme-text text-xs sm:text-sm font-medium hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none min-w-0 max-w-full"
       >
         <FolderGit2 className="w-4 h-4 text-theme-text-muted shrink-0" aria-hidden="true" />
-        <span className="truncate max-w-[140px] sm:max-w-[200px]" data-testid="selected-project-name">
+        <span className="truncate max-w-[90px] xs:max-w-[120px] sm:max-w-[200px]" data-testid="selected-project-name">
           {selected?.name || 'Select project'}
         </span>
         <ChevronsUpDown className="w-3.5 h-3.5 text-theme-text-muted shrink-0" aria-hidden="true" />

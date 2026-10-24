@@ -419,7 +419,7 @@ export const GraphPage: React.FC = () => {
         {/* Search & Filters and Legend Toggle */}
         {selectedProjectId && (
           <div className="pt-0.5 flex items-center justify-between flex-wrap gap-2">
-            <div className="flex-1 min-w-[280px]">
+            <div className="flex-1 min-w-0 sm:min-w-[280px]">
               <GraphSearchFilters
                 projectId={selectedProjectId}
                 onSelectResult={handleSelectSearchResult}
