@@ -427,7 +427,8 @@ describe('Investigations Screen (Step 12a-1 Part 2)', () => {
     expect(detail.getByTestId('verification-badge-not_tested')).toHaveTextContent('Not tested');
 
     // Evidence
-    expect(detail.getByText('backend/routes/fees.js:2')).toBeInTheDocument();
+    const evidenceList = detail.getByTestId('evidence-list');
+    expect(within(evidenceList).getByText('backend/routes/fees.js:2')).toBeInTheDocument();
     expect(detail.getByText('specifier:')).toBeInTheDocument();
     expect(detail.getByText('../services/feeService')).toBeInTheDocument();
     expect(detail.getByText('Source code is not displayed in Phase 1')).toBeInTheDocument();
@@ -477,7 +478,8 @@ describe('Investigations Screen (Step 12a-1 Part 2)', () => {
     );
 
     // FindingDetail shows file and line from line_start/line_end
-    expect(screen.getByText('frontend/src/pages/NoticePage.tsx:13')).toBeInTheDocument();
+    const evidenceList = screen.getByTestId('evidence-list');
+    expect(within(evidenceList).getByText('frontend/src/pages/NoticePage.tsx:13')).toBeInTheDocument();
   });
 
   it('T09: evidence allowlist: extra keys like snippet/secret are never rendered, secret_pattern pattern is shown', () => {
@@ -508,9 +510,10 @@ describe('Investigations Screen (Step 12a-1 Part 2)', () => {
     );
 
     // Allowlisted values ARE present
-    expect(screen.getByText('config/keys.js:14')).toBeInTheDocument();
-    expect(screen.getByText('pattern:')).toBeInTheDocument();
-    expect(screen.getByText('AWS_ACCESS_KEY_ID')).toBeInTheDocument();
+    const evidenceList = screen.getByTestId('evidence-list');
+    expect(within(evidenceList).getByText('config/keys.js:14')).toBeInTheDocument();
+    expect(within(evidenceList).getByText('pattern:')).toBeInTheDocument();
+    expect(within(evidenceList).getByText('AWS_ACCESS_KEY_ID')).toBeInTheDocument();
 
     // Disallowed keys & values MUST NEVER be in the DOM
     expect(screen.queryByText('AKIAIOSFODNN7EXAMPLE')).not.toBeInTheDocument();

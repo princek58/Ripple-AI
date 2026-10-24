@@ -1,11 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, Wrench, ShieldAlert, GitPullRequest } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Wrench,
+  ShieldAlert,
+  GitPullRequest,
+  AlertTriangle,
+} from 'lucide-react';
 import { Button } from '../../components/ui/Button.js';
 import { SeverityBadge } from '../../components/ui/SeverityBadge.js';
 import { ConfidenceBadge } from '../../components/ui/ConfidenceBadge.js';
 import { VerificationBadge } from '../../components/ui/VerificationBadge.js';
 import { ruleLabel, formatEvidence } from './investigationsUrl.js';
+import { getHowToFix } from './howToFix.js';
+import { useExplainLanguage } from '../../lib/useExplainLanguage.js';
 import type { FindingDetailData } from '../../../../shared/types.js';
 
 export interface FindingDetailProps {
@@ -23,12 +32,18 @@ const ALLOWED_EVIDENCE_KEYS = new Set([
   'pattern',
 ]);
 
+const AUTO_FIX_RULES = ['env_undeclared', 'api_unmatched_call', 'broken_import'];
+
 export const FindingDetail: React.FC<FindingDetailProps> = ({
   finding,
   onBack,
   showBackButton = false,
 }) => {
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const [lang, setLang] = useExplainLanguage();
+  const guidance = getHowToFix(finding.rule_id, lang);
+  const firstEvidence = finding.evidence?.[0];
+  const startHere = firstEvidence ? formatEvidence(firstEvidence) : '';
 
   // Focus heading when component mounts (critical for mobile back-and-forth accessibility)
   useEffect(() => {
@@ -199,6 +214,170 @@ export const FindingDetail: React.FC<FindingDetailProps> = ({
           {finding.not_confirmed || 'None specified.'}
         </div>
       </section>
+
+      {/* Labelled card: How to fix */}
+      <details
+        open
+        data-testid="how-to-fix-card"
+        className="rounded-xl border border-theme-border bg-theme-surface shadow-xs overflow-hidden"
+      >
+        <summary className="p-4 sm:p-5 cursor-pointer select-none bg-theme-surface/70 hover:bg-theme-surface-active/40 border-b border-theme-border flex items-center justify-between focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="font-heading font-bold text-sm sm:text-base text-theme-text">
+              How to fix
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-forest/10 text-forest dark:bg-lime/10 dark:text-lime border border-forest/20 dark:border-lime/20">
+              Template-based, not AI
+            </span>
+          </div>
+        </summary>
+
+        <div className="p-4 sm:p-5 space-y-4">
+          {/* Header row: explanatory sentence + language toggle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-xs text-theme-text-muted">
+              These steps are written guidance. Ripple AI has not run or tested them.
+            </p>
+            <div
+              role="radiogroup"
+              aria-label="Guidance language"
+              className="inline-flex p-0.5 rounded-lg bg-theme-bg border border-theme-border shrink-0 self-start sm:self-auto"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={lang === 'en'}
+                aria-label="English"
+                onClick={() => setLang('en')}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    setLang('hi');
+                  }
+                }}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime ${
+                  lang === 'en'
+                    ? 'bg-theme-surface text-theme-text shadow-xs font-semibold'
+                    : 'text-theme-text-muted hover:text-theme-text'
+                }`}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={lang === 'hi'}
+                aria-label="Hinglish"
+                onClick={() => setLang('hi')}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    setLang('en');
+                  }
+                }}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime ${
+                  lang === 'hi'
+                    ? 'bg-theme-surface text-theme-text shadow-xs font-semibold'
+                    : 'text-theme-text-muted hover:text-theme-text'
+                }`}
+              >
+                Hinglish
+              </button>
+            </div>
+          </div>
+
+          {/* Start here (only when first evidence yields a non-empty location) */}
+          {startHere && (
+            <div
+              data-testid="how-to-fix-start-here"
+              className="p-3 rounded-lg bg-theme-bg border border-theme-border text-xs"
+            >
+              <span className="font-semibold text-theme-text">Start here: </span>
+              <span className="font-code text-theme-text">{startHere}</span>
+            </div>
+          )}
+
+          {/* What this means */}
+          <section className="space-y-1.5" aria-labelledby="what-this-means-heading">
+            <h4
+              id="what-this-means-heading"
+              className="text-xs font-semibold uppercase tracking-wider text-theme-text-muted"
+            >
+              What this means
+            </h4>
+            <p className="text-xs sm:text-sm text-theme-text leading-relaxed">
+              {guidance.whatItMeans}
+            </p>
+          </section>
+
+          {/* Steps you can follow */}
+          <section className="space-y-1.5" aria-labelledby="steps-follow-heading">
+            <h4
+              id="steps-follow-heading"
+              className="text-xs font-semibold uppercase tracking-wider text-theme-text-muted"
+            >
+              Steps you can follow
+            </h4>
+            <ol className="list-decimal list-inside space-y-1 text-xs sm:text-sm text-theme-text leading-relaxed">
+              {guidance.steps.map((step, idx) => (
+                <li key={idx} className="pl-1">
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          {/* How to check it worked */}
+          <section className="space-y-1.5" aria-labelledby="verify-heading">
+            <h4
+              id="verify-heading"
+              className="text-xs font-semibold uppercase tracking-wider text-theme-text-muted"
+            >
+              How to check it worked
+            </h4>
+            <p className="text-xs sm:text-sm text-theme-text leading-relaxed">
+              {guidance.verify}
+            </p>
+          </section>
+
+          {/* Caution (when present) */}
+          {guidance.caution && (
+            <section
+              aria-labelledby="caution-heading"
+              className="p-3 rounded-lg bg-severity-medium/10 border border-severity-medium/30 text-xs space-y-1"
+            >
+              <h4
+                id="caution-heading"
+                className="font-semibold text-severity-medium flex items-center gap-1.5"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Caution</span>
+              </h4>
+              <p className="text-theme-text leading-relaxed">{guidance.caution}</p>
+            </section>
+          )}
+
+          {/* Auto-fix note for env_undeclared, api_unmatched_call, broken_import */}
+          {AUTO_FIX_RULES.includes(finding.rule_id) && (
+            <p
+              data-testid="how-to-fix-autofix-note"
+              className="text-xs text-theme-text-muted italic pt-1 border-t border-theme-border/60"
+            >
+              For some cases Ripple AI can suggest a change in Fixes. It is only a suggestion and is never applied automatically.
+            </p>
+          )}
+
+          {/* Secret note for secret_pattern */}
+          {finding.rule_id === 'secret_pattern' && (
+            <p
+              data-testid="how-to-fix-secret-note"
+              className="text-xs text-theme-text-muted italic pt-1 border-t border-theme-border/60"
+            >
+              Ripple AI never builds an automatic fix for secrets.
+            </p>
+          )}
+        </div>
+      </details>
 
       {/* Labelled block: Affected nodes */}
       <section className="space-y-2" aria-labelledby="affected-nodes-heading">
