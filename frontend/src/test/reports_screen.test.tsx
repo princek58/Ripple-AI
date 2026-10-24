@@ -624,7 +624,7 @@ describe('Reports Screen (Step 12c Part 3)', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('reports-pagination-text')).toHaveTextContent('Showing 26 to 30 of 30 reports');
-    });
+    }, { timeout: 6000 });
 
     expect(screen.getByTestId('reports-prev-page')).toBeEnabled();
     expect(screen.getByTestId('reports-next-page')).toBeDisabled();

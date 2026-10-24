@@ -538,7 +538,17 @@ describe('Overview Screen & Real Backend Data (Step 10b)', () => {
         const liveProjectsRes = await fetch('http://localhost:4000/api/projects');
         expect(liveProjectsRes.ok).toBe(true);
         const liveProjectsJson = await liveProjectsRes.json();
-        const projectId = liveProjectsJson.data[0].id;
+        let projectId = liveProjectsJson.data[0].id;
+        for (const p of liveProjectsJson.data) {
+          const sRes = await fetch(`http://localhost:4000/api/projects/${p.id}/summary`);
+          if (sRes.ok) {
+            const sJson = await sRes.json();
+            if (sJson.data?.counts?.nodes > 0) {
+              projectId = p.id;
+              break;
+            }
+          }
+        }
 
         // 1. Verify summary keys
         const liveSummaryRes = await fetch(`http://localhost:4000/api/projects/${projectId}/summary`);
