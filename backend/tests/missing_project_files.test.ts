@@ -47,7 +47,7 @@ describe('Missing Project Files Handling (Step 13c Part 3)', () => {
           path: 'src/index.ts',
           size: 512,
           language: 'TypeScript',
-          sensitive: 0,
+          sensitive: false,
         },
       ],
     });
