@@ -16,9 +16,11 @@ import projectsListFixture from './fixtures/api/projects_list.json';
 import findingsDefaultFixture from './fixtures/api/findings_default.json';
 import findingBrokenImportFixture from './fixtures/api/finding_detail_broken_import.json';
 import findingFixProposedFixture from './fixtures/api/finding_detail_fix_proposed.json';
+import findingApiUnmatchedFixture from './fixtures/api/finding_detail_api_unmatched_call.json';
 
 const brokenImportDetail: FindingDetailData = findingBrokenImportFixture.data as unknown as FindingDetailData;
 const fixProposedDetail: FindingDetailData = findingFixProposedFixture.data as unknown as FindingDetailData;
+const apiUnmatchedDetail: FindingDetailData = findingApiUnmatchedFixture.data as unknown as FindingDetailData;
 const defaultFindings: PaginatedFindings = findingsDefaultFixture.data as unknown as PaginatedFindings;
 
 const capturedProjects: Project[] = projectsListFixture.data;
@@ -247,8 +249,8 @@ describe('Investigations Screen (Step 12a-1 Part 2)', () => {
       expect(abortSignals.length).toBeGreaterThanOrEqual(1);
     });
 
-    // Rapidly change filter
-    const severitySelect = screen.getByLabelText('Filter by Severity');
+    // Wait for list to render and rapidly change filter
+    const severitySelect = await screen.findByLabelText('Filter by Severity');
     fireEvent.change(severitySelect, { target: { value: 'high' } });
     fireEvent.change(severitySelect, { target: { value: 'medium' } });
 
@@ -465,6 +467,17 @@ describe('Investigations Screen (Step 12a-1 Part 2)', () => {
     expect(
       screen.getByText('A proposed fix is available for this finding and ready for review.')
     ).toBeInTheDocument();
+  });
+
+  it('T08c: renders evidence file and line number with the REAL api_unmatched_call capture', () => {
+    render(
+      <MemoryRouter>
+        <FindingDetail finding={apiUnmatchedDetail} />
+      </MemoryRouter>
+    );
+
+    // FindingDetail shows file and line from line_start/line_end
+    expect(screen.getByText('frontend/src/pages/NoticePage.tsx:13')).toBeInTheDocument();
   });
 
   it('T09: evidence allowlist: extra keys like snippet/secret are never rendered, secret_pattern pattern is shown', () => {

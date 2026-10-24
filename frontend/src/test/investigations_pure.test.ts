@@ -145,8 +145,8 @@ describe('Investigations Pure Functions', () => {
       ).toBe('src/App.tsx:10-25');
     });
 
-    it('formats evidence with line property fallback', () => {
-      expect(formatEvidence({ file: 'src/secret.js', line: 42 })).toBe(
+    it('formats evidence with single line when line_start equals line_end', () => {
+      expect(formatEvidence({ file: 'src/secret.js', line_start: 42, line_end: 42 })).toBe(
         'src/secret.js:42'
       );
     });

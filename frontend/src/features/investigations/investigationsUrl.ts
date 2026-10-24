@@ -148,12 +148,7 @@ export function formatEvidence(ev: FindingEvidenceItem): string {
   if (!ev) return '';
 
   const file = typeof ev.file === 'string' ? ev.file : '';
-  const lineStart =
-    typeof ev.line_start === 'number'
-      ? ev.line_start
-      : typeof ev.line === 'number'
-        ? ev.line
-        : undefined;
+  const lineStart = typeof ev.line_start === 'number' ? ev.line_start : undefined;
   const lineEnd = typeof ev.line_end === 'number' ? ev.line_end : undefined;
 
   if (file) {
