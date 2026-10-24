@@ -19,6 +19,7 @@ import {
 import type {
   Finding,
   FindingDetailData,
+  ProjectSummary,
 } from '../../../../shared/types.js';
 
 export const InvestigationsPage: React.FC = () => {
@@ -37,6 +38,9 @@ export const InvestigationsPage: React.FC = () => {
     () => parseInvestigationsUrl(searchParams),
     [searchParams]
   );
+
+  // Summary state for never-scanned detection
+  const [summary, setSummary] = useState<ProjectSummary | null>(null);
 
   // Findings list state
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -93,6 +97,7 @@ export const InvestigationsPage: React.FC = () => {
       setSelectedFinding(null);
       setIsForeignOr404(false);
       setDetailError(null);
+      setSummary(null);
     }
     previousProjectIdRef.current = selectedProjectId;
   }, [selectedProjectId, navigate]);
@@ -101,7 +106,6 @@ export const InvestigationsPage: React.FC = () => {
   const fetchFindingsList = useCallback(async () => {
     if (!selectedProjectId) return;
 
-    // Never scanned project
     if (isNeverScanned(selectedProject)) {
       setIsFindingsLoading(false);
       setFindings([]);
@@ -120,12 +124,32 @@ export const InvestigationsPage: React.FC = () => {
 
     try {
       const query = buildFindingsQuery(urlState, 25);
-      const res = await api.getFindings(selectedProjectId, query, abortController.signal);
+      const [res, summaryRes] = await Promise.allSettled([
+        api.getFindings(selectedProjectId, query, abortController.signal),
+        api.getSummary(selectedProjectId, abortController.signal),
+      ]);
 
       if (abortController.signal.aborted) return;
 
-      setFindings(res.items || []);
-      setTotalFindings(res.total ?? 0);
+      if (summaryRes.status === 'fulfilled') {
+        setSummary(summaryRes.value);
+        if (isNeverScanned(selectedProject, summaryRes.value)) {
+          setIsFindingsLoading(false);
+          setFindings([]);
+          setTotalFindings(0);
+          return;
+        }
+      }
+
+      if (res.status === 'fulfilled') {
+        setFindings(res.value.items || []);
+        setTotalFindings(res.value.total ?? 0);
+      } else {
+        const msg = getFriendlyErrorMessage(res.reason);
+        if (msg !== 'Request cancelled') {
+          setFindingsError(msg);
+        }
+      }
     } catch (err: unknown) {
       if (abortController.signal.aborted) return;
       const msg = getFriendlyErrorMessage(err);
@@ -290,7 +314,7 @@ export const InvestigationsPage: React.FC = () => {
   }
 
   // State 3: Project exists but never scanned (NO ZEROS)
-  if (isNeverScanned(selectedProject)) {
+  if (isNeverScanned(selectedProject, summary)) {
     return (
       <div className="p-6">
         <div
@@ -308,7 +332,7 @@ export const InvestigationsPage: React.FC = () => {
           </p>
           <div className="mt-4">
             <Button
-              onClick={() => selectedProject && rescan(selectedProject.id)}
+              onClick={() => selectedProject && rescan(selectedProject.id, fetchFindingsList)}
               disabled={isScanning}
               className="gap-2"
             >

@@ -21,6 +21,7 @@ import { ErrorState } from '../../components/ui/ErrorState.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { Button } from '../../components/ui/Button.js';
 import { TestRunItem, TestRunStatus, TestCounts } from './testsTypes.js';
+import type { ProjectSummary } from '../../../../shared/types.js';
 import {
   parseTestsUrl,
   buildTestsUrl,
@@ -42,6 +43,9 @@ export const TestsPage: React.FC = () => {
     () => parseTestsUrl(searchParams),
     [searchParams]
   );
+
+  // Summary state for never-scanned detection
+  const [summary, setSummary] = useState<ProjectSummary | null>(null);
 
   const [items, setItems] = useState<TestRunItem[]>([]);
   const [counts, setCounts] = useState<TestCounts | null>(null);
@@ -81,7 +85,6 @@ export const TestsPage: React.FC = () => {
       return;
     }
 
-    // Never-scanned project
     if (isNeverScanned(selectedProject)) {
       setIsLoading(false);
       setItems([]);
@@ -100,13 +103,32 @@ export const TestsPage: React.FC = () => {
     setError(null);
 
     try {
-      const res = await api.getTests(selectedProjectId, abortController.signal);
-      if (!abortController.signal.aborted) {
-        setItems(res.items || []);
-        setCounts(res.counts || { pass: 0, fail: 0, skipped: 0, not_run: 0 });
-        if (res.note) {
-          setNote(res.note);
+      const [res, summaryRes] = await Promise.allSettled([
+        api.getTests(selectedProjectId, abortController.signal),
+        api.getSummary(selectedProjectId, abortController.signal),
+      ]);
+
+      if (abortController.signal.aborted) return;
+
+      if (summaryRes.status === 'fulfilled') {
+        setSummary(summaryRes.value);
+        if (isNeverScanned(selectedProject, summaryRes.value)) {
+          setIsLoading(false);
+          setItems([]);
+          setCounts(null);
+          setError(null);
+          return;
         }
+      }
+
+      if (res.status === 'fulfilled') {
+        setItems(res.value.items || []);
+        setCounts(res.value.counts || { pass: 0, fail: 0, skipped: 0, not_run: 0 });
+        if (res.value.note) {
+          setNote(res.value.note);
+        }
+      } else {
+        setError(getFriendlyErrorMessage(res.reason));
       }
     } catch (err: unknown) {
       if (!abortController.signal.aborted) {
@@ -129,6 +151,7 @@ export const TestsPage: React.FC = () => {
       if (activeAbortRef.current) {
         activeAbortRef.current.abort();
       }
+      setSummary(null);
       setSearchParams(new URLSearchParams(), { replace: true });
     }
     if (selectedProjectId) {
@@ -215,7 +238,7 @@ export const TestsPage: React.FC = () => {
   }
 
   // State 3: Project never scanned (NEVER show zeros here)
-  if (isNeverScanned(selectedProject)) {
+  if (isNeverScanned(selectedProject, summary)) {
     return (
       <div className="h-full flex items-center justify-center p-6" data-testid="tests-never-scanned">
         <div className="flex flex-col items-center justify-center text-center p-8 bg-theme-surface border border-theme-border rounded-xl max-w-md space-y-4">
@@ -231,7 +254,7 @@ export const TestsPage: React.FC = () => {
             size="md"
             onClick={() => {
               if (selectedProjectId) {
-                rescan(selectedProjectId);
+                rescan(selectedProjectId, fetchTests);
               }
             }}
             disabled={isScanning}

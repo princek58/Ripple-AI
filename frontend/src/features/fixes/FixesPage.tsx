@@ -14,6 +14,7 @@ import { FixDetail } from './FixDetail.js';
 import { GenerateFixCard } from './GenerateFixCard.js';
 import { parseFixesUrl, buildFixesUrl } from './fixesPure.js';
 import type { ProjectFixItem, Fix } from './fixesTypes.js';
+import type { ProjectSummary } from '../../../../shared/types.js';
 
 export const FixesPage: React.FC = () => {
   const location = useLocation();
@@ -23,6 +24,9 @@ export const FixesPage: React.FC = () => {
 
   // URL State
   const urlState = useMemo(() => parseFixesUrl(location.search), [location.search]);
+
+  // Summary state for never-scanned detection
+  const [summary, setSummary] = useState<ProjectSummary | null>(null);
 
   // Fixes list state
   const [items, setItems] = useState<ProjectFixItem[]>([]);
@@ -86,6 +90,7 @@ export const FixesPage: React.FC = () => {
       }
       setSelectedFix(null);
       setFindingHasNoFix(false);
+      setSummary(null);
       navigate('/app/fixes', { replace: true });
     }
     if (selectedProjectId) {
@@ -97,7 +102,6 @@ export const FixesPage: React.FC = () => {
   const fetchFixesList = useCallback(async () => {
     if (!selectedProjectId) return;
 
-    // Never scanned project
     if (isNeverScanned(selectedProject)) {
       setIsListLoading(false);
       setItems([]);
@@ -115,20 +119,36 @@ export const FixesPage: React.FC = () => {
     setListError(null);
 
     try {
-      const res = await api.getProjectFixes(
-        selectedProjectId,
-        {
-          status: urlState.status || undefined,
-          page: urlState.page,
-          pageSize: 25,
-        },
-        abortController.signal
-      );
+      const [res, summaryRes] = await Promise.allSettled([
+        api.getProjectFixes(
+          selectedProjectId,
+          {
+            status: urlState.status || undefined,
+            page: urlState.page,
+            pageSize: 25,
+          },
+          abortController.signal
+        ),
+        api.getSummary(selectedProjectId, abortController.signal),
+      ]);
 
-      // Only apply if not aborted
-      if (!abortController.signal.aborted) {
-        setItems(res.items || []);
-        setTotalItems(res.total || 0);
+      if (abortController.signal.aborted) return;
+
+      if (summaryRes.status === 'fulfilled') {
+        setSummary(summaryRes.value);
+        if (isNeverScanned(selectedProject, summaryRes.value)) {
+          setIsListLoading(false);
+          setItems([]);
+          setTotalItems(0);
+          return;
+        }
+      }
+
+      if (res.status === 'fulfilled') {
+        setItems(res.value.items || []);
+        setTotalItems(res.value.total || 0);
+      } else {
+        setListError(getFriendlyErrorMessage(res.reason));
       }
     } catch (err: unknown) {
       if (!abortController.signal.aborted) {
@@ -272,7 +292,7 @@ export const FixesPage: React.FC = () => {
   }
 
   // State 3: Project never scanned
-  if (isNeverScanned(selectedProject)) {
+  if (isNeverScanned(selectedProject, summary)) {
     return (
       <div className="h-full flex items-center justify-center p-6">
         <div className="flex flex-col items-center justify-center text-center p-8 bg-theme-surface border border-theme-border rounded-xl max-w-md space-y-4">
@@ -288,7 +308,7 @@ export const FixesPage: React.FC = () => {
             size="md"
             onClick={() => {
               if (selectedProjectId) {
-                rescan(selectedProjectId);
+                rescan(selectedProjectId, fetchFixesList);
               }
             }}
             disabled={isScanning}

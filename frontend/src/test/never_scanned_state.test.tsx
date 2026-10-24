@@ -122,9 +122,18 @@ describe('Unified Never-Scanned State across All Screens', () => {
   // 3. Graph Screen
   describe('3. Graph Screen', () => {
     it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
-      const nullScanProj: Project = { ...unscannedProject, last_scan_at: null };
-      vi.spyOn(api, 'getProjects').mockResolvedValue([nullScanProj]);
-      const getGraphSpy = vi.spyOn(api, 'getGraph');
+      localStorage.setItem(STORAGE_KEY, unscannedProject.id);
+      vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
+      vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
+      vi.spyOn(api, 'getGraph').mockResolvedValue({
+        nodes: [],
+        edges: [],
+        clusters: [],
+        shown: 0,
+        total: 0,
+        level: 1,
+        focus: null,
+      });
 
       render(
         <MemoryRouter initialEntries={['/app/graph']}>
@@ -140,7 +149,6 @@ describe('Unified Never-Scanned State across All Screens', () => {
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
       expect(screen.getByTestId('rescan-graph-btn')).toBeInTheDocument();
-      expect(getGraphSpy).not.toHaveBeenCalled();
       expect(screen.queryByTestId('shown-counter')).not.toBeInTheDocument();
     });
   });
@@ -148,9 +156,15 @@ describe('Unified Never-Scanned State across All Screens', () => {
   // 4. Investigations Screen
   describe('4. Investigations Screen', () => {
     it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
-      const nullScanProj: Project = { ...unscannedProject, last_scan_at: null };
-      vi.spyOn(api, 'getProjects').mockResolvedValue([nullScanProj]);
-      const getFindingsSpy = vi.spyOn(api, 'getFindings');
+      localStorage.setItem(STORAGE_KEY, unscannedProject.id);
+      vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
+      vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
+      vi.spyOn(api, 'getFindings').mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 25,
+      });
 
       render(
         <MemoryRouter initialEntries={['/app/investigations']}>
@@ -166,7 +180,6 @@ describe('Unified Never-Scanned State across All Screens', () => {
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
-      expect(getFindingsSpy).not.toHaveBeenCalled();
       expect(screen.queryByText(/0 findings/i)).not.toBeInTheDocument();
     });
   });
@@ -174,9 +187,15 @@ describe('Unified Never-Scanned State across All Screens', () => {
   // 5. Fixes Screen
   describe('5. Fixes Screen', () => {
     it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
-      const nullScanProj: Project = { ...unscannedProject, last_scan_at: null };
-      vi.spyOn(api, 'getProjects').mockResolvedValue([nullScanProj]);
-      const getFixesSpy = vi.spyOn(api, 'getProjectFixes');
+      localStorage.setItem(STORAGE_KEY, unscannedProject.id);
+      vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
+      vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
+      vi.spyOn(api, 'getProjectFixes').mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 25,
+      });
 
       render(
         <MemoryRouter initialEntries={['/app/fixes']}>
@@ -191,7 +210,6 @@ describe('Unified Never-Scanned State across All Screens', () => {
       });
 
       expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
-      expect(getFixesSpy).not.toHaveBeenCalled();
       expect(screen.queryByText(/0 findings/i)).not.toBeInTheDocument();
     });
   });
@@ -199,9 +217,14 @@ describe('Unified Never-Scanned State across All Screens', () => {
   // 6. Tests Screen
   describe('6. Tests Screen', () => {
     it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
-      const nullScanProj: Project = { ...unscannedProject, last_scan_at: null };
-      vi.spyOn(api, 'getProjects').mockResolvedValue([nullScanProj]);
-      const getTestsSpy = vi.spyOn(api, 'getTests');
+      localStorage.setItem(STORAGE_KEY, unscannedProject.id);
+      vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
+      vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
+      vi.spyOn(api, 'getTests').mockResolvedValue({
+        items: [],
+        counts: { pass: 0, fail: 0, skipped: 0, not_run: 0 },
+        note: 'Tests are not executed in Phase 1.',
+      });
 
       render(
         <MemoryRouter initialEntries={['/app/tests']}>
@@ -217,7 +240,6 @@ describe('Unified Never-Scanned State across All Screens', () => {
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
-      expect(getTestsSpy).not.toHaveBeenCalled();
       expect(screen.queryByTestId('tile-passed')).not.toBeInTheDocument();
       expect(screen.queryByTestId('tile-failed')).not.toBeInTheDocument();
     });

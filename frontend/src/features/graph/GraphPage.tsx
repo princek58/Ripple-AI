@@ -26,6 +26,7 @@ import type {
   GraphResponseData,
   NodeDetailsData,
   GraphNode,
+  ProjectSummary,
 } from '../../../../shared/types.js';
 
 export const GraphPage: React.FC = () => {
@@ -34,6 +35,9 @@ export const GraphPage: React.FC = () => {
   const { selectedProject, selectedProjectId, projects, isLoading: isProjectsLoading } =
     useProjects();
   const { rescan, isScanning } = useRescan();
+
+  // Summary state for never-scanned detection
+  const [summary, setSummary] = useState<ProjectSummary | null>(null);
 
   // URL state
   const { focus: urlFocus, level: urlLevel, depth: urlDepth } = useMemo(
@@ -70,6 +74,7 @@ export const GraphPage: React.FC = () => {
       setIs404Focus(false);
       setFocusNodeDetails(null);
       setMaxNodes(50);
+      setSummary(null);
     }
     previousProjectIdRef.current = selectedProjectId;
   }, [selectedProjectId, navigate]);
@@ -94,33 +99,47 @@ export const GraphPage: React.FC = () => {
     setIs404Focus(false);
 
     try {
+      const summaryPromise = api.getSummary(selectedProjectId, controller.signal);
+
       // Case 1: Focus provided without level (e.g. from Overview screen link)
       if (urlFocus && urlLevel === null) {
         try {
-          const details = await api.getNodeDetails(
-            selectedProjectId,
-            urlFocus,
-            controller.signal
-          );
+          const [details, summaryRes] = await Promise.allSettled([
+            api.getNodeDetails(selectedProjectId, urlFocus, controller.signal),
+            summaryPromise,
+          ]);
           if (controller.signal.aborted) return;
 
-          const { level, depth } = resolveLevelFromNodeType(details.node.type);
-          if (level === 2) {
-            setSearchParams({ focus: urlFocus, level: '2' }, { replace: true });
-          } else {
-            setSearchParams(
-              { focus: urlFocus, level: '3', depth: String(depth) },
-              { replace: true }
-            );
+          if (summaryRes.status === 'fulfilled') {
+            setSummary(summaryRes.value);
+            if (isNeverScanned(selectedProject, summaryRes.value)) {
+              setIsGraphLoading(false);
+              return;
+            }
           }
-          return;
+
+          if (details.status === 'fulfilled') {
+            const { level, depth } = resolveLevelFromNodeType(details.value.node.type);
+            if (level === 2) {
+              setSearchParams({ focus: urlFocus, level: '2' }, { replace: true });
+            } else {
+              setSearchParams(
+                { focus: urlFocus, level: '3', depth: String(depth) },
+                { replace: true }
+              );
+            }
+            return;
+          } else {
+            const err = details.reason;
+            if (err instanceof ApiClientError && err.status === 404) {
+              setIs404Focus(true);
+              setIsGraphLoading(false);
+              return;
+            }
+            throw err;
+          }
         } catch (err: unknown) {
           if (controller.signal.aborted) return;
-          if (err instanceof ApiClientError && err.status === 404) {
-            setIs404Focus(true);
-            setIsGraphLoading(false);
-            return;
-          }
           throw err;
         }
       }
@@ -144,10 +163,26 @@ export const GraphPage: React.FC = () => {
         queryParams.depth = urlDepth;
       }
 
-      const data = await api.getGraph(selectedProjectId, queryParams, controller.signal);
-      if (!controller.signal.aborted) {
-        setGraphData(data);
+      const [graphResult, summaryResult] = await Promise.allSettled([
+        api.getGraph(selectedProjectId, queryParams, controller.signal),
+        summaryPromise,
+      ]);
+
+      if (controller.signal.aborted) return;
+
+      if (summaryResult.status === 'fulfilled') {
+        setSummary(summaryResult.value);
+        if (isNeverScanned(selectedProject, summaryResult.value)) {
+          setIsGraphLoading(false);
+          return;
+        }
+      }
+
+      if (graphResult.status === 'fulfilled') {
+        setGraphData(graphResult.value);
         setIsGraphLoading(false);
+      } else {
+        throw graphResult.reason;
       }
 
       // Fetch node details for focus node to populate breadcrumb
@@ -279,7 +314,7 @@ export const GraphPage: React.FC = () => {
   }
 
   // 3. Never scanned state
-  const neverScanned = isNeverScanned(selectedProject);
+  const neverScanned = isNeverScanned(selectedProject, summary);
   if (neverScanned && selectedProject) {
     return (
       <div className="p-6">
