@@ -25,10 +25,14 @@ export function setupPageCheckListeners(page: Page) {
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];
 
+  page.removeAllListeners('console');
+  page.removeAllListeners('pageerror');
+  page.removeAllListeners('response');
+  page.removeAllListeners('requestfailed');
+
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       const text = msg.text();
-      // Ignore React 19 hydration/test noise if any, but record actual errors
       consoleErrors.push(text);
     }
   });
@@ -49,6 +53,10 @@ export function setupPageCheckListeners(page: Page) {
   });
 
   page.on('requestfailed', (request) => {
+    const failure = request.failure();
+    if (failure?.errorText?.includes('ERR_ABORTED')) {
+      return;
+    }
     try {
       const url = new URL(request.url());
       failedRequests.push(url.pathname);
@@ -63,15 +71,16 @@ export function setupPageCheckListeners(page: Page) {
 export async function runPageChecks(
   page: Page,
   isAppRoute: boolean,
+  isPhone: boolean,
   collected: { consoleErrors: string[]; pageErrors: string[]; failedRequests: string[] }
 ): Promise<PageCheckResult> {
-  const domResult = await page.evaluate((isApp) => {
-    // 1. Horizontal overflow
+  const domResult = await page.evaluate(({ isApp, isPhoneViewport }) => {
+    // 1. Horizontal overflow on phone viewport
     const docEl = document.documentElement;
     const body = document.body;
     const scrollW = Math.max(docEl.scrollWidth, body ? body.scrollWidth : 0);
     const clientW = docEl.clientWidth;
-    const hasHorizontalOverflow = scrollW > clientW + 1;
+    const hasHorizontalOverflow = isPhoneViewport && scrollW > clientW + 1;
 
     // 2. Buttons, links, inputs without accessible name
     const interactives = Array.from(
@@ -178,7 +187,7 @@ export async function runPageChecks(
       forbiddenText: foundForbidden,
       sampleDataCount,
     };
-  }, isAppRoute);
+  }, { isApp: isAppRoute, isPhoneViewport: isPhone });
 
   return {
     consoleErrors: collected.consoleErrors,

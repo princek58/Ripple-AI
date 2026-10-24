@@ -48,8 +48,8 @@ test.describe('Automated Checks Self-Test', () => {
       console.error('Deliberate test console error injected by self-test');
     });
 
-    // Run automated checks (marking as an /app/* route to check sample data tag detection)
-    const result = await runPageChecks(page, true, listeners);
+    // Run automated checks (marking as an /app/* route and phone viewport to check all detections)
+    const result = await runPageChecks(page, true, true, listeners);
 
     // Assert that each injected defect is detected:
     console.log('\n--- SELF-TEST AUTOMATED CHECK DETECTION RESULTS ---');

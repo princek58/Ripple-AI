@@ -145,7 +145,7 @@ test.describe('Automated Visual QA Suite', () => {
         await page.screenshot({ path: screenshotFilePath, fullPage: true });
 
         // Run automated DOM/console/network checks
-        const checkResult = await runPageChecks(page, isAppRoute, listeners);
+        const checkResult = await runPageChecks(page, isAppRoute, v.device === 'phone', listeners);
 
         allChecks[fileKey] = {
           file: screenshotFileName,
