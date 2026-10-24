@@ -123,6 +123,26 @@ npm --workspace=@ripple-ai/backend run build
 npm --workspace=@ripple-ai/frontend run build
 ```
 
+### Visual QA
+
+Run full automated browser visual regression and quality verification:
+
+- **Single-click launcher (Windows)**: Double-click `run-qa.bat` in the project root.
+- **Command line**: `npm --prefix frontend run qa`
+- **What it checks**:
+  - Console and uncaught page errors
+  - Failed network requests
+  - Mobile phone horizontal viewport overflow
+  - Dependency graph node overlaps
+  - Container clipping warnings
+  - Interactive controls without accessible names
+  - Images missing alt attributes
+  - Forbidden placeholder text (`undefined`, `NaN`, `null`, `[object Object]`)
+  - "Sample data" tags on `/app/*` routes
+  - Landing page dynamic counter animation and final values
+- **Isolation**: Uses the installed Microsoft Edge or Google Chrome, an isolated temporary database fixture, and dedicated ports 3100 (frontend) and 4100 (backend). It never touches production data or dev ports 3000/4000.
+- **Contact sheet**: An HTML contact sheet displaying all captured desktop and phone screenshots with automated check results is generated at `frontend/qa-screenshots/index.html`.
+
 ## Safety design
 
 Ripple AI enforces 10 core safety principles across all analysis workflows:
@@ -174,7 +194,9 @@ RippleAI/
 
 ## Known limitations
 
-- **Print layout & screen design**: Print layout and screen visual design have not been checked by an automated browser test.
+- **Backend dependency advisory (Zod)**: The backend dependency `zod` (3.25.76) has an open npm audit advisory (GHSA-mrhx-c7xc-m3w5, memory use while validating oversized collections); the suggested fix is a major upgrade that has not been applied; the app is for single-user local use.
+- **Visual QA review**: Visual QA is automated plus an AI review of screenshots and has not been checked by a human designer.
+- **Print layout verification**: Print layout is only checked by the stylesheet test, not by a printed page.
 - **Graph page bundle size**: The `elkjs` layout engine is bundled whole, so the Graph page chunk is about 1.6 MB (uncompressed).
 - **Unbuilt graph features**: The level 4 evidence graph and the scan history strip are not built.
 - **Routerless fixtures**: In architectures without a centralized router file (such as the included `demo-erp` sample), some standalone utility and helper files may be flagged as `isolated_file`.
@@ -185,4 +207,4 @@ RippleAI/
 
 - **Phase 1**: Complete.
 - **Phase 2**: Not built.
-- **Test suite**: 401 tests passing across 36 test files (85 backend tests, 316 frontend tests, 0 failures) as of 2026-10-24.
+- **Test suite**: 420 tests passing across 42 test files (92 backend tests, 328 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.
