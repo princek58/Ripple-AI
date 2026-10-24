@@ -182,18 +182,24 @@ test.describe('Automated Visual QA Suite', () => {
           await page.waitForTimeout(300);
         }
 
-        // Landing counters scroll trigger: scroll slowly down and up before screenshot
+        // Landing counters scroll trigger: scroll stats band into view to trigger count-up and wait for settle
         if (r.slug === 'landing') {
-          await page.evaluate(async () => {
-            const docEl = document.documentElement;
-            const scrollHeight = Math.max(docEl.scrollHeight, document.body ? document.body.scrollHeight : 0);
-            for (let y = 0; y < scrollHeight; y += 400) {
-              window.scrollTo(0, y);
-              await new Promise((resolve) => setTimeout(resolve, 80));
-            }
-            window.scrollTo(0, 0);
+          await page.evaluate(() => {
+            const el = document.querySelector('[data-testid="stats-band"]');
+            if (el) el.scrollIntoView({ block: 'center' });
           });
-          await page.waitForTimeout(1000);
+          try {
+            await page.waitForFunction(
+              () => {
+                const levels = document.querySelector('[data-testid="stat-value-levels"]')?.textContent?.trim();
+                const checks = document.querySelector('[data-testid="stat-value-checks"]')?.textContent?.trim();
+                return levels === '4' && checks === '6';
+              },
+              { timeout: 3500 }
+            );
+          } catch {}
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.waitForTimeout(400);
         }
 
         await page.screenshot({ path: screenshotFilePath, fullPage: true });

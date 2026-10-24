@@ -58,6 +58,8 @@ export const StatsBand: React.FC<StatsBandProps> = ({
 
   const hasAnimatedRef = useRef(false);
   const elementRef = useRef<HTMLDivElement>(null);
+  const rafIdRef = useRef<number | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -75,6 +77,11 @@ export const StatsBand: React.FC<StatsBandProps> = ({
       if (hasAnimatedRef.current) return;
       hasAnimatedRef.current = true;
 
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+
       const duration = 800; // ms
       const startTime = performance.now();
 
@@ -89,32 +96,48 @@ export const StatsBand: React.FC<StatsBandProps> = ({
         });
 
         if (progress < 1) {
-          requestAnimationFrame(animate);
+          rafIdRef.current = requestAnimationFrame(animate);
         } else {
           setCounts({ levels: 4, checks: 6, executed: 0 });
+          rafIdRef.current = null;
         }
       };
 
-      requestAnimationFrame(animate);
+      rafIdRef.current = requestAnimationFrame(animate);
     };
 
     // If IntersectionObserver is available, observe visibility
+    let observer: IntersectionObserver | null = null;
     if (typeof IntersectionObserver !== 'undefined' && elementRef.current) {
-      const observer = new IntersectionObserver(
+      observer = new IntersectionObserver(
         (entries) => {
           if (entries[0]?.isIntersecting) {
             startCountUp();
-            observer.disconnect();
+            if (observer) {
+              observer.disconnect();
+              observer = null;
+            }
           }
         },
         { threshold: 0.1 }
       );
       observer.observe(elementRef.current);
-      return () => observer.disconnect();
+
+      // Fallback: If no intersection event occurs within 1000ms, start count-up
+      // so values are never left at a misleading 0
+      fallbackTimerRef.current = setTimeout(() => {
+        startCountUp();
+      }, 1000);
     } else {
       // Fallback for environments without IntersectionObserver (e.g., standard test runners)
       startCountUp();
     }
+
+    return () => {
+      if (observer) observer.disconnect();
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    };
   }, [reducedMotion]);
 
   return (

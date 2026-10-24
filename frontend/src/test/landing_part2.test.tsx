@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { LandingPage } from '../pages/LandingPage.js';
 import { StickyGraphZoom } from '../features/landing/StickyGraphZoom.js';
@@ -190,6 +190,108 @@ describe('Landing Page Part 2 (Step 9b)', () => {
       rerender(<StatsBand forceReducedMotion={true} />);
 
       expect(screen.getByTestId('stat-value-checks')).toHaveTextContent('6');
+    });
+
+    it('IntersectionObserver callback with isIntersecting true leads to final values 4, 6, and 0', async () => {
+      let observerCb: (entries: Partial<IntersectionObserverEntry>[]) => void = () => {};
+      const disconnectMock = vi.fn();
+      const originalIO = window.IntersectionObserver;
+      window.IntersectionObserver = class {
+        constructor(cb: any) {
+          observerCb = cb;
+        }
+        observe = vi.fn();
+        disconnect = disconnectMock;
+        unobserve = vi.fn();
+      } as any;
+
+      try {
+        render(<StatsBand forceReducedMotion={false} />);
+
+        // Before intersection, initial values are 0
+        expect(screen.getByTestId('stat-value-levels')).toHaveTextContent('0');
+        expect(screen.getByTestId('stat-value-checks')).toHaveTextContent('0');
+
+        // Trigger intersection callback
+        act(() => {
+          observerCb([{ isIntersecting: true }]);
+        });
+
+        // Advance animation to completion
+        await waitFor(() => {
+          expect(screen.getByTestId('stat-value-levels')).toHaveTextContent('4');
+          expect(screen.getByTestId('stat-value-checks')).toHaveTextContent('6');
+          expect(screen.getByTestId('stat-value-executed')).toHaveTextContent('0');
+          expect(screen.getByTestId('stat-value-readonly')).toHaveTextContent('Read-only');
+        });
+        expect(disconnectMock).toHaveBeenCalled();
+      } finally {
+        window.IntersectionObserver = originalIO;
+      }
+    });
+
+    it('re-render during the animation does not reset or freeze it', async () => {
+      let observerCb: (entries: Partial<IntersectionObserverEntry>[]) => void = () => {};
+      const originalIO = window.IntersectionObserver;
+      window.IntersectionObserver = class {
+        constructor(cb: any) {
+          observerCb = cb;
+        }
+        observe = vi.fn();
+        disconnect = vi.fn();
+        unobserve = vi.fn();
+      } as any;
+
+      try {
+        const { rerender } = render(<StatsBand forceReducedMotion={false} className="initial-class" />);
+
+        // Trigger intersection callback
+        act(() => {
+          observerCb([{ isIntersecting: true }]);
+        });
+
+        // Re-render immediately during active animation
+        rerender(<StatsBand forceReducedMotion={false} className="re-rendered-class" />);
+
+        // The animation should not freeze, but continue and reach final values 4 and 6
+        await waitFor(() => {
+          expect(screen.getByTestId('stat-value-levels')).toHaveTextContent('4');
+          expect(screen.getByTestId('stat-value-checks')).toHaveTextContent('6');
+          expect(screen.getByTestId('stat-value-executed')).toHaveTextContent('0');
+        });
+      } finally {
+        window.IntersectionObserver = originalIO;
+      }
+    });
+
+    it('without any intersection event, fallback timer settles counters to 4 and 6 within 1000ms so numbers are never permanently 0', async () => {
+      const originalIO = window.IntersectionObserver;
+      // IntersectionObserver is present but never fires an intersection event
+      window.IntersectionObserver = class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+        unobserve = vi.fn();
+      } as any;
+
+      try {
+        render(<StatsBand forceReducedMotion={false} />);
+
+        // Initially 0 before fallback
+        expect(screen.getByTestId('stat-value-levels')).toHaveTextContent('0');
+        expect(screen.getByTestId('stat-value-checks')).toHaveTextContent('0');
+
+        // Without intersection, fallback timer kicks in and animates to final values
+        await waitFor(
+          () => {
+            expect(screen.getByTestId('stat-value-levels')).toHaveTextContent('4');
+            expect(screen.getByTestId('stat-value-checks')).toHaveTextContent('6');
+            expect(screen.getByTestId('stat-value-executed')).toHaveTextContent('0');
+          },
+          { timeout: 3500 }
+        );
+      } finally {
+        window.IntersectionObserver = originalIO;
+      }
     });
   });
 
