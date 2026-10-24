@@ -1,0 +1,1 @@
+{"data":null,"error":"Circular dependencies require architectural restructuring to extract shared modules or interfaces. [NO_AUTOMATIC_FIX]"}
