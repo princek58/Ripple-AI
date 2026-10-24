@@ -278,7 +278,7 @@ describe('Reports Screen (Step 12c Part 3)', () => {
     fireEvent.click(generateBtn);
 
     await waitFor(() => {
-      expect(postCallCount).toBe(1);
+      expect(screen.getByText('New Generated Report')).toBeInTheDocument();
     });
 
     // Verify it called POST exactly once
