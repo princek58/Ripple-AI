@@ -7,18 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run src",
+    "qa": "playwright test --config=e2e/qa.config.ts"
   },
   "dependencies": {
+    "@xyflow/react": "^12.12.0",
     "elkjs": "^0.9.3",
     "framer-motion": "^12.4.7",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.2.0",
-    "@xyflow/react": "^12.12.0"
+    "react-router-dom": "^7.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.0.10",

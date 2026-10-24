@@ -6,3 +6,6 @@ dist
 build
 *.zip
 *.tsbuildinfo
+frontend/qa-screenshots/
+frontend/test-results/
+frontend/playwright-report/
