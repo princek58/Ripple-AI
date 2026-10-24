@@ -37,6 +37,17 @@ router.post(
       return sendError(res, 'Finding not found', 404);
     }
 
+    const storageBase = path.resolve(config.storagePath);
+    const projectFilesDir = path.resolve(storageBase, finding.project_id, 'files');
+    if (!fs.existsSync(projectFilesDir)) {
+      return sendError(
+        res,
+        'Project files are missing. Upload the ZIP again',
+        409,
+        'PROJECT_FILES_MISSING'
+      );
+    }
+
     // Return existing open proposed fix if present
     const existingFix = fixesRepo.findProposedByFindingId(id);
     if (existingFix) {

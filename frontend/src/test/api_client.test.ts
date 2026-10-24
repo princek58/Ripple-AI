@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { apiFetch, ApiClientError, api } from '../lib/api.js';
+import { apiFetch, ApiClientError, api, getFriendlyErrorMessage } from '../lib/api.js';
 
 describe('API Client', () => {
   beforeEach(() => {
@@ -124,5 +124,24 @@ describe('API Client', () => {
 
     await api.getReports('test-id');
     expect(global.fetch).toHaveBeenCalledWith('/api/projects/test-id/reports', expect.anything());
+  });
+
+  it('getFriendlyErrorMessage returns friendly message for PROJECT_FILES_MISSING', () => {
+    const errorWithCode = new ApiClientError(
+      'Project files are missing. Upload the ZIP again [PROJECT_FILES_MISSING]',
+      409,
+      'PROJECT_FILES_MISSING'
+    );
+    expect(getFriendlyErrorMessage(errorWithCode)).toBe(
+      'The stored files of this project are missing. Please upload the ZIP again.'
+    );
+
+    const errorWithMessageOnly = new ApiClientError(
+      'Project files are missing [PROJECT_FILES_MISSING]',
+      409
+    );
+    expect(getFriendlyErrorMessage(errorWithMessageOnly)).toBe(
+      'The stored files of this project are missing. Please upload the ZIP again.'
+    );
   });
 });

@@ -310,6 +310,17 @@ router.get(
       return sendError(res, 'Project not found', 404);
     }
 
+    const storageBase = path.resolve(config.storagePath);
+    const projectFilesDir = path.resolve(storageBase, id, 'files');
+    if (!fs.existsSync(projectFilesDir)) {
+      return sendError(
+        res,
+        'Project files are missing. Upload the ZIP again',
+        409,
+        'PROJECT_FILES_MISSING'
+      );
+    }
+
     const filesResult = repo.findFiles(id, { page, pageSize, q });
     return sendSuccess(res, filesResult);
   }
@@ -381,6 +392,17 @@ router.post(
       return sendError(res, 'Project not found', 404);
     }
 
+    const storageBase = path.resolve(config.storagePath);
+    const projectFilesDir = path.resolve(storageBase, id, 'files');
+    if (!fs.existsSync(projectFilesDir)) {
+      return sendError(
+        res,
+        'Project files are missing. Upload the ZIP again',
+        409,
+        'PROJECT_FILES_MISSING'
+      );
+    }
+
     const scanId = crypto.randomUUID();
     const startedAt = new Date().toISOString();
 
@@ -393,8 +415,6 @@ router.post(
     });
 
     try {
-      const storageBase = path.resolve(config.storagePath);
-      const projectFilesDir = path.resolve(storageBase, id, 'files');
 
       // 2. Scan project files safely
       const scannedFiles = scanProjectFiles(projectFilesDir, {

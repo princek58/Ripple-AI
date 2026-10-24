@@ -35,6 +35,7 @@ export interface ApiFetchOptions extends RequestInit {
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const REASON_CODE_EXPLANATIONS: Record<string, string> = {
+  PROJECT_FILES_MISSING: 'The stored files of this project are missing. Please upload the ZIP again.',
   ZIP_UNSAFE_PATH: 'Archive contains unsafe file paths [ZIP_UNSAFE_PATH]',
   ZIP_TOO_MANY_FILES: 'Archive contains too many files [ZIP_TOO_MANY_FILES]',
   ZIP_BOMB: 'Archive compression ratio is suspiciously high [ZIP_BOMB]',
@@ -43,6 +44,9 @@ export const REASON_CODE_EXPLANATIONS: Record<string, string> = {
 
 export function getFriendlyErrorMessage(err: unknown): string {
   if (err instanceof ApiClientError) {
+    if (err.code === 'PROJECT_FILES_MISSING' || err.message?.includes('PROJECT_FILES_MISSING')) {
+      return 'The stored files of this project are missing. Please upload the ZIP again.';
+    }
     if (err.status === 400) {
       return 'This is not a valid ZIP file';
     }
@@ -50,6 +54,9 @@ export function getFriendlyErrorMessage(err: unknown): string {
       return 'File is too large';
     }
     if (err.status === 409) {
+      if (err.code === 'PROJECT_FILES_MISSING' || err.message?.includes('PROJECT_FILES_MISSING')) {
+        return 'The stored files of this project are missing. Please upload the ZIP again.';
+      }
       if (err.code === 'SCAN_REQUIRED' || err.message?.includes('SCAN_REQUIRED')) {
         return 'Scan the project first';
       }
