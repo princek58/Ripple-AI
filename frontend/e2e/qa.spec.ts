@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from '@playwright/test';
-import { setupPageCheckListeners, runPageChecks, type PageCheckResult } from './checkHelpers.js';
+import { setupPageCheckListeners, runPageChecks } from './checkHelpers.js';
 import type { SeedData } from './seedHelper.js';
 
 const screenshotsDir = 'C:\\RippleAI\\frontend\\qa-screenshots';
 const seedFile = 'C:\\RippleAI\\frontend\\e2e\\.seed-info.json';
+const checksJsonPath = path.join(screenshotsDir, 'checks.json');
 
 interface RouteDef {
   slug: string;
@@ -97,34 +98,26 @@ const allVariants: VariantDef[] = [
 ];
 
 test.describe('Automated Visual QA Suite', () => {
-  test.setTimeout(300000); // 5 minutes for full run
+  for (const r of routes) {
+    test(`route: ${r.slug}`, async ({ page, baseURL }) => {
+      fs.mkdirSync(screenshotsDir, { recursive: true });
 
-  test('captures screenshots and runs automated checks across routes and variants', async ({
-    page,
-    baseURL,
-  }) => {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
+      if (!fs.existsSync(seedFile)) {
+        throw new Error(`Seed data file missing at: ${seedFile}`);
+      }
+      const seed: SeedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
 
-    if (!fs.existsSync(seedFile)) {
-      throw new Error(`Seed data file missing at: ${seedFile}`);
-    }
-    const seed: SeedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
+      let allChecks: Record<string, any> = {};
+      if (fs.existsSync(checksJsonPath)) {
+        try {
+          allChecks = JSON.parse(fs.readFileSync(checksJsonPath, 'utf8'));
+        } catch {}
+      }
 
-    // Load existing checks if present so partial/grep runs preserve other recorded results
-    const checksJsonPath = path.join(screenshotsDir, 'checks.json');
-    let allChecks: Record<string, any> = {};
-    if (fs.existsSync(checksJsonPath)) {
-      try {
-        allChecks = JSON.parse(fs.readFileSync(checksJsonPath, 'utf8'));
-      } catch {}
-    }
-
-    for (const r of routes) {
       const targetPath = r.pathBuilder(seed);
       const isAppRoute = targetPath.startsWith('/app');
       const targetProjectId = r.projectType === 'scanned' ? seed.scannedProjectId : seed.unscannedProjectId;
 
-      // Filter variants if route specifies variantsOnly
       const activeVariants = r.variantsOnly
         ? allVariants.filter((v) =>
             r.variantsOnly!.some((o) => o.device === v.device && o.theme === v.theme)
@@ -138,10 +131,8 @@ test.describe('Automated Visual QA Suite', () => {
 
         console.log(`[qa-capture] Capturing ${screenshotFileName} -> ${targetPath} (${v.device}, ${v.theme})`);
 
-        // Set viewport
         await page.setViewportSize(v.viewport);
 
-        // Pre-configure localStorage before navigation
         await page.addInitScript(
           ({ theme, projectId }) => {
             try {
@@ -152,14 +143,11 @@ test.describe('Automated Visual QA Suite', () => {
           { theme: v.theme, projectId: targetProjectId }
         );
 
-        // Track errors and requests
         const listeners = setupPageCheckListeners(page);
 
-        // Navigate
         const fullUrl = `${baseURL || 'http://localhost:3100'}${targetPath}`;
         await page.goto(fullUrl, { waitUntil: 'domcontentloaded' });
 
-        // Ensure theme applied to root document
         await page.evaluate(
           ({ theme, projectId }) => {
             try {
@@ -178,12 +166,10 @@ test.describe('Automated Visual QA Suite', () => {
           { theme: v.theme, projectId: targetProjectId }
         );
 
-        // Wait for page to settle
         try {
           await page.waitForLoadState('networkidle', { timeout: 6000 });
         } catch {}
 
-        // Settle layout
         if (targetPath.includes('/app/graph')) {
           const skeleton = page.locator('[data-testid="graph-layout-skeleton"]');
           try {
@@ -196,8 +182,7 @@ test.describe('Automated Visual QA Suite', () => {
           await page.waitForTimeout(300);
         }
 
-        // Landing counters scroll trigger: scroll slowly from top to bottom and back
-        // so count-up animation runs and finishes before screenshot
+        // Landing counters scroll trigger: scroll slowly down and up before screenshot
         if (r.slug === 'landing') {
           await page.evaluate(async () => {
             const docEl = document.documentElement;
@@ -208,14 +193,11 @@ test.describe('Automated Visual QA Suite', () => {
             }
             window.scrollTo(0, 0);
           });
-          // Wait 1000ms for 800ms count-up animation to complete
           await page.waitForTimeout(1000);
         }
 
-        // Take full-page screenshot
         await page.screenshot({ path: screenshotFilePath, fullPage: true });
 
-        // Run automated DOM/console/network checks
         const checkResult = await runPageChecks(page, isAppRoute, v.device === 'phone', listeners);
 
         allChecks[fileKey] = {
@@ -227,10 +209,8 @@ test.describe('Automated Visual QA Suite', () => {
           ...checkResult,
         };
       }
-    }
 
-    // Write checks.json
-    fs.writeFileSync(checksJsonPath, JSON.stringify(allChecks, null, 2), 'utf8');
-    console.log(`[qa-capture] Successfully written ${Object.keys(allChecks).length} checks to ${checksJsonPath}`);
-  });
+      fs.writeFileSync(checksJsonPath, JSON.stringify(allChecks, null, 2), 'utf8');
+    });
+  }
 });
