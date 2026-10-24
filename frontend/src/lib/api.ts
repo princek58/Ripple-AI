@@ -14,6 +14,7 @@ import type {
   Report,
   ApiResponse,
 } from '../../../shared/types.js';
+import type { ProjectFixesResult } from '../features/fixes/fixesTypes.js';
 
 export class ApiClientError extends Error {
   constructor(
@@ -47,7 +48,13 @@ export function getFriendlyErrorMessage(err: unknown): string {
     if (err.status === 413) {
       return 'File is too large';
     }
+    if (err.status === 409) {
+      return 'This fix was already approved or rejected';
+    }
     if (err.status === 422) {
+      if (err.code === 'NO_AUTOMATIC_FIX' || err.message?.includes('NO_AUTOMATIC_FIX')) {
+        return 'Ripple AI cannot build an automatic change for this finding';
+      }
       const code = err.code || '';
       const msg = err.message || '';
       for (const [reasonCode, explanation] of Object.entries(REASON_CODE_EXPLANATIONS)) {
@@ -297,9 +304,51 @@ export const api = {
     return apiFetch<FindingDetailData>(`/api/findings/${findingId}`, { signal });
   },
 
-  getFixes(projectId: string, status?: string, signal?: AbortSignal): Promise<{ items: Fix[]; total: number }> {
+  getFixes(
+    projectId: string,
+    status?: string,
+    signal?: AbortSignal
+  ): Promise<ProjectFixesResult> {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-    return apiFetch<{ items: Fix[]; total: number }>(`/api/projects/${projectId}/fixes${qs}`, { signal });
+    return apiFetch<ProjectFixesResult>(`/api/projects/${projectId}/fixes${qs}`, { signal });
+  },
+
+  getProjectFixes(
+    projectId: string,
+    query?: { status?: string; page?: number; pageSize?: number },
+    signal?: AbortSignal
+  ): Promise<ProjectFixesResult> {
+    const searchParams = new URLSearchParams();
+    if (query?.status) searchParams.set('status', query.status);
+    if (query?.page !== undefined) searchParams.set('page', String(query.page));
+    if (query?.pageSize !== undefined) searchParams.set('pageSize', String(query.pageSize));
+    const qs = searchParams.toString();
+    return apiFetch<ProjectFixesResult>(`/api/projects/${projectId}/fixes${qs ? `?${qs}` : ''}`, { signal });
+  },
+
+  getFindingFixes(findingId: string, signal?: AbortSignal): Promise<Fix[]> {
+    return apiFetch<Fix[]>(`/api/findings/${findingId}/fixes`, { signal });
+  },
+
+  createFixForFinding(findingId: string, signal?: AbortSignal): Promise<Fix> {
+    return apiFetch<Fix>(`/api/findings/${findingId}/fixes`, {
+      method: 'POST',
+      signal,
+    });
+  },
+
+  approveFix(fixId: string, signal?: AbortSignal): Promise<Fix> {
+    return apiFetch<Fix>(`/api/fixes/${fixId}/approve`, {
+      method: 'POST',
+      signal,
+    });
+  },
+
+  rejectFix(fixId: string, signal?: AbortSignal): Promise<Fix> {
+    return apiFetch<Fix>(`/api/fixes/${fixId}/reject`, {
+      method: 'POST',
+      signal,
+    });
   },
 
   getTests(projectId: string, signal?: AbortSignal): Promise<{ items: TestRun[]; counts: Record<string, number>; note: string }> {

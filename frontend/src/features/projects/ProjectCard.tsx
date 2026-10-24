@@ -17,6 +17,7 @@ import { SeverityBadge } from '../../components/ui/SeverityBadge.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.js';
 
 export interface ProjectSummaryState {
   data?: ProjectSummary;
@@ -46,7 +47,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
 
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown menu on click outside
   useEffect(() => {
@@ -62,63 +62,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isMenuOpen]);
-
-  // Focus trap and Escape listener for Delete confirmation dialog
-  useEffect(() => {
-    if (!isConfirmOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        closeConfirmDialog();
-        return;
-      }
-
-      if (e.key === 'Tab' && dialogRef.current) {
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, [tabindex]:not([tabindex="-1"])'
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last?.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first?.focus();
-          }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    // Initial focus on the cancel button for safety
-    const timer = setTimeout(() => {
-      if (dialogRef.current) {
-        const cancelBtn = dialogRef.current.querySelector<HTMLElement>(
-          '[data-testid="cancel-delete-button"]'
-        );
-        cancelBtn?.focus();
-      }
-    }, 50);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      clearTimeout(timer);
-    };
-  }, [isConfirmOpen]);
-
-  const closeConfirmDialog = () => {
-    setIsConfirmOpen(false);
-    if (deleteTriggerRef.current) {
-      deleteTriggerRef.current.focus();
-    }
-  };
 
   const handleOpenConfirm = () => {
     setIsMenuOpen(false);
@@ -304,55 +247,31 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       </div>
 
       {/* Accessible Delete Confirmation Dialog */}
-      {isConfirmOpen && (
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby={`delete-title-${project.id}`}
-          aria-describedby={`delete-desc-${project.id}`}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-theme-text/40 backdrop-blur-xs"
-        >
-          <div
-            ref={dialogRef}
-            className="w-full max-w-md rounded-2xl border border-theme-border bg-theme-surface shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none text-theme-text"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-severity-critical/10 text-severity-critical flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" aria-hidden="true" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 id={`delete-title-${project.id}`} className="font-heading font-bold text-lg text-theme-text">
-                  Delete project
-                </h3>
-                <p id={`delete-desc-${project.id}`} className="mt-1 text-xs sm:text-sm text-theme-text-muted">
-                  Are you sure you want to delete <strong className="text-theme-text">{project.name}</strong>? The project's stored files and findings will be removed permanently. This action cannot be undone.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="cancel-delete-button"
-                disabled={isDeleting}
-                onClick={closeConfirmDialog}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                data-testid="confirm-delete-button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-              >
-                {isDeleting ? 'Deleting...' : 'Delete project'}
-              </Button>
-            </div>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete project"
+        description={
+          <>
+            Are you sure you want to delete <strong className="text-theme-text">{project.name}</strong>? The project's stored files and findings will be removed permanently. This action cannot be undone.
+          </>
+        }
+        confirmText="Delete project"
+        confirmVariant="danger"
+        cancelText="Cancel"
+        isLoading={isDeleting}
+        triggerRef={deleteTriggerRef}
+        cancelTestId="cancel-delete-button"
+        confirmTestId="confirm-delete-button"
+        dialogTitleId={`delete-title-${project.id}`}
+        dialogDescId={`delete-desc-${project.id}`}
+        icon={
+          <div className="w-10 h-10 rounded-full bg-severity-critical/10 text-severity-critical flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" aria-hidden="true" />
           </div>
-        </div>
-      )}
+        }
+      />
     </Card>
   );
 };

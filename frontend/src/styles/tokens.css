@@ -40,6 +40,14 @@
   --severity-low: #475569;
   --severity-unknown: #4B5563;
 
+  /* Diff Viewer Tokens - Light Theme (WCAG AA >= 4.5) */
+  --diff-add-bg: #ECFDF5;
+  --diff-add-text: #065F46;
+  --diff-del-bg: #FEF2F2;
+  --diff-del-text: #991B1B;
+  --diff-line-number: #475569;
+  --diff-gutter-bg: #F1F5F9;
+
   /* Typography */
   --font-space-grotesk: 'Space Grotesk', sans-serif;
   --font-inter: 'Inter', sans-serif;
@@ -67,6 +75,14 @@
   --severity-medium: #FACC15;
   --severity-low: #CBD5E1;
   --severity-unknown: #CBD5E1;
+
+  /* Diff Viewer Tokens - Dark Theme (WCAG AA >= 4.5) */
+  --diff-add-bg: #0D382B;
+  --diff-add-text: #A7F3D0;
+  --diff-del-bg: #3B1219;
+  --diff-del-text: #FCA5A5;
+  --diff-line-number: #94A3B8;
+  --diff-gutter-bg: #1A2E26;
 }
 
 /* Native select & option elements styled with tokens for dark/light readability */

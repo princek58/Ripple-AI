@@ -48,6 +48,16 @@ export default {
           low: 'var(--severity-low)',
           unknown: 'var(--severity-unknown)',
         },
+
+        // Diff Viewer colours
+        diff: {
+          'add-bg': 'var(--diff-add-bg)',
+          'add-text': 'var(--diff-add-text)',
+          'del-bg': 'var(--diff-del-bg)',
+          'del-text': 'var(--diff-del-text)',
+          'line-number': 'var(--diff-line-number)',
+          'gutter-bg': 'var(--diff-gutter-bg)',
+        },
       },
       fontFamily: {
         heading: ['var(--font-space-grotesk)', 'sans-serif'],

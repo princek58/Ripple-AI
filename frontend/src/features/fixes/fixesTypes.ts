@@ -23,6 +23,7 @@ export interface ProjectFixItem {
   files: string[];
   status: FixStatus;
   approved_at: string | null;
+  patch_path?: string | null;
 }
 
 export interface ProjectFixesResult {

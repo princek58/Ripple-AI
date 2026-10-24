@@ -5,7 +5,6 @@ import { ProjectProvider } from './lib/projectContext.js';
 import { AppShell } from './components/layout/AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
 import {
-  FixesPage,
   TestsPage,
   ReportsPage,
 } from './pages/AppPlaceholders.js';
@@ -19,6 +18,7 @@ const GraphPage = React.lazy(() => import('./features/graph/GraphPage.js'));
 const InvestigationsPage = React.lazy(
   () => import('./features/investigations/InvestigationsPage.js')
 );
+const FixesPage = React.lazy(() => import('./features/fixes/FixesPage.js'));
 
 export function AppRoutes() {
   return (
@@ -62,7 +62,21 @@ export function AppRoutes() {
               </Suspense>
             }
           />
-          <Route path="fixes" element={<FixesPage />} />
+          <Route
+            path="fixes"
+            element={
+              <Suspense
+                fallback={
+                  <div className="p-6 space-y-4" data-testid="fixes-lazy-fallback">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-96 w-full rounded-2xl" />
+                  </div>
+                }
+              >
+                <FixesPage />
+              </Suspense>
+            }
+          />
           <Route path="tests" element={<TestsPage />} />
           <Route path="reports" element={<ReportsPage />} />
         </Route>

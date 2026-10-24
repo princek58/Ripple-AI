@@ -118,6 +118,19 @@ describe('Contrast and Theme Integrity (Step 11c Part A)', () => {
       expect(getBlendedContrastRatio(highSevColor, cardSurface, 0.1)).toBeGreaterThanOrEqual(4.5);
       // not_tested: --theme-text-muted on --theme-surface
       expect(getContrastRatio(resolve(theme, '--theme-text-muted'), cardSurface)).toBeGreaterThanOrEqual(4.5);
+
+      // 11. Diff viewer tokens (Step 12b)
+      const diffAddText = resolve(theme, '--diff-add-text');
+      const diffAddBg = resolve(theme, '--diff-add-bg');
+      expect(getContrastRatio(diffAddText, diffAddBg)).toBeGreaterThanOrEqual(4.5);
+
+      const diffDelText = resolve(theme, '--diff-del-text');
+      const diffDelBg = resolve(theme, '--diff-del-bg');
+      expect(getContrastRatio(diffDelText, diffDelBg)).toBeGreaterThanOrEqual(4.5);
+
+      const diffLineNo = resolve(theme, '--diff-line-number');
+      const diffGutterBg = resolve(theme, '--diff-gutter-bg');
+      expect(getContrastRatio(diffLineNo, diffGutterBg)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
