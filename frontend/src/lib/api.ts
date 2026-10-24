@@ -10,11 +10,11 @@ import type {
   PaginatedFindings,
   FindingsQueryParams,
   Fix,
-  TestRun,
   Report,
   ApiResponse,
 } from '../../../shared/types.js';
 import type { ProjectFixesResult } from '../features/fixes/fixesTypes.js';
+import type { ProjectTestsData } from '../features/tests/testsTypes.js';
 
 export class ApiClientError extends Error {
   constructor(
@@ -351,12 +351,19 @@ export const api = {
     });
   },
 
-  getTests(projectId: string, signal?: AbortSignal): Promise<{ items: TestRun[]; counts: Record<string, number>; note: string }> {
-    return apiFetch<{ items: TestRun[]; counts: Record<string, number>; note: string }>(`/api/projects/${projectId}/tests`, { signal });
+  getTests(projectId: string, signal?: AbortSignal): Promise<ProjectTestsData> {
+    return apiFetch<ProjectTestsData>(`/api/projects/${projectId}/tests`, { signal });
   },
 
   getReports(projectId: string, signal?: AbortSignal): Promise<Report[]> {
     return apiFetch<Report[]>(`/api/projects/${projectId}/reports`, { signal });
+  },
+
+  createReport(projectId: string, signal?: AbortSignal): Promise<Report> {
+    return apiFetch<Report>(`/api/projects/${projectId}/reports`, {
+      method: 'POST',
+      signal,
+    });
   },
 
   getReport(id: string, format?: 'md', signal?: AbortSignal): Promise<Report | string> {

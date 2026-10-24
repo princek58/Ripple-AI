@@ -4,10 +4,7 @@ import { ThemeProvider } from './lib/theme.js';
 import { ProjectProvider } from './lib/projectContext.js';
 import { AppShell } from './components/layout/AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
-import {
-  TestsPage,
-  ReportsPage,
-} from './pages/AppPlaceholders.js';
+import { ReportsPage } from './pages/AppPlaceholders.js';
 import { OverviewPage } from './features/overview/OverviewPage.js';
 import { ProjectsPage } from './features/projects/ProjectsPage.js';
 import { DesignSystemPage } from './pages/DesignSystemPage.js';
@@ -19,6 +16,7 @@ const InvestigationsPage = React.lazy(
   () => import('./features/investigations/InvestigationsPage.js')
 );
 const FixesPage = React.lazy(() => import('./features/fixes/FixesPage.js'));
+const TestsPage = React.lazy(() => import('./features/tests/TestsPage.js'));
 
 export function AppRoutes() {
   return (
@@ -77,7 +75,21 @@ export function AppRoutes() {
               </Suspense>
             }
           />
-          <Route path="tests" element={<TestsPage />} />
+          <Route
+            path="tests"
+            element={
+              <Suspense
+                fallback={
+                  <div className="p-6 space-y-4" data-testid="tests-lazy-fallback">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-96 w-full rounded-2xl" />
+                  </div>
+                }
+              >
+                <TestsPage />
+              </Suspense>
+            }
+          />
           <Route path="reports" element={<ReportsPage />} />
         </Route>
 
