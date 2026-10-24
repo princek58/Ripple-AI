@@ -1,0 +1,58 @@
+/* Print Stylesheet for Ripple AI Analysis Reports */
+
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  /* Hide application navigation, project switcher, toolbar, and report list */
+  header,
+  nav,
+  aside,
+  [data-testid="top-navigation"],
+  [data-testid="app-navigation"],
+  [data-testid="app-header"],
+  [data-testid="project-switcher"],
+  [data-testid="reports-toolbar"],
+  [data-testid="reports-list-panel"],
+  [data-testid="reports-sidebar"],
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Document body and main container formatting */
+  body,
+  #root,
+  main {
+    background: transparent !important;
+    color: currentColor !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Show report preview container cleanly */
+  [data-testid="report-preview"] {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Avoid page breaks inside table rows, tables, preformatted text */
+  tr,
+  table,
+  pre,
+  blockquote {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Visible only in print */
+  .print-only {
+    display: block !important;
+  }
+}
