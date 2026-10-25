@@ -48,6 +48,10 @@
   --impact-proven: #0B3B2C;
   --impact-possible: #B45309;
 
+  /* Most Affected Pill Tokens - Light Theme (WCAG AA >= 4.5:1) */
+  --pill-most-affected-bg: #9A3412;
+  --pill-most-affected-text: #FFFFFF;
+
   /* Diff Viewer Tokens - Light Theme (WCAG AA >= 4.5) */
   --diff-add-bg: #ECFDF5;
   --diff-add-text: #065F46;
@@ -91,6 +95,10 @@
   --impact-ring: #94A3B8;
   --impact-proven: #34D399;
   --impact-possible: #FBBF24;
+
+  /* Most Affected Pill Tokens - Dark Theme (WCAG AA >= 4.5:1) */
+  --pill-most-affected-bg: #FB923C;
+  --pill-most-affected-text: #0F1B18;
 
   /* Diff Viewer Tokens - Dark Theme (WCAG AA >= 4.5) */
   --diff-add-bg: #0D382B;

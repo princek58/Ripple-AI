@@ -70,6 +70,10 @@ export default {
           proven: 'var(--impact-proven)',
           possible: 'var(--impact-possible)',
         },
+        pill: {
+          'most-affected-bg': 'var(--pill-most-affected-bg)',
+          'most-affected-text': 'var(--pill-most-affected-text)',
+        },
       },
       fontFamily: {
         heading: ['var(--font-space-grotesk)', 'sans-serif'],

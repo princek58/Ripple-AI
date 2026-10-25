@@ -147,6 +147,13 @@ describe('Contrast and Theme Integrity (Step 11c Part A)', () => {
       expect(getContrastRatio(ringToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
       expect(getContrastRatio(provenToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
       expect(getContrastRatio(possibleToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
+
+      // 14. Most Affected Pill tokens (UI-1: >= 4.5:1 in both themes)
+      const pillBg = resolve(theme, '--pill-most-affected-bg');
+      const pillText = resolve(theme, '--pill-most-affected-text');
+      expect(pillBg).toBeTruthy();
+      expect(pillText).toBeTruthy();
+      expect(getContrastRatio(pillText, pillBg)).toBeGreaterThanOrEqual(4.5);
     }
   });
 

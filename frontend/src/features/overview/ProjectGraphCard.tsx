@@ -1,22 +1,15 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { GraphResponseData, GraphNode, FindingSeverity } from '../../../../shared/types.js';
+import type { GraphResponseData } from '../../../../shared/types.js';
 import { NodeShape } from '../graph/nodeShapes.js';
 import { SeverityBadge } from '../../components/ui/SeverityBadge.js';
 import { Card } from '../../components/ui/Card.js';
+import { computeL1Layout } from './l1Layout.js';
 
 export interface ProjectGraphCardProps {
   graphData: GraphResponseData;
   className?: string;
 }
-
-const SEVERITY_ORDER: Record<FindingSeverity, number> = {
-  critical: 5,
-  high: 4,
-  medium: 3,
-  low: 2,
-  unknown: 1,
-};
 
 export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
   graphData,
@@ -24,74 +17,31 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  const projectNode = useMemo(
-    () => graphData.nodes.find((n) => n.type === 'project'),
-    [graphData.nodes]
-  );
+  const layout = useMemo(() => computeL1Layout(graphData), [graphData]);
+  const {
+    svgWidth,
+    svgHeight,
+    centerX,
+    centerY,
+    orbitRadius,
+    projectNode,
+    moduleNodes,
+    edges,
+    hiddenEdgesCount,
+    overflowModulesCount,
+    mostAffectedModuleId,
+  } = layout;
 
-  const moduleNodes = useMemo(
+  const allModuleNodes = useMemo(
     () => graphData.nodes.filter((n) => n.type === 'module'),
     [graphData.nodes]
   );
 
-  // Cap at 24 modules
-  const MAX_DISPLAYED_MODULES = 24;
-  const displayedModules = useMemo(
-    () => moduleNodes.slice(0, MAX_DISPLAYED_MODULES),
-    [moduleNodes]
-  );
-  const overflowCount = moduleNodes.length - displayedModules.length;
-
-  // Identify highest maxSeverity module
-  const mostAffectedModuleId = useMemo(() => {
-    let topModuleId: string | null = null;
-    let highestRank = -1;
-    let highestCount = -1;
-
-    for (const m of moduleNodes) {
-      if (m.maxSeverity && (m.findingCount ?? 0) > 0) {
-        const rank = SEVERITY_ORDER[m.maxSeverity] ?? 0;
-        const count = m.findingCount ?? 0;
-        if (rank > highestRank || (rank === highestRank && count > highestCount)) {
-          highestRank = rank;
-          highestCount = count;
-          topModuleId = m.id;
-        }
-      }
-    }
-    return topModuleId;
-  }, [moduleNodes]);
-
-  // SVG layout dimensions
-  const svgWidth = 640;
-  const svgHeight = 440;
-  const centerX = svgWidth / 2;
-  const centerY = svgHeight / 2;
-  const orbitRadius = 145;
-
-  // Node positions map
-  const nodePositions = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
-    if (projectNode) {
-      map.set(projectNode.id, { x: centerX, y: centerY });
-    }
-
-    const count = displayedModules.length;
-    displayedModules.forEach((mod, index) => {
-      const angle = (2 * Math.PI * index) / (count || 1) - Math.PI / 2;
-      const x = Math.round(centerX + orbitRadius * Math.cos(angle));
-      const y = Math.round(centerY + orbitRadius * Math.sin(angle));
-      map.set(mod.id, { x, y });
-    });
-
-    return map;
-  }, [projectNode, displayedModules, centerX, centerY, orbitRadius]);
-
-  const handleNodeClick = (node: GraphNode) => {
+  const handleNodeClick = (node: { id: string }) => {
     navigate(`/app/graph?focus=${encodeURIComponent(node.id)}`);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, node: GraphNode) => {
+  const handleKeyDown = (e: React.KeyboardEvent, node: { id: string }) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleNodeClick(node);
@@ -139,34 +89,22 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
           />
 
           {/* Spokes connecting center project to modules */}
-          {displayedModules.map((mod) => {
-            const pos = nodePositions.get(mod.id);
-            if (!pos) return null;
-            return (
-              <line
-                key={`spoke-${mod.id}`}
-                x1={centerX}
-                y1={centerY}
-                x2={pos.x}
-                y2={pos.y}
-                stroke="var(--theme-border)"
-                strokeWidth={1}
-                strokeDasharray="2 2"
-                aria-hidden="true"
-              />
-            );
-          })}
+          {moduleNodes.map((mod) => (
+            <line
+              key={`spoke-${mod.id}`}
+              x1={centerX}
+              y1={centerY}
+              x2={mod.pos.x}
+              y2={mod.pos.y}
+              stroke="var(--theme-border)"
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              aria-hidden="true"
+            />
+          ))}
 
-          {/* Derived Module-to-Module Edges */}
-          {graphData.edges.map((edge) => {
-            const source = nodePositions.get(edge.source_id);
-            const target = nodePositions.get(edge.target_id);
-            if (!source || !target) return null;
-
-            // Offset to prevent direct node overlap
-            const midX = (source.x + target.x) / 2;
-            const midY = (source.y + target.y) / 2;
-
+          {/* Derived Module-to-Module Edges with Quadratic Outward Arc */}
+          {edges.map((edge) => {
             const isResolved = edge.status === 'resolved';
             const isPossible = edge.status === 'possible';
             const isUnresolved = edge.status === 'unresolved';
@@ -179,20 +117,23 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
 
             return (
               <g key={edge.id} className="edge-group">
-                <line
-                  x1={source.x}
-                  y1={source.y}
-                  x2={target.x}
-                  y2={target.y}
+                <path
+                  d={edge.pathD}
+                  fill="none"
                   stroke="var(--theme-text-muted)"
                   strokeWidth={1.5}
                   strokeOpacity={0.6}
                   strokeDasharray={strokeDash}
                 />
-                {/* Edge count badge / label */}
-                {edge.count !== undefined && (
-                  <g transform={`translate(${midX}, ${midY})`}>
-                    <circle r={9} fill="var(--theme-surface)" stroke="var(--theme-border)" strokeWidth={1} />
+                {/* Edge count badge / label positioned without overlapping labels or other chips */}
+                {edge.count !== undefined && edge.chipPos && (
+                  <g transform={`translate(${edge.chipPos.x}, ${edge.chipPos.y})`}>
+                    <circle
+                      r={9}
+                      fill="var(--theme-surface)"
+                      stroke="var(--theme-border)"
+                      strokeWidth={1}
+                    />
                     <text
                       textAnchor="middle"
                       dy="3"
@@ -204,10 +145,10 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
                     </text>
                   </g>
                 )}
-                {isUnresolved && (
+                {isUnresolved && edge.chipPos && (
                   <text
-                    x={midX + 10}
-                    y={midY - 5}
+                    x={edge.chipPos.x + 10}
+                    y={edge.chipPos.y - 5}
                     fontSize={11}
                     fontWeight="bold"
                     fill="var(--severity-high)"
@@ -232,16 +173,30 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
             >
               <NodeShape
                 type="project"
-                cx={centerX}
-                cy={centerY}
-                r={28}
+                cx={projectNode.pos.x}
+                cy={projectNode.pos.y}
+                r={projectNode.radius}
                 stroke="var(--theme-surface)"
                 strokeWidth={3}
               />
+              {/* Readable background for project label */}
+              <rect
+                x={projectNode.labelBox.x}
+                y={projectNode.labelBox.y}
+                width={projectNode.labelBox.width}
+                height={projectNode.labelBox.height}
+                rx={4}
+                fill="var(--theme-surface)"
+                fillOpacity={0.85}
+              />
               <text
-                x={centerX}
-                y={centerY + 42}
+                x={projectNode.pos.x}
+                y={projectNode.labelBox.y + 11}
                 textAnchor="middle"
+                paintOrder="stroke fill"
+                stroke="var(--theme-surface)"
+                strokeWidth={3}
+                strokeLinejoin="round"
                 className="font-heading font-bold text-xs fill-theme-text select-none"
               >
                 {projectNode.label}
@@ -250,11 +205,8 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
           )}
 
           {/* Module Nodes */}
-          {displayedModules.map((node) => {
-            const pos = nodePositions.get(node.id);
-            if (!pos) return null;
-
-            const isMostAffected = node.id === mostAffectedModuleId;
+          {moduleNodes.map((node) => {
+            const isMostAffected = node.isMostAffected;
             const hasFindings = (node.findingCount ?? 0) > 0;
 
             return (
@@ -271,9 +223,9 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
                 {/* Highlight outline for most affected module */}
                 {isMostAffected && (
                   <circle
-                    cx={pos.x}
-                    cy={pos.y}
-                    r={26}
+                    cx={node.pos.x}
+                    cy={node.pos.y}
+                    r={node.ringRadius || 26}
                     fill="none"
                     stroke="var(--severity-high)"
                     strokeWidth={3.5}
@@ -284,40 +236,53 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
 
                 <NodeShape
                   type="module"
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={20}
+                  cx={node.pos.x}
+                  cy={node.pos.y}
+                  r={node.radius}
                   stroke={isMostAffected ? 'var(--severity-high)' : 'var(--theme-surface)'}
                   strokeWidth={isMostAffected ? 3 : 2}
                 />
 
-                {/* Module Label */}
+                {/* Readable background for module label */}
+                <rect
+                  x={node.labelBox.x}
+                  y={node.labelBox.y}
+                  width={node.labelBox.width}
+                  height={node.labelBox.height}
+                  rx={3}
+                  fill="var(--theme-surface)"
+                  fillOpacity={0.85}
+                />
                 <text
-                  x={pos.x}
-                  y={pos.y + 32}
+                  x={node.pos.x}
+                  y={node.labelBox.y + 11}
                   textAnchor="middle"
+                  paintOrder="stroke fill"
+                  stroke="var(--theme-surface)"
+                  strokeWidth={3}
+                  strokeLinejoin="round"
                   className="font-heading font-medium text-[11px] fill-theme-text select-none"
                 >
                   {node.label}
                 </text>
 
-                {/* Most affected text label */}
+                {/* Most affected text label with semantic tokens and sufficient padding */}
                 {isMostAffected && (
-                  <g transform={`translate(${pos.x}, ${pos.y - 32})`}>
+                  <g transform={`translate(${node.pos.x}, ${node.pos.y - 34})`}>
                     <rect
-                      x={-38}
+                      x={-44}
                       y={-10}
-                      width={76}
-                      height={18}
-                      rx={9}
-                      fill="var(--severity-high)"
-                      className="fill-severity-high"
+                      width={88}
+                      height={20}
+                      rx={10}
+                      fill="var(--pill-most-affected-bg)"
                     />
                     <text
                       textAnchor="middle"
-                      dy={3}
+                      dy={3.5}
                       fontSize={9}
-                      className="fill-cream font-bold select-none uppercase tracking-wider"
+                      fill="var(--pill-most-affected-text)"
+                      className="font-bold select-none uppercase tracking-wider"
                     >
                       Most affected
                     </text>
@@ -327,8 +292,8 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
                 {/* Severity Badge / Finding count */}
                 {hasFindings && node.maxSeverity && (
                   <foreignObject
-                    x={pos.x - 28}
-                    y={pos.y + 38}
+                    x={node.pos.x - 28}
+                    y={node.labelBox.y + node.labelBox.height + 2}
                     width={56}
                     height={24}
                     className="overflow-visible pointer-events-none"
@@ -344,15 +309,27 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
             );
           })}
 
-          {/* Overflow text if > 24 modules */}
-          {overflowCount > 0 && (
+          {/* Hidden edges count text when edges are capped */}
+          {hiddenEdgesCount > 0 && (
             <text
               x={centerX}
-              y={svgHeight - 15}
+              y={overflowModulesCount > 0 ? svgHeight - 28 : svgHeight - 15}
               textAnchor="middle"
               className="text-xs font-medium fill-theme-text-muted select-none"
             >
-              +{overflowCount} more modules
+              +{hiddenEdgesCount} more connections, see the module list
+            </text>
+          )}
+
+          {/* Overflow text if > 24 modules */}
+          {overflowModulesCount > 0 && (
+            <text
+              x={centerX}
+              y={svgHeight - 12}
+              textAnchor="middle"
+              className="text-xs font-medium fill-theme-text-muted select-none"
+            >
+              +{overflowModulesCount} more modules
             </text>
           )}
         </svg>
@@ -386,10 +363,10 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
         {/* Accessible Text Alternative */}
         <details className="cursor-pointer text-xs">
           <summary className="hover:text-theme-text font-medium">
-            Accessible module list ({moduleNodes.length})
+            Accessible module list ({allModuleNodes.length})
           </summary>
           <ul className="mt-2 space-y-1 pl-4 list-disc max-h-32 overflow-y-auto">
-            {moduleNodes.map((m) => (
+            {allModuleNodes.map((m) => (
               <li key={m.id}>
                 <button
                   type="button"
