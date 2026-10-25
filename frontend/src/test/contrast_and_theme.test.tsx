@@ -136,6 +136,17 @@ describe('Contrast and Theme Integrity (Step 11c Part A)', () => {
       const edgeToken = resolve(theme, '--edge-investigation-path');
       expect(edgeToken).toBeTruthy();
       expect(getContrastRatio(edgeToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
+
+      // 13. Change impact tokens against panel surface (Step P2-A2: >= 3:1)
+      const ringToken = resolve(theme, '--impact-ring');
+      const provenToken = resolve(theme, '--impact-proven');
+      const possibleToken = resolve(theme, '--impact-possible');
+      expect(ringToken).toBeTruthy();
+      expect(provenToken).toBeTruthy();
+      expect(possibleToken).toBeTruthy();
+      expect(getContrastRatio(ringToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
+      expect(getContrastRatio(provenToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
+      expect(getContrastRatio(possibleToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
     }
   });
 

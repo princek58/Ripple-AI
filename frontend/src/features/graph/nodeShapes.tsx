@@ -49,6 +49,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
           fill={defaultFill}
           stroke={defaultStroke}
           strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
           className={className}
         />
       );
@@ -65,6 +66,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
           fill={defaultFill}
           stroke={defaultStroke}
           strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
           className={className}
         />
       );
@@ -85,6 +87,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
           fill={defaultFill}
           stroke={defaultStroke}
           strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
           className={className}
         />
       );
@@ -108,6 +111,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
             fill={defaultFill}
             stroke={defaultStroke}
             strokeWidth={strokeWidth}
+            strokeDasharray={strokeDasharray}
           />
           <ellipse
             cx={cx}
@@ -117,6 +121,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
             fill={defaultFill}
             stroke={defaultStroke}
             strokeWidth={strokeWidth}
+            strokeDasharray={strokeDasharray}
           />
         </g>
       );
@@ -131,6 +136,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
           fill={defaultFill}
           stroke={defaultStroke}
           strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
           className={className}
         />
       );
@@ -161,6 +167,7 @@ export const NodeShape: React.FC<NodeShapeProps> = ({
           fill={defaultFill}
           stroke={defaultStroke}
           strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
           className={className}
         />
       );

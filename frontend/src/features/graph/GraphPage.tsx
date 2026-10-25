@@ -22,12 +22,15 @@ import {
   resolveLevelFromNodeType,
   type FlowTransformResult,
 } from './graphTransform.js';
+import { parseImpactUrl } from '../impact/impactPure.js';
 import type {
   GraphResponseData,
   NodeDetailsData,
   GraphNode,
   ProjectSummary,
 } from '../../../../shared/types.js';
+
+const ImpactView = React.lazy(() => import('../impact/ImpactView.js'));
 
 export const GraphPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,6 +47,12 @@ export const GraphPage: React.FC = () => {
     () => parseGraphUrl(searchParams),
     [searchParams]
   );
+  const { impact: urlImpact } = useMemo(
+    () => parseImpactUrl(searchParams),
+    [searchParams]
+  );
+
+  const impactButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Component state
   const [graphData, setGraphData] = useState<GraphResponseData | null>(null);
@@ -275,6 +284,33 @@ export const GraphPage: React.FC = () => {
       } else {
         navigate(`/app/graph?level=3&focus=${nodeId}&depth=1`);
       }
+    },
+    [navigate]
+  );
+
+  // Impact handlers
+  const handleShowImpact = useCallback(
+    (nodeId: string) => {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('impact', nodeId);
+      setSearchParams(newParams);
+    },
+    [searchParams, setSearchParams]
+  );
+
+  const handleCloseImpact = useCallback(() => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('impact');
+    newParams.delete('depth');
+    setSearchParams(newParams);
+    setTimeout(() => {
+      impactButtonRef.current?.focus();
+    }, 0);
+  }, [searchParams, setSearchParams]);
+
+  const handleNavigateFocusFromImpact = useCallback(
+    (nodeId: string) => {
+      navigate(`/app/graph?focus=${encodeURIComponent(nodeId)}`);
     },
     [navigate]
   );
@@ -529,11 +565,45 @@ export const GraphPage: React.FC = () => {
                   setSelectedNodeId(null);
                   navigate('/app/graph');
                 }}
+                onShowImpact={handleShowImpact}
+                impactButtonRef={impactButtonRef}
+                isImpactOpen={Boolean(urlImpact)}
               />
             )}
           </>
         )}
       </main>
+
+      {/* Ripple View (Change Impact) Panel */}
+      {urlImpact && selectedProjectId && (
+        <div className="flex-shrink-0 px-4 py-4 max-w-7xl w-full mx-auto">
+          <React.Suspense
+            fallback={
+              <div
+                data-testid="impact-suspense-skeleton"
+                className="p-6 bg-theme-surface border border-theme-border rounded-2xl space-y-4"
+              >
+                <Skeleton className="h-6 w-48 rounded-lg" />
+                <Skeleton className="h-4 w-full rounded-md" />
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-16 rounded-xl" />
+                  ))}
+                </div>
+                <Skeleton className="h-64 w-full rounded-2xl" />
+              </div>
+            }
+          >
+            <ImpactView
+              projectId={selectedProjectId}
+              nodeId={urlImpact}
+              onClose={handleCloseImpact}
+              onNavigateFocus={handleNavigateFocusFromImpact}
+              className="rounded-2xl border border-theme-border shadow-xl"
+            />
+          </React.Suspense>
+        </div>
+      )}
 
       {/* Accessible Text Alternative (Collapsible card at bottom) */}
       <footer className="flex-shrink-0 px-4 pt-4 pb-12 max-w-7xl w-full mx-auto">

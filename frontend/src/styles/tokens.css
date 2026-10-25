@@ -43,6 +43,11 @@
   /* Graph Edge Tokens - Light Theme (WCAG >= 3:1 against card surface) */
   --edge-investigation-path: #C2410C;
 
+  /* Change Impact Tokens - Light Theme (WCAG >= 3:1 against surface) */
+  --impact-ring: #64748B;
+  --impact-proven: #0B3B2C;
+  --impact-possible: #B45309;
+
   /* Diff Viewer Tokens - Light Theme (WCAG AA >= 4.5) */
   --diff-add-bg: #ECFDF5;
   --diff-add-text: #065F46;
@@ -81,6 +86,11 @@
 
   /* Graph Edge Tokens - Dark Theme (WCAG >= 3:1 against card surface) */
   --edge-investigation-path: #FB923C;
+
+  /* Change Impact Tokens - Dark Theme (WCAG >= 3:1 against surface) */
+  --impact-ring: #94A3B8;
+  --impact-proven: #34D399;
+  --impact-possible: #FBBF24;
 
   /* Diff Viewer Tokens - Dark Theme (WCAG AA >= 4.5) */
   --diff-add-bg: #0D382B;

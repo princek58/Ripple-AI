@@ -16,6 +16,9 @@ export interface NodeDetailsPanelProps {
   onNavigateNode: (nodeId: string) => void;
   onExpand: (nodeId: string, nodeType: string, depth?: number) => void;
   onBackToLevel1: () => void;
+  onShowImpact?: (nodeId: string) => void;
+  impactButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  isImpactOpen?: boolean;
   className?: string;
 }
 
@@ -26,6 +29,9 @@ export const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
   onNavigateNode,
   onExpand,
   onBackToLevel1,
+  onShowImpact,
+  impactButtonRef,
+  isImpactOpen = false,
   className = '',
 }) => {
   const [data, setData] = useState<NodeDetailsData | null>(null);
@@ -46,17 +52,18 @@ export const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
     }
   }, [nodeId]);
 
-  // Handle Escape key to close panel
+  // Handle Escape key to close panel (ignored when impact view is open so impact handles it)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isImpactOpen) return;
         onClose();
         previousFocusedElementRef.current?.focus();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isImpactOpen]);
 
   // Fetch node details with stale response protection
   const fetchDetails = useCallback(
@@ -401,9 +408,40 @@ export const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
         )}
       </div>
 
-      {/* Footer Controls: Expand & Back to Level 1 */}
+      {/* Footer Controls: Expand & Back to Level 1 & Show Impact */}
       {!isLoading && !is404 && data && (
         <div className="flex-shrink-0 p-4 border-t border-theme-border bg-theme-surface/90 flex flex-col gap-2.5">
+          {/* Show Impact */}
+          {(() => {
+            const isImpactDisabled = data.node.type === 'module' || data.node.type === 'project';
+            return (
+              <div className="space-y-1">
+                <button
+                  ref={impactButtonRef}
+                  type="button"
+                  disabled={isImpactDisabled}
+                  data-testid="show-impact-btn"
+                  onClick={() => onShowImpact?.(data.node.id)}
+                  className={`w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border text-xs font-semibold transition-colors ${
+                    isImpactDisabled
+                      ? 'border-theme-border bg-theme-surface-active/40 text-theme-text-muted opacity-60 cursor-not-allowed'
+                      : 'border-theme-border bg-theme-surface hover:bg-theme-surface-active text-theme-text'
+                  }`}
+                >
+                  Show impact
+                </button>
+                <p
+                  className="text-[11px] text-theme-text-muted leading-relaxed"
+                  data-testid="impact-helper-text"
+                >
+                  {isImpactDisabled
+                    ? 'Impact works for files, API endpoints and config items. Choose one inside the module.'
+                    : 'What may be affected if this changes'}
+                </p>
+              </div>
+            );
+          })()}
+
           {/* Depth Selector for level 3 */}
           {data.node.type !== 'module' && (
             <div className="flex items-center justify-between">

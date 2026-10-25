@@ -63,6 +63,13 @@ export default {
         edge: {
           'investigation-path': 'var(--edge-investigation-path)',
         },
+
+        // Change Impact colours
+        impact: {
+          ring: 'var(--impact-ring)',
+          proven: 'var(--impact-proven)',
+          possible: 'var(--impact-possible)',
+        },
       },
       fontFamily: {
         heading: ['var(--font-space-grotesk)', 'sans-serif'],
