@@ -420,13 +420,26 @@ export const FindingDetail: React.FC<FindingDetailProps> = ({
                   </div>
                 </div>
 
-                <Link
-                  to={`/app/graph?focus=${encodeURIComponent(node.id)}`}
-                  className="inline-flex items-center gap-1 font-medium text-forest dark:text-lime hover:underline shrink-0 text-xs px-2 py-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
-                >
-                  <span>View in Graph</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
-                </Link>
+                <div className="flex items-center gap-2 shrink-0">
+                  {['file', 'api', 'config', 'backend', 'frontend', 'database', 'test'].includes(node.type) && (
+                    <Link
+                      to={`/app/graph?focus=${encodeURIComponent(node.id)}&impact=${encodeURIComponent(node.id)}`}
+                      data-testid={`show-impact-link-${node.id}`}
+                      className="inline-flex items-center gap-1 font-medium text-forest dark:text-lime hover:underline text-xs px-2 py-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
+                    >
+                      <span>Show impact</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    </Link>
+                  )}
+
+                  <Link
+                    to={`/app/graph?focus=${encodeURIComponent(node.id)}`}
+                    className="inline-flex items-center gap-1 font-medium text-forest dark:text-lime hover:underline text-xs px-2 py-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
+                  >
+                    <span>View in Graph</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

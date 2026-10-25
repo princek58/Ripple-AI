@@ -275,3 +275,90 @@ describe('FindingDetail How To Fix Card (Step 12a-2 Part 2)', () => {
     expect(screen.queryByText(/this finding is verified/i)).not.toBeInTheDocument();
   });
 });
+
+describe('FindingDetail Affected Nodes Show Impact Link (Step P2-A2 Part 4)', () => {
+  it('renders "Show impact" link for file nodes pointing to /app/graph?focus=<id>&impact=<id>', () => {
+    render(
+      <MemoryRouter>
+        <FindingDetail finding={brokenImportDetail} />
+      </MemoryRouter>
+    );
+
+    const fileNode = brokenImportDetail.nodes[0];
+    const impactLink = screen.getByTestId(`show-impact-link-${fileNode.id}`);
+    expect(impactLink).toBeInTheDocument();
+    expect(impactLink).toHaveTextContent('Show impact');
+    expect(impactLink).toHaveAttribute(
+      'href',
+      `/app/graph?focus=${encodeURIComponent(fileNode.id)}&impact=${encodeURIComponent(fileNode.id)}`
+    );
+  });
+
+  it('renders "Show impact" link for config and api nodes from real captures', () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <FindingDetail finding={envUndeclaredDetail} />
+      </MemoryRouter>
+    );
+
+    // envUndeclaredDetail contains config node
+    const configNode = envUndeclaredDetail.nodes.find((n) => n.type === 'config');
+    if (configNode) {
+      const link = screen.getByTestId(`show-impact-link-${configNode.id}`);
+      expect(link).toHaveAttribute(
+        'href',
+        `/app/graph?focus=${encodeURIComponent(configNode.id)}&impact=${encodeURIComponent(configNode.id)}`
+      );
+    }
+    unmount();
+
+    // apiUnmatchedDetail contains api node
+    render(
+      <MemoryRouter>
+        <FindingDetail finding={apiUnmatchedDetail} />
+      </MemoryRouter>
+    );
+    const apiNode = apiUnmatchedDetail.nodes.find((n) => n.type === 'api');
+    if (apiNode) {
+      const link = screen.getByTestId(`show-impact-link-${apiNode.id}`);
+      expect(link).toHaveAttribute(
+        'href',
+        `/app/graph?focus=${encodeURIComponent(apiNode.id)}&impact=${encodeURIComponent(apiNode.id)}`
+      );
+    }
+  });
+
+  it('does NOT render "Show impact" link for module nodes', () => {
+    const findingWithModule: FindingDetailData = {
+      ...brokenImportDetail,
+      id: 'custom-mod-finding',
+      nodes: [
+        {
+          id: 'mod-shared-id',
+          label: 'shared',
+          type: 'module',
+          path: 'shared',
+        },
+        {
+          id: 'file-sub-id',
+          label: 'index.js',
+          type: 'backend',
+          path: 'shared/index.js',
+        },
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <FindingDetail finding={findingWithModule} />
+      </MemoryRouter>
+    );
+
+    // Module node must NOT have a "Show impact" link
+    expect(screen.queryByTestId('show-impact-link-mod-shared-id')).not.toBeInTheDocument();
+
+    // File node MUST have a "Show impact" link
+    expect(screen.getByTestId('show-impact-link-file-sub-id')).toBeInTheDocument();
+  });
+});
+
