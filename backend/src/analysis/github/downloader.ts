@@ -247,16 +247,26 @@ export async function downloadGithubZip(
     return { bytesWritten };
   } catch (err: any) {
     if (fileStream) {
-      try {
-        fileStream.destroy();
-      } catch {}
+      await new Promise<void>((resolve) => {
+        if ((fileStream as any).closed) return resolve();
+        fileStream!.once('close', () => resolve());
+        fileStream!.destroy();
+      });
       fileStream = null;
     }
 
     if (fs.existsSync(destFile)) {
-      try {
-        fs.unlinkSync(destFile);
-      } catch {}
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          fs.unlinkSync(destFile);
+          break;
+        } catch (e: any) {
+          if (attempt < 4 && (e.code === 'EBUSY' || e.code === 'EPERM')) {
+            const start = Date.now();
+            while (Date.now() - start < 20) {}
+          }
+        }
+      }
     }
 
     if (controller.signal.aborted) {

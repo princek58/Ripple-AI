@@ -5,6 +5,8 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { extractZip, ZipError, type ExtractResult } from '../analysis/zip/index.js';
+import { parseGithubUrl, downloadGithubZip, GithubError } from '../analysis/github/index.js';
+import type { Project } from '../types.js';
 import { scanProjectFiles } from '../analysis/scanner/index.js';
 import { buildGraph } from '../analysis/graphBuilder/index.js';
 import { runAllChecks } from '../checks/index.js';
@@ -43,6 +45,159 @@ const filesQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
   q: z.string().optional(),
 });
+
+export interface ProcessProjectZipParams {
+  tempZipPath: string;
+  rawProjectName: string;
+  extraScanNotes?: string | null;
+}
+
+export async function processProjectZip(
+  params: ProcessProjectZipParams
+): Promise<Project> {
+  const { tempZipPath, rawProjectName, extraScanNotes } = params;
+  const limits = config.upload;
+
+  // Check first 2 bytes are ZIP signature 'PK' (0x50, 0x4B)
+  try {
+    const fd = fs.openSync(tempZipPath, 'r');
+    const magic = Buffer.alloc(2);
+    const bytesRead = fs.readSync(fd, magic, 0, 2, 0);
+    fs.closeSync(fd);
+
+    if (bytesRead < 2 || magic[0] !== 0x50 || magic[1] !== 0x4b) {
+      throw new ZipError('ZIP_INVALID', 'Uploaded file is not a valid ZIP');
+    }
+  } catch (err: unknown) {
+    if (err instanceof ZipError) throw err;
+    throw new ZipError('ZIP_INVALID', 'Failed to inspect uploaded file');
+  }
+
+  // Set up project and extraction paths
+  const projectId = crypto.randomUUID();
+  const storageBase = path.resolve(config.storagePath);
+  const tempExtractionDir = path.resolve(config.tempStoragePath, `extract_${projectId}`);
+  const projectDir = path.resolve(storageBase, projectId);
+  const projectFilesDir = path.resolve(projectDir, 'files');
+
+  // Safety check: Ensure paths stay inside backend/storage
+  if (
+    !tempExtractionDir.startsWith(storageBase + path.sep) ||
+    !projectDir.startsWith(storageBase + path.sep)
+  ) {
+    throw new ZipError('ZIP_UNSAFE_PATH', 'Invalid storage path');
+  }
+
+  // Extract ZIP
+  let extractResult: ExtractResult;
+  try {
+    extractResult = await extractZip(tempZipPath, tempExtractionDir, limits);
+  } catch (extractErr: unknown) {
+    if (fs.existsSync(tempExtractionDir)) {
+      fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+    }
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+    throw extractErr;
+  }
+
+  // Move extracted files to backend/storage/<projectId>/files/
+  try {
+    fs.mkdirSync(projectDir, { recursive: true });
+    try {
+      fs.renameSync(tempExtractionDir, projectFilesDir);
+    } catch {
+      // On Windows renameSync can occasionally fail with EPERM/EBUSY; fallback to copy + delete
+      fs.cpSync(tempExtractionDir, projectFilesDir, { recursive: true });
+      fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+    }
+  } catch {
+    if (fs.existsSync(tempExtractionDir)) {
+      fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+    }
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+    throw new Error('STORAGE_ERROR');
+  }
+
+  // Sanitise project name from rawProjectName:
+  // strip extension, allow letters, digits, space, dot, dash, underscore, max 80 chars, fallback "project"
+  const nameWithoutExt = path.basename(rawProjectName, path.extname(rawProjectName));
+  const sanitizedName = nameWithoutExt
+    .replace(/[^a-zA-Z0-9 ._-]/g, '')
+    .trim()
+    .slice(0, 80)
+    .trim();
+  const projectName = sanitizedName || 'project';
+
+  // Unique languages
+  const languages = Array.from(new Set(extractResult.files.map((f) => f.language))).sort();
+  const languagesJson = JSON.stringify(languages);
+
+  // Skipped summary notes
+  const skippedCategories: Record<string, number> = {};
+  for (const item of extractResult.skipped) {
+    const cat = item.reason.split(' ')[0] || item.reason;
+    skippedCategories[cat] = (skippedCategories[cat] || 0) + 1;
+  }
+  let notes =
+    extractResult.skippedCount > 0
+      ? `Skipped ${extractResult.skippedCount} file(s): ` +
+        Object.entries(skippedCategories)
+          .map(([cat, count]) => `${cat} (${count})`)
+          .join(', ')
+      : null;
+
+  if (extraScanNotes) {
+    notes = notes ? `${notes}\n${extraScanNotes}` : extraScanNotes;
+  }
+
+  // Database save in single transaction
+  const db = getDatabase();
+  const repo = new ProjectsRepository(db);
+  const scanId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  try {
+    const project = repo.createWithScanAndFiles({
+      project: {
+        id: projectId,
+        name: projectName,
+        size_bytes: extractResult.totalBytes,
+        file_count: extractResult.extractedCount,
+        languages: languagesJson,
+        created_at: now,
+        last_scan_at: now,
+      },
+      scan: {
+        id: scanId,
+        started_at: now,
+        finished_at: now,
+        status: 'completed',
+        files_total: extractResult.totalEntries,
+        files_skipped: extractResult.skippedCount,
+        notes,
+      },
+      files: extractResult.files.map((f) => ({
+        id: crypto.randomUUID(),
+        path: f.path,
+        size: f.size,
+        language: f.language,
+        sensitive: f.sensitive,
+      })),
+    });
+
+    return project;
+  } catch {
+    // On DB failure, delete project folder and leave no partial data
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+    throw new Error('DB_ERROR');
+  }
+}
 
 // POST /api/projects - Upload ZIP and extract project
 router.post('/projects', async (req: Request, res: Response) => {
@@ -111,145 +266,24 @@ router.post('/projects', async (req: Request, res: Response) => {
 
     tempFilePath = req.file.path;
 
-    // Check first 2 bytes are ZIP signature 'PK' (0x50, 0x4B)
     try {
-      const fd = fs.openSync(tempFilePath, 'r');
-      const magic = Buffer.alloc(2);
-      const bytesRead = fs.readSync(fd, magic, 0, 2, 0);
-      fs.closeSync(fd);
-
-      if (bytesRead < 2 || magic[0] !== 0x50 || magic[1] !== 0x4b) {
-        return sendError(res, 'Uploaded file is not a valid ZIP', 400, 'ZIP_INVALID');
+      const project = await processProjectZip({
+        tempZipPath: tempFilePath,
+        rawProjectName: req.file.originalname || '',
+      });
+      return sendSuccess(res, project, 201);
+    } catch (err: unknown) {
+      if (err instanceof ZipError) {
+        const statusCode = err.code === 'ZIP_INVALID' ? 400 : 422;
+        return sendError(res, err.message, statusCode, err.code);
       }
-    } catch {
-      return sendError(res, 'Failed to inspect uploaded file', 400, 'ZIP_INVALID');
-    }
-
-    // Set up project and extraction paths
-    const projectId = crypto.randomUUID();
-    const storageBase = path.resolve(config.storagePath);
-    const tempExtractionDir = path.resolve(config.tempStoragePath, `extract_${projectId}`);
-    const projectDir = path.resolve(storageBase, projectId);
-    const projectFilesDir = path.resolve(projectDir, 'files');
-
-    // Safety check: Ensure paths stay inside backend/storage
-    if (
-      !tempExtractionDir.startsWith(storageBase + path.sep) ||
-      !projectDir.startsWith(storageBase + path.sep)
-    ) {
-      return sendError(res, 'Invalid storage path', 400, 'ZIP_UNSAFE_PATH');
-    }
-
-    // Extract ZIP
-    let extractResult: ExtractResult;
-    try {
-      extractResult = await extractZip(tempFilePath, tempExtractionDir, limits);
-    } catch (extractErr: unknown) {
-      if (fs.existsSync(tempExtractionDir)) {
-        fs.rmSync(tempExtractionDir, { recursive: true, force: true });
+      if (err instanceof Error && err.message === 'STORAGE_ERROR') {
+        return sendError(res, 'Failed to move extracted files to storage', 500, 'STORAGE_ERROR');
       }
-      if (fs.existsSync(projectDir)) {
-        fs.rmSync(projectDir, { recursive: true, force: true });
-      }
-
-      if (extractErr instanceof ZipError) {
-        const statusCode = extractErr.code === 'ZIP_INVALID' ? 400 : 422;
-        return sendError(res, extractErr.message, statusCode, extractErr.code);
+      if (err instanceof Error && err.message === 'DB_ERROR') {
+        return sendError(res, 'Failed to save project records to database', 500, 'DB_ERROR');
       }
       return sendError(res, 'Failed to extract ZIP archive', 400, 'ZIP_INVALID');
-    }
-
-    // Move extracted files to backend/storage/<projectId>/files/
-    try {
-      fs.mkdirSync(projectDir, { recursive: true });
-      try {
-        fs.renameSync(tempExtractionDir, projectFilesDir);
-      } catch {
-        // On Windows renameSync can occasionally fail with EPERM/EBUSY; fallback to copy + delete
-        fs.cpSync(tempExtractionDir, projectFilesDir, { recursive: true });
-        fs.rmSync(tempExtractionDir, { recursive: true, force: true });
-      }
-    } catch {
-      if (fs.existsSync(tempExtractionDir)) {
-        fs.rmSync(tempExtractionDir, { recursive: true, force: true });
-      }
-      if (fs.existsSync(projectDir)) {
-        fs.rmSync(projectDir, { recursive: true, force: true });
-      }
-      return sendError(res, 'Failed to move extracted files to storage', 500, 'STORAGE_ERROR');
-    }
-
-    // Sanitise project name from ZIP filename:
-    // strip extension, allow letters, digits, space, dot, dash, underscore, max 80 chars, fallback "project"
-    const originalName = req.file.originalname || '';
-    const nameWithoutExt = path.basename(originalName, path.extname(originalName));
-    const sanitizedName = nameWithoutExt
-      .replace(/[^a-zA-Z0-9 ._-]/g, '')
-      .trim()
-      .slice(0, 80)
-      .trim();
-    const projectName = sanitizedName || 'project';
-
-    // Unique languages
-    const languages = Array.from(new Set(extractResult.files.map((f) => f.language))).sort();
-    const languagesJson = JSON.stringify(languages);
-
-    // Skipped summary notes
-    const skippedCategories: Record<string, number> = {};
-    for (const item of extractResult.skipped) {
-      const cat = item.reason.split(' ')[0] || item.reason;
-      skippedCategories[cat] = (skippedCategories[cat] || 0) + 1;
-    }
-    const notes =
-      extractResult.skippedCount > 0
-        ? `Skipped ${extractResult.skippedCount} file(s): ` +
-          Object.entries(skippedCategories)
-            .map(([cat, count]) => `${cat} (${count})`)
-            .join(', ')
-        : null;
-
-    // Database save in single transaction
-    const db = getDatabase();
-    const repo = new ProjectsRepository(db);
-    const scanId = crypto.randomUUID();
-    const now = new Date().toISOString();
-
-    try {
-      const project = repo.createWithScanAndFiles({
-        project: {
-          id: projectId,
-          name: projectName,
-          size_bytes: extractResult.totalBytes,
-          file_count: extractResult.extractedCount,
-          languages: languagesJson,
-          created_at: now,
-          last_scan_at: now,
-        },
-        scan: {
-          id: scanId,
-          started_at: now,
-          finished_at: now,
-          status: 'completed',
-          files_total: extractResult.totalEntries,
-          files_skipped: extractResult.skippedCount,
-          notes,
-        },
-        files: extractResult.files.map((f) => ({
-          id: crypto.randomUUID(),
-          path: f.path,
-          size: f.size,
-          language: f.language,
-          sensitive: f.sensitive,
-        })),
-      });
-
-      return sendSuccess(res, project, 201);
-    } catch {
-      // On DB failure, delete project folder and leave no partial data
-      if (fs.existsSync(projectDir)) {
-        fs.rmSync(projectDir, { recursive: true, force: true });
-      }
-      return sendError(res, 'Failed to save project records to database', 500, 'DB_ERROR');
     }
   } finally {
     activeUploads--;
@@ -263,6 +297,93 @@ router.post('/projects', async (req: Request, res: Response) => {
     }
   }
 });
+
+const importGithubBodySchema = z.object({
+  url: z.string({ required_error: 'URL is required', invalid_type_error: 'URL must be a string' }),
+});
+
+// POST /api/projects/import-github - Download public GitHub repository ZIP and extract project
+router.post(
+  '/projects/import-github',
+  validate({ body: importGithubBodySchema }),
+  async (req: Request, res: Response) => {
+    if (activeUploads >= MAX_CONCURRENT_UPLOADS) {
+      return sendError(res, 'Too many concurrent uploads', 429, 'TOO_MANY_UPLOADS');
+    }
+
+    activeUploads++;
+    let tempZipPath: string | null = null;
+
+    try {
+      // 1. Parse and validate GitHub URL (pure check, no network request on invalid)
+      const parsed = parseGithubUrl(req.body.url);
+
+      // 2. Prepare isolated temporary storage path
+      fs.mkdirSync(config.tempStoragePath, { recursive: true });
+      tempZipPath = path.resolve(config.tempStoragePath, `${crypto.randomUUID()}.tmp`);
+
+      // 3. Download repository ZIP from GitHub
+      await downloadGithubZip(parsed, tempZipPath);
+
+      // 4. Process ZIP through the shared pipeline
+      const extraScanNotes = `Imported from github.com/${parsed.owner}/${parsed.repo} (public)`;
+      const project = await processProjectZip({
+        tempZipPath,
+        rawProjectName: parsed.repo,
+        extraScanNotes,
+      });
+
+      return sendSuccess(res, project, 201);
+    } catch (err: unknown) {
+      if (err instanceof GithubError) {
+        switch (err.code) {
+          case 'GITHUB_URL_INVALID':
+            return sendError(res, 'Invalid GitHub repository link', 400, err.code);
+          case 'GITHUB_REPO_NOT_FOUND':
+            return sendError(res, err.message, 404, err.code);
+          case 'GITHUB_REPO_TOO_LARGE':
+            return sendError(res, 'Repository exceeds maximum size limit', 413, err.code);
+          case 'GITHUB_UNAVAILABLE':
+            return sendError(res, 'GitHub service is unavailable or rate limited', 502, err.code);
+          case 'GITHUB_UNREACHABLE':
+            return sendError(res, 'Unable to reach GitHub', 502, err.code);
+          case 'GITHUB_REDIRECT_BLOCKED':
+            return sendError(res, 'Download redirect was blocked', 502, err.code);
+        }
+      }
+
+      if (err instanceof ZipError) {
+        const statusCode = err.code === 'ZIP_INVALID' ? 400 : 422;
+        return sendError(res, err.message, statusCode, err.code);
+      }
+
+      if (err instanceof Error && err.message === 'STORAGE_ERROR') {
+        return sendError(res, 'Failed to store project files', 500, 'STORAGE_ERROR');
+      }
+
+      if (err instanceof Error && err.message === 'DB_ERROR') {
+        return sendError(res, 'Failed to save project records to database', 500, 'DB_ERROR');
+      }
+
+      return sendError(res, 'Failed to import repository', 500, 'IMPORT_ERROR');
+    } finally {
+      activeUploads--;
+      if (tempZipPath && fs.existsSync(tempZipPath)) {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          try {
+            fs.unlinkSync(tempZipPath);
+            break;
+          } catch (e: any) {
+            if (attempt < 4 && (e.code === 'EBUSY' || e.code === 'EPERM')) {
+              const start = Date.now();
+              while (Date.now() - start < 20) {}
+            }
+          }
+        }
+      }
+    }
+  }
+);
 
 // GET /api/projects - list projects, newest first
 router.get('/projects', (_req: Request, res: Response) => {
