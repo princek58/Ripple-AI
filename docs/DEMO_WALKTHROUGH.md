@@ -44,7 +44,15 @@ This guide is designed for a non-technical presenter or product specialist demon
 - **What to Say**:
   > *"Drilling into the fees module reveals internal relationships between API routes, backend services, and unresolvable dependencies that would otherwise fail silently at runtime."*
 
-### Step 4: Investigations & Level 4 Evidence Path
+### Step 4: Change Impact ("Ripple View")
+- **Exact Action**:
+  - Open the Graph, click noticeService.js, press Show impact, press Play.
+- **What to Say**:
+  > *"Ripple view traces deterministic static dependency paths round-by-round to show which files, API endpoints, config items, and tests may be affected if noticeService.js changes."*
+- **Important**:
+  - Do not claim: that the impact list is complete or guaranteed.
+
+### Step 5: Investigations & Level 4 Evidence Path
 - **Exact Action**:
   - Click **Investigations** in the top navigation bar.
   - Select the high-severity finding: **Broken import "../services/feeService" in fees.js**.
@@ -55,7 +63,7 @@ This guide is designed for a non-technical presenter or product specialist demon
 - **What to Say**:
   > *"Ripple AI isolates the exact evidence line in fees.js and maps the complete investigation path in a dedicated mini graph, keeping severity, confidence, and testing verification strictly separate."*
 
-### Step 5: Suggested Fixes & Report Transparency
+### Step 6: Suggested Fixes & Report Transparency
 - **Exact Action**:
   - Click **Fixes** in the top navigation bar.
   - Select the proposed change for `JWT_SECRET` in `.env.example`.
@@ -84,6 +92,8 @@ To maintain complete credibility, never make any of the following claims during 
    - Ripple AI is built strictly for single-user local use on `localhost`. There is no login, user database, or cloud sync.
 6. **Tested on Sample Scenarios**:
    - The platform has been tested on small-to-medium demo repositories (`demo-erp`, 17 files, 30 nodes); do not claim real-time enterprise repository indexing.
+7. **Change Impact is Not Guaranteed**:
+   - Do not claim: that the impact list is complete or guaranteed. Impact is a static estimate from code connections, and unresolved dynamic references or runtime reflection can hide more.
 
 ---
 

@@ -19,6 +19,9 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
   4. `env_undeclared`: Flags references to `process.env.*` variables in source files that are absent from `.env.example`.
   5. `api_unmatched_call`: Identifies client-side API calls (e.g. `fetch('/api/...')` or `axios`) that do not match any registered server route.
   6. `secret_pattern`: Scans files for hardcoded secrets, private keys, and credential tokens using regex pattern matching.
+- **Change Impact analysis ("Ripple view")**:
+  - In the Graph screen (via the "Show impact" button in node details) and Investigations screen (via "Show impact" links on affected nodes), computes deterministic static dependency paths to show which files, API endpoints, config items, and tests may be affected if an item changes.
+  - Groups affected nodes by distance into rounds (Round 1 = direct dependents, Round 2 = transitive dependents) and displays them on concentric rings ("Ripple view") around the start node with progressive playback controls, count tiles, and a grouped text alternative.
 - **Findings with three separate fields**: Every finding maintains three distinct classifications:
   - **Severity**: Potential impact of the issue on the system (`critical`, `high`, `medium`, `low`, `unknown`).
   - **Confidence**: Certainty of the static analysis finding (`confirmed`, `likely`, `hypothesis`).
@@ -198,6 +201,7 @@ RippleAI/
 
 ## Known limitations
 
+- **Change Impact is a static estimate**: The change impact analysis is a static estimate from code connections. It is not a guarantee, and no code was run. Unresolved dynamic references can hide additional dependents.
 - **Backend dependency advisory (Zod)**: The backend dependency `zod` (3.25.76) has an open npm audit advisory (GHSA-mrhx-c7xc-m3w5, memory use while validating oversized collections); the suggested fix is a major upgrade that has not been applied; the app is for single-user local use.
 - **Visual QA review**: Visual QA is automated plus an AI review of screenshots and has not been checked by a human designer.
 - **Print layout verification**: Print layout is only checked by the stylesheet test, not by a printed page.
@@ -209,5 +213,5 @@ RippleAI/
 ## Status
 
 - **Phase 1**: Complete.
-- **Phase 2**: Not built.
-- **Test suite**: 463 tests passing across 46 test files (92 backend tests, 371 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.
+- **Phase 2A (Change Impact)**: Complete.
+- **Test suite**: 510 tests passing across 49 test files (102 backend tests, 408 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.

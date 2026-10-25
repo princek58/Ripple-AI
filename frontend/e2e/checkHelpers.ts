@@ -37,6 +37,14 @@ export interface MiniGraphCheckResult {
   valid: boolean;
 }
 
+export interface ImpactCheckResult {
+  found: boolean;
+  staticEstimateVisible: boolean;
+  round1Visible: boolean;
+  hasHorizontalOverflow: boolean;
+  valid: boolean;
+}
+
 export interface PageCheckResult {
   consoleErrors: string[];
   pageErrors: string[];
@@ -60,6 +68,7 @@ export interface PageCheckResult {
   clippingWarnings: ClippingWarning[];
   landingCounters?: LandingCountersResult;
   miniGraphCheck?: MiniGraphCheckResult;
+  impactCheck?: ImpactCheckResult;
 }
 
 export function setupPageCheckListeners(page: Page) {
@@ -399,6 +408,55 @@ export async function runPageChecks(
       };
     }
 
+    // 10. Impact view check (Ripple View)
+    const impactPanelEl = document.querySelector('[data-testid="impact-view-panel"]');
+    let impactCheck: ImpactCheckResult | undefined;
+    if (impactPanelEl) {
+      const allTextNodes = Array.from(impactPanelEl.querySelectorAll<HTMLElement>('*'));
+
+      // Check "static estimate" visible
+      const estimateEl = allTextNodes.find((el) => {
+        return (el.textContent || '').toLowerCase().includes('static estimate');
+      });
+      let isEstimateVisible = false;
+      if (estimateEl) {
+        const style = window.getComputedStyle(estimateEl);
+        const rect = estimateEl.getBoundingClientRect();
+        isEstimateVisible =
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0;
+      }
+
+      // Check "Round 1" visible (or zero results where diagram rings are not drawn)
+      const round1El = allTextNodes.find((el) => {
+        const txt = (el.textContent || '').trim();
+        return txt.startsWith('Round 1') || txt.includes('Round 1');
+      });
+      let isRound1Visible = false;
+      if (round1El) {
+        const style = window.getComputedStyle(round1El);
+        const rect = round1El.getBoundingClientRect();
+        isRound1Visible =
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0;
+      }
+
+      const isZeroImpact = Boolean(impactPanelEl.querySelector('[data-testid="zero-impact-banner"]'));
+      const round1Pass = isZeroImpact || isRound1Visible;
+
+      impactCheck = {
+        found: true,
+        staticEstimateVisible: isEstimateVisible,
+        round1Visible: isRound1Visible,
+        hasHorizontalOverflow: hasHorizontalOverflow,
+        valid: isEstimateVisible && round1Pass && (!isPhoneViewport || !hasHorizontalOverflow),
+      };
+    }
+
     return {
       horizontalOverflow: hasHorizontalOverflow,
       scrollWidth: scrollW,
@@ -415,6 +473,7 @@ export async function runPageChecks(
       clippingWarnings,
       landingCounters,
       miniGraphCheck,
+      impactCheck,
     };
   }, { isApp: isAppRoute, isPhoneViewport: isPhone });
 
@@ -434,5 +493,6 @@ export async function runPageChecks(
     clippingWarnings: domResult.clippingWarnings,
     landingCounters: domResult.landingCounters,
     miniGraphCheck: domResult.miniGraphCheck,
+    impactCheck: domResult.impactCheck,
   };
 }

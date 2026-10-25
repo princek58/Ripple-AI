@@ -81,6 +81,11 @@ test.describe('Automated Checks Self-Test', () => {
             </div>
           </div>
 
+          <!-- Defective impact view panel (missing "static estimate" and "Round 1") -->
+          <section data-testid="impact-view-panel">
+            <div>Defective impact panel without required text</div>
+          </section>
+
           <!-- Sample data tag -->
           <span class="badge">Sample data</span>
         </body>
@@ -137,6 +142,13 @@ test.describe('Automated Checks Self-Test', () => {
     expect(result.miniGraphCheck?.found).toBe(true);
     expect(result.miniGraphCheck?.investigationPathVisible).toBe(false);
     expect(result.miniGraphCheck?.valid).toBe(false);
+
+    // Impact view check assertion: must detect missing "static estimate" and "Round 1"
+    expect(result.impactCheck).toBeDefined();
+    expect(result.impactCheck?.found).toBe(true);
+    expect(result.impactCheck?.staticEstimateVisible).toBe(false);
+    expect(result.impactCheck?.round1Visible).toBe(false);
+    expect(result.impactCheck?.valid).toBe(false);
   });
 
   test('proves that automated checks stay quiet on a clean page', async ({ page }) => {
@@ -207,6 +219,12 @@ test.describe('Automated Checks Self-Test', () => {
             </div>
           </div>
 
+          <!-- Valid impact view panel with visible "static estimate" and "Round 1" -->
+          <section data-testid="impact-view-panel" style="width: 100%; box-sizing: border-box;">
+            <div>This is a static estimate from code connections.</div>
+            <div>Round 1: depends directly on it</div>
+          </section>
+
           <!-- Clean text without forbidden tokens -->
           <p>Everything is operating within defined boundaries.</p>
         </body>
@@ -223,6 +241,7 @@ test.describe('Automated Checks Self-Test', () => {
     console.log('Clipping warnings:', result.clippingWarnings.length);
     console.log('Landing counters valid:', result.landingCounters?.valid);
     console.log('Mini graph valid:', result.miniGraphCheck?.valid);
+    console.log('Impact check valid:', result.impactCheck?.valid);
     console.log('Unlabeled elements:', result.unlabeledElements.count);
     console.log('Forbidden tokens:', result.forbiddenText.length);
     console.log('Sample data tags:', result.sampleDataCount);
@@ -239,6 +258,12 @@ test.describe('Automated Checks Self-Test', () => {
     expect(result.miniGraphCheck?.investigationPathVisible).toBe(true);
     expect(result.miniGraphCheck?.hasHorizontalOverflow).toBe(false);
     expect(result.miniGraphCheck?.valid).toBe(true);
+    expect(result.impactCheck).toBeDefined();
+    expect(result.impactCheck?.found).toBe(true);
+    expect(result.impactCheck?.staticEstimateVisible).toBe(true);
+    expect(result.impactCheck?.round1Visible).toBe(true);
+    expect(result.impactCheck?.hasHorizontalOverflow).toBe(false);
+    expect(result.impactCheck?.valid).toBe(true);
     expect(result.unlabeledElements.count).toBe(0);
     expect(result.forbiddenText).toHaveLength(0);
     expect(result.sampleDataCount).toBe(0);

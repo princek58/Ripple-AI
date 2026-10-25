@@ -129,14 +129,16 @@ export const GraphPage: React.FC = () => {
 
           if (details.status === 'fulfilled') {
             const { level, depth } = resolveLevelFromNodeType(details.value.node.type);
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set('focus', urlFocus);
             if (level === 2) {
-              setSearchParams({ focus: urlFocus, level: '2' }, { replace: true });
+              nextParams.set('level', '2');
+              nextParams.delete('depth');
             } else {
-              setSearchParams(
-                { focus: urlFocus, level: '3', depth: String(depth) },
-                { replace: true }
-              );
+              nextParams.set('level', '3');
+              nextParams.set('depth', String(depth));
             }
+            setSearchParams(nextParams, { replace: true });
             return;
           } else {
             const err = details.reason;

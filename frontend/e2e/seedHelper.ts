@@ -5,6 +5,9 @@ export interface SeedData {
   scannedProjectId: string;
   unscannedProjectId: string;
   feesModuleNodeId: string;
+  noticeServiceNodeId: string;
+  helpersNodeId: string;
+  legacyReportNodeId: string;
   brokenImportFindingId: string;
   circularDependencyFindingId: string;
   isolatedFileFindingId: string;
@@ -175,10 +178,34 @@ export async function seedQaBackend(backendUrl = 'http://localhost:4100'): Promi
   const feesModuleNodeId = feesNode.id;
   console.log(`[seed] Found fees module node ID: ${feesModuleNodeId}`);
 
+  // 9. Find noticeService, helpers, legacyReport node IDs for change impact QA
+  console.log(`[seed] Fetching impact target nodes (noticeService, helpers, legacyReport)...`);
+  const searchNoticeRes = await fetch(`${backendUrl}/api/projects/${scannedProjectId}/graph/search?q=noticeService.js`);
+  const noticeItem = (await searchNoticeRes.json()).data?.items?.[0];
+  const noticeServiceNodeId = noticeItem?.id;
+
+  const searchHelpersRes = await fetch(`${backendUrl}/api/projects/${scannedProjectId}/graph/search?q=helpers.js`);
+  const helpersItem = (await searchHelpersRes.json()).data?.items?.[0];
+  const helpersNodeId = helpersItem?.id;
+
+  const searchLegacyRes = await fetch(`${backendUrl}/api/projects/${scannedProjectId}/graph/search?q=legacyReport.js`);
+  const legacyItem = (await searchLegacyRes.json()).data?.items?.[0];
+  const legacyReportNodeId = legacyItem?.id;
+
+  if (!noticeServiceNodeId || !helpersNodeId || !legacyReportNodeId) {
+    throw new Error(
+      `Failed to find impact target nodes: noticeService=${noticeServiceNodeId}, helpers=${helpersNodeId}, legacyReport=${legacyReportNodeId}`
+    );
+  }
+  console.log(`[seed] Found impact nodes: noticeService=${noticeServiceNodeId}, helpers=${helpersNodeId}, legacyReport=${legacyReportNodeId}`);
+
   const seedResult: SeedData = {
     scannedProjectId,
     unscannedProjectId,
     feesModuleNodeId,
+    noticeServiceNodeId,
+    helpersNodeId,
+    legacyReportNodeId,
     brokenImportFindingId,
     circularDependencyFindingId,
     isolatedFileFindingId,

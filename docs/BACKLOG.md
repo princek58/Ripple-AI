@@ -32,3 +32,8 @@ This document tracks known limitations, technical debt, security advisories, and
 | **B-15** | Performance Audit | Verify that opening Investigations does not download the 1.6 MB graphTransform chunk before the Evidence path card is opened. | Minor | Open |
 | **B-16** | Test Hygiene | 31 Step 14 tests were not mutation-checked (important ones: Open in Graph click, highlighted investigation path, reduced motion). | Minor | Open |
 | **B-17** | Feature Enhancement | The mini graph shows finding-level evidence only; module-level impact comes with Feature A. | Minor | Open |
+| **B-18** | Architecture & Types | Impact types are mirrored in `shared/types.ts` and `backend/src/types.ts` and can drift (add a test that compares the key names of the two copies if easy, else leave open). | Minor | Open |
+| **B-19** | Backend Architecture | `backend/src/routes/projects.ts` keeps growing; move the graph and impact routes to their own router file later. | Minor | Open |
+| **B-20** | Benchmarking & Scale | Impact analysis was checked only on the small `demo-erp` fixture; bigger real projects are measured in rehearsal R1. | Minor | Open |
+| **B-21** | Localization | Impact text has no Hinglish version yet (the chatbox will explain in Hinglish). | Minor | Open |
+

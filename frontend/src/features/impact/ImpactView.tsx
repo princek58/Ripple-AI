@@ -101,12 +101,12 @@ export const ImpactView: React.FC<ImpactViewProps> = ({
       const totalRounds = rounds.length > 0 ? rounds[rounds.length - 1].round : 1;
       setMaxRound(totalRounds);
 
-      // If prefers reduced motion, show all rounds immediately, else reveal
+      // If prefers reduced motion, show all rounds immediately, else start at round 1
       if (prefersReducedMotion) {
         setCurrentRound(totalRounds);
         setIsPlaying(false);
       } else {
-        setCurrentRound(totalRounds); // default show full or progressive
+        setCurrentRound(1);
         setIsPlaying(false);
       }
 

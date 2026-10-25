@@ -34,6 +34,10 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
     { slug: 'app-fixes-unscanned', title: 'Fixes Screen (Unscanned Project)', path: '/app/fixes' },
     { slug: 'app-tests-unscanned', title: 'Tests Screen (Unscanned Project)', path: '/app/tests' },
     { slug: 'app-reports-unscanned', title: 'Reports Screen (Unscanned Project)', path: '/app/reports' },
+    { slug: 'app-graph-impact-noticeservice', title: 'Architecture Graph - Impact View: noticeService.js', path: '/app/graph?focus=<noticeServiceId>&impact=<noticeServiceId>' },
+    { slug: 'app-graph-impact-helpers', title: 'Architecture Graph - Impact View: helpers.js (Circular)', path: '/app/graph?focus=<helpersId>&impact=<helpersId>' },
+    { slug: 'app-graph-impact-legacyreport', title: 'Architecture Graph - Impact View: legacyReport.js (Zero Impact)', path: '/app/graph?focus=<legacyReportId>&impact=<legacyReportId>' },
+    { slug: 'app-graph-impact-noticeservice-round3', title: 'Architecture Graph - Impact View: noticeService.js (Round 3 State)', path: '/app/graph?focus=<noticeServiceId>&impact=<noticeServiceId>' },
   ];
 
   function formatChecks(check: any) {
@@ -47,6 +51,7 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
       (check.nodeOverlaps && check.nodeOverlaps.length > 0) ||
       (check.landingCounters && !check.landingCounters.valid) ||
       (check.miniGraphCheck && !check.miniGraphCheck.valid) ||
+      (check.impactCheck && !check.impactCheck.valid) ||
       (check.unlabeledElements && check.unlabeledElements.count > 0) ||
       (check.imagesWithoutAlt && check.imagesWithoutAlt > 0) ||
       (check.forbiddenText && check.forbiddenText.length > 0) ||
@@ -126,6 +131,15 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
         details.push(`<div class="item ok-item">Mini Graph Check: Valid ("Investigation path" visible, no phone overflow)</div>`);
       } else {
         details.push(`<div class="item warn-item"><strong>Mini Graph Check: INVALID</strong> (Investigation path visible: ${check.miniGraphCheck.investigationPathVisible}, phone overflow: ${check.miniGraphCheck.hasHorizontalOverflow})</div>`);
+      }
+    }
+
+    // Impact View Check
+    if (check.impactCheck) {
+      if (check.impactCheck.valid) {
+        details.push(`<div class="item ok-item">Impact View Check: Valid ("static estimate" & "Round 1" visible, no phone overflow)</div>`);
+      } else {
+        details.push(`<div class="item warn-item"><strong>Impact View Check: INVALID</strong> (static estimate: ${check.impactCheck.staticEstimateVisible}, Round 1: ${check.impactCheck.round1Visible}, phone overflow: ${check.impactCheck.hasHorizontalOverflow})</div>`);
       }
     }
 

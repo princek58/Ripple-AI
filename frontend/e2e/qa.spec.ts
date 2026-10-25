@@ -113,6 +113,30 @@ const routes: RouteDef[] = [
       { device: 'phone', theme: 'dark' },
     ],
   },
+  // Change Impact (Ripple View) QA routes (Step P2-A2 Part 5)
+  {
+    slug: 'app-graph-impact-noticeservice',
+    pathBuilder: (seed) => `/app/graph?focus=${seed.noticeServiceNodeId}&impact=${seed.noticeServiceNodeId}`,
+    projectType: 'scanned',
+  },
+  {
+    slug: 'app-graph-impact-helpers',
+    pathBuilder: (seed) => `/app/graph?focus=${seed.helpersNodeId}&impact=${seed.helpersNodeId}`,
+    projectType: 'scanned',
+    variantsOnly: [{ device: 'desktop', theme: 'light' }],
+  },
+  {
+    slug: 'app-graph-impact-legacyreport',
+    pathBuilder: (seed) => `/app/graph?focus=${seed.legacyReportNodeId}&impact=${seed.legacyReportNodeId}`,
+    projectType: 'scanned',
+    variantsOnly: [{ device: 'desktop', theme: 'light' }],
+  },
+  {
+    slug: 'app-graph-impact-noticeservice-round3',
+    pathBuilder: (seed) => `/app/graph?focus=${seed.noticeServiceNodeId}&impact=${seed.noticeServiceNodeId}`,
+    projectType: 'scanned',
+    variantsOnly: [{ device: 'desktop', theme: 'light' }],
+  },
 ];
 
 interface VariantDef {
@@ -266,6 +290,35 @@ test.describe('Automated Visual QA Suite', () => {
           }
         }
 
+        // Wait for Impact view if on an impact route
+        if (r.slug.startsWith('app-graph-impact')) {
+          const impactPanel = page.locator('[data-testid="impact-view-panel"]');
+          try {
+            await impactPanel.waitFor({ state: 'visible', timeout: 12000 });
+            const impactSkeleton = page.locator('[data-testid="impact-loading-skeleton"]');
+            if ((await impactSkeleton.count()) > 0) {
+              await impactSkeleton.waitFor({ state: 'detached', timeout: 12000 });
+            }
+          } catch (e) {
+            console.warn(`[qa] Failed waiting for impact panel on ${r.slug}:`, e);
+          }
+          await page.waitForTimeout(600);
+
+          // For Round 3 capture of noticeService.js, click next round twice
+          if (r.slug === 'app-graph-impact-noticeservice-round3') {
+            const nextBtn = page.locator('[data-testid="round-next-btn"]');
+            try {
+              await nextBtn.waitFor({ state: 'visible', timeout: 6000 });
+              await nextBtn.click();
+              await page.waitForTimeout(400);
+              await nextBtn.click();
+              await page.waitForTimeout(400);
+            } catch (e) {
+              console.warn(`[qa] Failed advancing to round 3:`, e);
+            }
+          }
+        }
+
         await page.screenshot({ path: screenshotFilePath, fullPage: true });
 
         const checkResult = await runPageChecks(page, isAppRoute, v.device === 'phone', listeners);
@@ -277,6 +330,22 @@ test.describe('Automated Visual QA Suite', () => {
           }
           if (v.device === 'phone' && checkResult.horizontalOverflow) {
             throw new Error(`[qa-check-fail] mini graph on ${fileKey} has horizontal overflow on phone`);
+          }
+        }
+
+        // Automated check assertion for impact view (Step P2-A2 Part 5 Item 9)
+        if (r.slug.startsWith('app-graph-impact')) {
+          if (!checkResult.impactCheck?.found) {
+            throw new Error(`[qa-check-fail] impact check not found on ${fileKey}`);
+          }
+          if (!checkResult.impactCheck?.staticEstimateVisible) {
+            throw new Error(`[qa-check-fail] "static estimate" not visible on ${fileKey}`);
+          }
+          if (r.slug !== 'app-graph-impact-legacyreport' && !checkResult.impactCheck?.round1Visible) {
+            throw new Error(`[qa-check-fail] "Round 1" not visible on ${fileKey}`);
+          }
+          if (v.device === 'phone' && checkResult.horizontalOverflow) {
+            throw new Error(`[qa-check-fail] horizontal overflow on phone for ${fileKey}`);
           }
         }
 
