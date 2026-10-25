@@ -42,11 +42,15 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     strokeDasharray = '3 3';
   }
 
-  const strokeColor = isHighlighted
-    ? 'var(--theme-primary)'
-    : 'var(--theme-border)';
+  const isInvestigationPath = edgeData.isInvestigationPath ?? false;
 
-  const strokeWidth = isHighlighted ? 2.5 : 1.5;
+  const strokeColor = isInvestigationPath
+    ? 'var(--edge-investigation-path)'
+    : isHighlighted
+      ? 'var(--theme-primary)'
+      : 'var(--theme-border)';
+
+  const strokeWidth = isInvestigationPath ? 3.5 : isHighlighted ? 2.5 : 1.5;
   const opacity = isDimmed ? 0.2 : 1;
 
   const showCountLabel = Boolean(count && count > 1) || Boolean(isDerived && count);
@@ -67,7 +71,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
         }}
       />
 
-      {(showCountLabel || showUnresolvedLabel) && (
+      {(showCountLabel || showUnresolvedLabel || isInvestigationPath) && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -76,8 +80,17 @@ export const CustomEdge: React.FC<EdgeProps> = ({
               pointerEvents: 'all',
               opacity,
             }}
-            className="nodrag nopan"
+            className="nodrag nopan flex items-center gap-1"
           >
+            {isInvestigationPath && (
+              <span
+                data-testid={`edge-investigation-path-label-${id}`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-theme-surface border border-theme-border text-theme-text shadow-xs whitespace-nowrap"
+                title="Investigation path"
+              >
+                Investigation path
+              </span>
+            )}
             {showUnresolvedLabel ? (
               <span
                 data-testid={`edge-stub-label-${id}`}

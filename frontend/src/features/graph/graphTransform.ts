@@ -35,6 +35,7 @@ export interface FlowEdgeData extends Record<string, unknown> {
   derived?: boolean;
   isDimmed?: boolean;
   isHighlighted?: boolean;
+  isInvestigationPath?: boolean;
 }
 
 export interface FlowTransformResult {

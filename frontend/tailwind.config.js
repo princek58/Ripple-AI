@@ -58,6 +58,11 @@ export default {
           'line-number': 'var(--diff-line-number)',
           'gutter-bg': 'var(--diff-gutter-bg)',
         },
+
+        // Graph Edge colours
+        edge: {
+          'investigation-path': 'var(--edge-investigation-path)',
+        },
       },
       fontFamily: {
         heading: ['var(--font-space-grotesk)', 'sans-serif'],

@@ -131,6 +131,11 @@ describe('Contrast and Theme Integrity (Step 11c Part A)', () => {
       const diffLineNo = resolve(theme, '--diff-line-number');
       const diffGutterBg = resolve(theme, '--diff-gutter-bg');
       expect(getContrastRatio(diffLineNo, diffGutterBg)).toBeGreaterThanOrEqual(4.5);
+
+      // 12. Investigation path edge token against card background (Step 14: >= 3:1)
+      const edgeToken = resolve(theme, '--edge-investigation-path');
+      expect(edgeToken).toBeTruthy();
+      expect(getContrastRatio(edgeToken, cardSurface)).toBeGreaterThanOrEqual(3.0);
     }
   });
 

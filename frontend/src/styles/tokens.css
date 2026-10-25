@@ -40,6 +40,9 @@
   --severity-low: #475569;
   --severity-unknown: #4B5563;
 
+  /* Graph Edge Tokens - Light Theme (WCAG >= 3:1 against card surface) */
+  --edge-investigation-path: #C2410C;
+
   /* Diff Viewer Tokens - Light Theme (WCAG AA >= 4.5) */
   --diff-add-bg: #ECFDF5;
   --diff-add-text: #065F46;
@@ -75,6 +78,9 @@
   --severity-medium: #FACC15;
   --severity-low: #CBD5E1;
   --severity-unknown: #CBD5E1;
+
+  /* Graph Edge Tokens - Dark Theme (WCAG >= 3:1 against card surface) */
+  --edge-investigation-path: #FB923C;
 
   /* Diff Viewer Tokens - Dark Theme (WCAG AA >= 4.5) */
   --diff-add-bg: #0D382B;

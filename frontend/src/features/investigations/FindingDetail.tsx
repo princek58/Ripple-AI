@@ -34,12 +34,16 @@ const ALLOWED_EVIDENCE_KEYS = new Set([
 
 const AUTO_FIX_RULES = ['env_undeclared', 'api_unmatched_call', 'broken_import'];
 
+const MiniEvidenceGraph = React.lazy(() => import('./MiniEvidenceGraph.js'));
+
 export const FindingDetail: React.FC<FindingDetailProps> = ({
   finding,
   onBack,
   showBackButton = false,
 }) => {
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const [isEvidencePathOpen, setIsEvidencePathOpen] = React.useState<boolean>(false);
   const [lang, setLang] = useExplainLanguage();
   const guidance = getHowToFix(finding.rule_id, lang);
   const firstEvidence = finding.evidence?.[0];
@@ -51,6 +55,14 @@ export const FindingDetail: React.FC<FindingDetailProps> = ({
       headingRef.current?.focus();
     }
   }, [finding.id, showBackButton]);
+
+  // When finding changes, close the details card and abort in-flight graph request
+  useEffect(() => {
+    if (detailsRef.current) {
+      detailsRef.current.open = false;
+    }
+    setIsEvidencePathOpen(false);
+  }, [finding.id]);
 
   return (
     <article
@@ -420,6 +432,53 @@ export const FindingDetail: React.FC<FindingDetailProps> = ({
           </ul>
         )}
       </section>
+
+      {/* Labelled card: Evidence path (L4 Mini Graph) */}
+      <details
+        ref={detailsRef}
+        data-testid="evidence-path-card"
+        className="rounded-xl border border-theme-border bg-theme-surface shadow-xs overflow-hidden"
+        onToggle={(e) => {
+          setIsEvidencePathOpen((e.target as HTMLDetailsElement).open);
+        }}
+      >
+        <summary
+          data-testid="evidence-path-summary"
+          onClick={() => {
+            setIsEvidencePathOpen((prev) => !prev);
+          }}
+          className="p-4 sm:p-5 cursor-pointer select-none bg-theme-surface/70 hover:bg-theme-surface-active/40 border-b border-theme-border flex items-center justify-between focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
+        >
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="font-heading font-bold text-sm sm:text-base text-theme-text">
+              Evidence path
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-forest/10 text-forest dark:bg-lime/10 dark:text-lime border border-forest/20 dark:border-lime/20">
+              Level 4 Graph
+            </span>
+          </div>
+        </summary>
+
+        <div className="p-4 sm:p-5">
+          {isEvidencePathOpen && (
+            <React.Suspense
+              fallback={
+                <div data-testid="mini-graph-loading" className="p-4 space-y-3">
+                  <div className="h-4 w-32 bg-theme-border/40 rounded animate-pulse" />
+                  <div className="h-56 w-full bg-theme-border/30 rounded-lg animate-pulse" />
+                </div>
+              }
+            >
+              <MiniEvidenceGraph
+                projectId={finding.project_id}
+                firstNodeId={finding.nodes?.[0]?.id || (finding as any).node_ids?.[0]}
+                findingEvidence={finding.evidence}
+                findingNodes={finding.nodes}
+              />
+            </React.Suspense>
+          )}
+        </div>
+      </details>
 
       <hr className="border-theme-border" />
 
