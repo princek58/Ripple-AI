@@ -27,6 +27,20 @@ const routes: RouteDef[] = [
     projectType: 'scanned',
   },
   {
+    slug: 'app-investigations',
+    pathBuilder: () => '/app/investigations',
+    projectType: 'scanned',
+  },
+  {
+    slug: 'app-investigations-history-expanded',
+    pathBuilder: () => '/app/investigations',
+    projectType: 'scanned',
+    variantsOnly: [
+      { device: 'phone', theme: 'light' },
+      { device: 'phone', theme: 'dark' },
+    ],
+  },
+  {
     slug: 'app-investigations-finding',
     pathBuilder: (seed) => `/app/investigations?finding=${seed.brokenImportFindingId}`,
     projectType: 'scanned',
@@ -35,6 +49,18 @@ const routes: RouteDef[] = [
     slug: 'app-investigations-minigraph',
     pathBuilder: (seed) => `/app/investigations?finding=${seed.brokenImportFindingId}`,
     projectType: 'scanned',
+  },
+  {
+    slug: 'app-investigations-minigraph-circular',
+    pathBuilder: (seed) => `/app/investigations?finding=${seed.circularDependencyFindingId}`,
+    projectType: 'scanned',
+    variantsOnly: [{ device: 'desktop', theme: 'light' }],
+  },
+  {
+    slug: 'app-investigations-minigraph-isolated',
+    pathBuilder: (seed) => `/app/investigations?finding=${seed.isolatedFileFindingId}`,
+    projectType: 'scanned',
+    variantsOnly: [{ device: 'desktop', theme: 'light' }],
   },
   { slug: 'app-fixes', pathBuilder: () => '/app/fixes', projectType: 'scanned' },
   { slug: 'app-tests', pathBuilder: () => '/app/tests', projectType: 'scanned' },
@@ -207,23 +233,52 @@ test.describe('Automated Visual QA Suite', () => {
           await page.waitForTimeout(400);
         }
 
-        // Open Evidence path mini graph if on app-investigations-minigraph route
-        if (r.slug === 'app-investigations-minigraph') {
+        // Open Evidence path mini graph if on minigraph routes
+        if (
+          r.slug === 'app-investigations-minigraph' ||
+          r.slug === 'app-investigations-minigraph-circular' ||
+          r.slug === 'app-investigations-minigraph-isolated'
+        ) {
           const evidenceSummary = page.locator('[data-testid="evidence-path-summary"]');
           try {
-            await evidenceSummary.waitFor({ state: 'visible', timeout: 6000 });
+            await evidenceSummary.waitFor({ state: 'visible', timeout: 8000 });
             await evidenceSummary.click();
             const miniGraph = page.locator('[data-testid="mini-graph-container"]');
-            await miniGraph.waitFor({ state: 'visible', timeout: 10000 });
+            await miniGraph.waitFor({ state: 'visible', timeout: 12000 });
+            await page.locator('text=Investigation path').first().waitFor({ state: 'visible', timeout: 10000 });
             await page.waitForTimeout(600);
           } catch (e) {
-            console.warn('[qa] Failed to open mini evidence graph:', e);
+            console.warn(`[qa] Failed to open mini evidence graph on ${r.slug}:`, e);
+          }
+        }
+
+        // Expand scan history strip on mobile if on app-investigations-history-expanded route
+        if (r.slug === 'app-investigations-history-expanded') {
+          const toggleBtn = page.locator('[data-testid="scan-history-mobile-toggle"]');
+          try {
+            await toggleBtn.waitFor({ state: 'visible', timeout: 8000 });
+            await toggleBtn.click();
+            const expandedArea = page.locator('[data-testid="scan-history-mobile-expanded"]');
+            await expandedArea.waitFor({ state: 'visible', timeout: 6000 });
+            await page.waitForTimeout(400);
+          } catch (e) {
+            console.warn('[qa] Failed to expand mobile scan history:', e);
           }
         }
 
         await page.screenshot({ path: screenshotFilePath, fullPage: true });
 
         const checkResult = await runPageChecks(page, isAppRoute, v.device === 'phone', listeners);
+
+        // Automated check assertion for broken_import mini graph
+        if (r.slug === 'app-investigations-minigraph') {
+          if (!checkResult.miniGraphCheck?.investigationPathVisible) {
+            throw new Error(`[qa-check-fail] mini graph on ${fileKey} does not have visible "Investigation path"`);
+          }
+          if (v.device === 'phone' && checkResult.horizontalOverflow) {
+            throw new Error(`[qa-check-fail] mini graph on ${fileKey} has horizontal overflow on phone`);
+          }
+        }
 
         allChecks[fileKey] = {
           file: screenshotFileName,

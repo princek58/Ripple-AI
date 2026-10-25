@@ -74,6 +74,13 @@ test.describe('Automated Checks Self-Test', () => {
           <!-- Visible text with "undefined" -->
           <p id="defect-text">Error state: value is undefined here</p>
 
+          <!-- Defective mini evidence graph container (missing "Investigation path" label) -->
+          <div data-testid="mini-graph-container">
+            <div class="legend">
+              <span>Ordinary</span>
+            </div>
+          </div>
+
           <!-- Sample data tag -->
           <span class="badge">Sample data</span>
         </body>
@@ -99,6 +106,7 @@ test.describe('Automated Checks Self-Test', () => {
     console.log('8. Image without alt detected:', result.imagesWithoutAlt > 0);
     console.log('9. Forbidden text detected:', result.forbiddenText);
     console.log('10. Sample data tag detected:', result.sampleDataCount);
+    console.log('11. Mini graph check evaluated:', result.miniGraphCheck);
     console.log('-------------------------------------------\n');
 
     expect(result.consoleErrors).toContain('Deliberate test console error injected by self-test');
@@ -123,6 +131,12 @@ test.describe('Automated Checks Self-Test', () => {
     expect(result.landingCounters).toBeDefined();
     expect(result.landingCounters?.valid).toBe(false);
     expect(result.landingCounters?.levels).toBe('0');
+
+    // Mini graph check assertion: must detect missing Investigation path label and defect
+    expect(result.miniGraphCheck).toBeDefined();
+    expect(result.miniGraphCheck?.found).toBe(true);
+    expect(result.miniGraphCheck?.investigationPathVisible).toBe(false);
+    expect(result.miniGraphCheck?.valid).toBe(false);
   });
 
   test('proves that automated checks stay quiet on a clean page', async ({ page }) => {
@@ -185,6 +199,14 @@ test.describe('Automated Checks Self-Test', () => {
           <!-- Image with alt -->
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Transparent placeholder" />
 
+          <!-- Valid mini evidence graph container with visible "Investigation path" label -->
+          <div data-testid="mini-graph-container">
+            <div class="legend">
+              <span class="font-medium">Investigation path</span>
+              <span>Ordinary</span>
+            </div>
+          </div>
+
           <!-- Clean text without forbidden tokens -->
           <p>Everything is operating within defined boundaries.</p>
         </body>
@@ -200,6 +222,7 @@ test.describe('Automated Checks Self-Test', () => {
     console.log('Node overlaps:', result.nodeOverlaps.length);
     console.log('Clipping warnings:', result.clippingWarnings.length);
     console.log('Landing counters valid:', result.landingCounters?.valid);
+    console.log('Mini graph valid:', result.miniGraphCheck?.valid);
     console.log('Unlabeled elements:', result.unlabeledElements.count);
     console.log('Forbidden tokens:', result.forbiddenText.length);
     console.log('Sample data tags:', result.sampleDataCount);
@@ -211,6 +234,11 @@ test.describe('Automated Checks Self-Test', () => {
     expect(result.nodeOverlaps).toHaveLength(0);
     expect(result.clippingWarnings).toHaveLength(0);
     expect(result.landingCounters?.valid).toBe(true);
+    expect(result.miniGraphCheck).toBeDefined();
+    expect(result.miniGraphCheck?.found).toBe(true);
+    expect(result.miniGraphCheck?.investigationPathVisible).toBe(true);
+    expect(result.miniGraphCheck?.hasHorizontalOverflow).toBe(false);
+    expect(result.miniGraphCheck?.valid).toBe(true);
     expect(result.unlabeledElements.count).toBe(0);
     expect(result.forbiddenText).toHaveLength(0);
     expect(result.sampleDataCount).toBe(0);

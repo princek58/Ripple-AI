@@ -30,6 +30,13 @@ export interface LandingCountersResult {
   valid: boolean;
 }
 
+export interface MiniGraphCheckResult {
+  found: boolean;
+  investigationPathVisible: boolean;
+  hasHorizontalOverflow: boolean;
+  valid: boolean;
+}
+
 export interface PageCheckResult {
   consoleErrors: string[];
   pageErrors: string[];
@@ -52,6 +59,7 @@ export interface PageCheckResult {
   nodeOverlaps: OverlapIssue[];
   clippingWarnings: ClippingWarning[];
   landingCounters?: LandingCountersResult;
+  miniGraphCheck?: MiniGraphCheckResult;
 }
 
 export function setupPageCheckListeners(page: Page) {
@@ -369,6 +377,28 @@ export async function runPageChecks(
       };
     }
 
+    // 9. Mini evidence graph check
+    const miniGraphEl = document.querySelector('[data-testid="mini-graph-container"]');
+    let miniGraphCheck: MiniGraphCheckResult | undefined;
+    if (miniGraphEl) {
+      const allTextNodes = Array.from(miniGraphEl.querySelectorAll<HTMLElement>('*'));
+      const pathEl = allTextNodes.find((el) => {
+        return (el.textContent || '').trim() === 'Investigation path';
+      });
+      let isVisible = false;
+      if (pathEl) {
+        const style = window.getComputedStyle(pathEl);
+        const rect = pathEl.getBoundingClientRect();
+        isVisible = style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+      }
+      miniGraphCheck = {
+        found: true,
+        investigationPathVisible: isVisible,
+        hasHorizontalOverflow: hasHorizontalOverflow,
+        valid: isVisible && (!isPhoneViewport || !hasHorizontalOverflow),
+      };
+    }
+
     return {
       horizontalOverflow: hasHorizontalOverflow,
       scrollWidth: scrollW,
@@ -384,6 +414,7 @@ export async function runPageChecks(
       nodeOverlaps,
       clippingWarnings,
       landingCounters,
+      miniGraphCheck,
     };
   }, { isApp: isAppRoute, isPhoneViewport: isPhone });
 
@@ -402,5 +433,6 @@ export async function runPageChecks(
     nodeOverlaps: domResult.nodeOverlaps,
     clippingWarnings: domResult.clippingWarnings,
     landingCounters: domResult.landingCounters,
+    miniGraphCheck: domResult.miniGraphCheck,
   };
 }

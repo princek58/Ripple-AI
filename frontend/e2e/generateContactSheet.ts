@@ -18,7 +18,12 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
     { slug: 'app-overview', title: 'Overview Screen (Scanned)', path: '/app/overview' },
     { slug: 'app-graph', title: 'Architecture Graph Level 1 (Scanned)', path: '/app/graph' },
     { slug: 'app-graph-fees-l2', title: 'Architecture Graph Level 2 - Fees Module', path: '/app/graph?level=2&focus=<feesId>' },
-    { slug: 'app-investigations-finding', title: 'Investigations - Broken Import Finding', path: '/app/investigations?finding=<findingId>' },
+    { slug: 'app-investigations', title: 'Investigations Screen (Scanned)', path: '/app/investigations' },
+    { slug: 'app-investigations-history-expanded', title: 'Investigations Screen - Scan History Expanded (Phone)', path: '/app/investigations' },
+    { slug: 'app-investigations-finding', title: 'Investigations - Broken Import Finding Detail', path: '/app/investigations?finding=<findingId>' },
+    { slug: 'app-investigations-minigraph', title: 'Investigations - Mini Evidence Graph Open (broken_import)', path: '/app/investigations?finding=<findingId>' },
+    { slug: 'app-investigations-minigraph-circular', title: 'Investigations - Mini Evidence Graph Open (circular_dependency)', path: '/app/investigations?finding=<findingId>' },
+    { slug: 'app-investigations-minigraph-isolated', title: 'Investigations - Mini Evidence Graph Open (isolated_file)', path: '/app/investigations?finding=<findingId>' },
     { slug: 'app-fixes', title: 'Fixes Screen', path: '/app/fixes' },
     { slug: 'app-tests', title: 'Tests Screen', path: '/app/tests' },
     { slug: 'app-reports', title: 'Reports Screen', path: '/app/reports' },
@@ -41,6 +46,7 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
       check.horizontalOverflow ||
       (check.nodeOverlaps && check.nodeOverlaps.length > 0) ||
       (check.landingCounters && !check.landingCounters.valid) ||
+      (check.miniGraphCheck && !check.miniGraphCheck.valid) ||
       (check.unlabeledElements && check.unlabeledElements.count > 0) ||
       (check.imagesWithoutAlt && check.imagesWithoutAlt > 0) ||
       (check.forbiddenText && check.forbiddenText.length > 0) ||
@@ -111,6 +117,15 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
         details.push(`<div class="item ok-item">Landing Counters: Valid (4, 6, 0, Read-only)</div>`);
       } else {
         details.push(`<div class="item warn-item"><strong>Landing Counters: Invalid</strong> (Levels: ${check.landingCounters.levels}, Checks: ${check.landingCounters.checks}, Executed: ${check.landingCounters.executed}, Read-only: ${check.landingCounters.readonly})</div>`);
+      }
+    }
+
+    // Mini Evidence Graph Check
+    if (check.miniGraphCheck) {
+      if (check.miniGraphCheck.valid) {
+        details.push(`<div class="item ok-item">Mini Graph Check: Valid ("Investigation path" visible, no phone overflow)</div>`);
+      } else {
+        details.push(`<div class="item warn-item"><strong>Mini Graph Check: INVALID</strong> (Investigation path visible: ${check.miniGraphCheck.investigationPathVisible}, phone overflow: ${check.miniGraphCheck.hasHorizontalOverflow})</div>`);
       }
     }
 

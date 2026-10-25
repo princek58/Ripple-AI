@@ -6,6 +6,8 @@ export interface SeedData {
   unscannedProjectId: string;
   feesModuleNodeId: string;
   brokenImportFindingId: string;
+  circularDependencyFindingId: string;
+  isolatedFileFindingId: string;
   envUndeclaredFindingId: string;
   proposedFixId: string;
   approvedFixId: string;
@@ -87,8 +89,22 @@ export async function seedQaBackend(backendUrl = 'http://localhost:4100'): Promi
   }
   const brokenImportFindingId = brokenImportFinding.id;
 
+  const circularFinding = findings.find((f) => f.rule_id === 'circular_dependency');
+  if (!circularFinding) {
+    throw new Error(`No circular_dependency finding found in scanned project findings`);
+  }
+  const circularDependencyFindingId = circularFinding.id;
+
+  const isolatedFinding = findings.find((f) => f.rule_id === 'isolated_file');
+  if (!isolatedFinding) {
+    throw new Error(`No isolated_file finding found in scanned project findings`);
+  }
+  const isolatedFileFindingId = isolatedFinding.id;
+
   console.log(`[seed] Found env_undeclared finding: ${envUndeclaredFindingId}`);
   console.log(`[seed] Found broken_import finding: ${brokenImportFindingId}`);
+  console.log(`[seed] Found circular_dependency finding: ${circularDependencyFindingId}`);
+  console.log(`[seed] Found isolated_file finding: ${isolatedFileFindingId}`);
 
   // 5. Create fix for env_undeclared and leave it proposed
   console.log(`[seed] Creating fix for env_undeclared (leaving proposed)...`);
@@ -164,6 +180,8 @@ export async function seedQaBackend(backendUrl = 'http://localhost:4100'): Promi
     unscannedProjectId,
     feesModuleNodeId,
     brokenImportFindingId,
+    circularDependencyFindingId,
+    isolatedFileFindingId,
     envUndeclaredFindingId,
     proposedFixId,
     approvedFixId,
