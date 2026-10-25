@@ -67,6 +67,7 @@ Every response uses { data, error } shape. Validate all input with zod.
 
 ## 6. ZIP safety (implement in the upload step)
 Max ZIP 50 MB, max 5,000 files, max total uncompressed 200 MB, max single file 5 MB, compression-ratio limit (zip-bomb), reject zip-slip paths (.., absolute paths, symlinks), skip node_modules, .git, dist, build, .next, __pycache__, venv. Extract with streams, never execute anything, never require/import uploaded files.
+Public GitHub repository ZIP downloads use the base URL from GITHUB_CODELOAD_BASE (default https://codeload.github.com, configurable so tests can point to a local mock server). Redirects are capped at 3 and restricted to the configured base host, github.com or codeload.github.com. Streamed downloads strictly enforce the 50 MB ZIP limit (GITHUB_REPO_TOO_LARGE) regardless of Content-Length accuracy, verify the PK magic bytes, and delete partial files on any failure.
 
 ## 7. Parser and graph builder
 - Walk extracted files; for JS/TS use ts-morph to read imports/exports, Express routes (app.get/post/..., router.*), fetch/axios calls with string URLs, process.env.X names.

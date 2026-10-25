@@ -67,6 +67,10 @@ export const config = {
     process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
   jsonBodyLimit: process.env.JSON_BODY_LIMIT || '1mb',
 
+  get githubCodeloadBase(): string {
+    return process.env.GITHUB_CODELOAD_BASE || 'https://codeload.github.com';
+  },
+
   get upload(): UploadLimits {
     return getUploadLimits();
   },
