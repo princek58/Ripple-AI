@@ -2,6 +2,68 @@
 
 Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, frontend port 3100).
 
+> [!NOTE]
+> **Audit Notice**: The review of findings as TRUE, FALSE, or UNSURE was conducted by an AI agent reading extracted source code and context lines, and does not represent an external human design or security audit.
+
+## Executive Summary & Rehearsal Highlights
+
+### Project Status Overview (One-Line per Project)
+- **`EduZone-master`**: **OK** — Uploaded (1561 ms, 10.3 MB), scanned 221 files in 994 ms with 18 findings (5 high broken imports verified true); graph L1 (4 nodes) rendered with zero UI/console errors; count badges and Bézier edge curves well-spaced.
+- **`School-Management-System_Rad_Project-master`**: **OK** — Uploaded (145 ms, 600 KB), scanned 100 files in 204 ms with 9 findings (1 broken import and 1 circular dependency verified true); 3-node L1 canvas clean with 0 console errors; long title handled neatly.
+- **`conduit-realworld-example-app-main`**: **Problems** (minor UI label clearance) — Uploaded (143 ms, 328 KB), scanned 154 files in 165 ms with 17 findings (caught genuine `.env.example` typo `DEV_DB_LOGGGIN`); zero console/render errors, but 34-character project label on Overview card horizontally touches adjacent module pill boundary.
+- **`vite-mern-template-main`**: **OK** — Uploaded (43 ms, 116 KB), scanned 36 files in 40 ms with 5 findings (all isolated config files); clean 2-node graph, zero console errors.
+
+### False Positive Rates per Rule
+
+| Rule ID | Sampled Findings | True Positives | False Positives | Unsure | False Positive Rate |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `broken_import` | 6 | 6 | 0 | 0 | **0.0%** (0 / 6) |
+| `circular_dependency` | 1 | 1 | 0 | 0 | **0.0%** (0 / 1) |
+| `env_undeclared` | 8 | 6 | 2 | 0 | **25.0%** (2 / 8) |
+| `isolated_file` | 20 | 8 | 12 | 0 | **60.0%** (12 / 20) |
+| **Total** | **35** | **21** | **14** | **0** | **40.0%** (14 / 35) |
+
+### Ranked List of Causes to Fix (Most Findings Affected First)
+
+1. **Build Tool & Bundler Configuration Files** (affected 8 / 20 sampled `isolated_file` findings, ~15 total across projects):
+   - *Impact*: High volume of low-severity findings.
+   - *Root Cause*: Tooling files such as `vite.config.ts`, `tailwind.config.cjs`, `postcss.config.cjs`, and `webpack.config.js` are executed by CLI tools/runners and not imported by entrypoints.
+   - *Fix*: Introduce an entrypoint/tooling whitelist for common configuration file patterns (`*.config.*`, `vite.config.*`, `tailwind.*`, `postcss.*`).
+2. **Dynamic ORM Model & Migration Loaders** (affected 3 / 20 sampled `isolated_file` findings, ~6 total across projects):
+   - *Impact*: False positives on database model definitions.
+   - *Root Cause*: Standard Sequelize pattern in `models/index.js` reads sibling files dynamically using `fs.readdirSync(__dirname)`. Static import scanning does not recognize these incoming references.
+   - *Fix*: Detect directory-scanning dynamic loader patterns (e.g., Sequelize boilerplate) and mark sibling model definitions as linked.
+3. **Standard Runtime Environment Variables** (affected 2 / 8 sampled `env_undeclared` findings):
+   - *Impact*: Flagging standard variables as undeclared.
+   - *Root Cause*: `process.env.NODE_ENV` and `npm_package_version` are automatically injected by Node.js and build tools at runtime without entry in `.env.example`.
+   - *Fix*: Provide a built-in exempt list of standard Node/npm runtime environment keys (`NODE_ENV`, `npm_*`, `CI`).
+4. **TypeScript Ambient Declaration Files** (affected 1 / 20 sampled `isolated_file` findings):
+   - *Impact*: False dead code alerts on types.
+   - *Root Cause*: `vite-env.d.ts` provides ambient types via `/// <reference types="vite/client" />` and is consumed globally by the compiler without `import` statements.
+   - *Fix*: Treat ambient declaration files (`*.d.ts`) as type definitions rather than isolated code files.
+5. **UI Label Clearance with Long Project Names** (affected 1 / 4 projects):
+   - *Impact*: Visual label crowding on Overview card.
+   - *Root Cause*: When project names exceed 30 characters (e.g. `conduit-realworld-example-app-main`), the label bounding box extends horizontally and touches the boundary of module badges placed on the bottom ring.
+   - *Fix*: Apply label truncation with ellipsis for names $>26$ characters or expand radial spacing for bottom-placed modules.
+
+### Limits Encountered During Rehearsal
+
+- **Archive Size**: Tested projects ranged from 116 KB to 10.3 MB. The largest archive (`EduZone-master.zip`, 10.3 MB) contains binary images and uploaded in 1.56s. All extractions and analyses completed without hitting HTTP 413 or memory allocation limits.
+- **File & Node Counts**: Tested repositories contained between 36 and 221 files, generating up to 289 nodes and 447 edges. The scanner processed all files in under 1 second without hitting file-count or graph-size limits.
+- **Processing Time**: API upload took 43 ms to 1561 ms; AST scan took 40 ms to 994 ms; Level 1 graph queries responded in 4 ms to 8 ms; and browser UI canvas rendering took 1005 ms to 2786 ms. All operations completed well under the 3-minute watchdog threshold.
+
+### What to Say Honestly in the Demo About Limits
+
+In demonstrations to users and stakeholders, present Ripple AI's capabilities and current boundaries with full transparency:
+- **Strengths**: Ripple AI executes deep static AST scanning, cross-file import tracking, and circular dependency detection across hundreds of files in under one second. It exhibits 100% precision on structural defects (`broken_import` caught genuine missing models and traversal typos; `circular_dependency` caught exact cyclic module loops) and caught a subtle 3-letter typo in `.env.example`.
+- **Known Boundaries**:
+  1. *Tooling & Config Files*: Ripple AI inspects the code import tree. Standalone configuration files (`vite.config.*`, `tailwind.*`) and ambient type declarations (`*.d.ts`) are currently flagged as isolated files because they are invoked out-of-band by CLI tools rather than imported.
+  2. *Dynamic Module Loading*: For security and sandboxing, Ripple AI performs static analysis without executing untrusted code. Projects utilizing dynamic directory scanning (e.g. Sequelize's `fs.readdirSync` in `models/index.js`) will show model files as isolated until dynamic pattern heuristics are enabled.
+  3. *Overview Card Layout*: Overview graphs are responsive and interactive, but project names exceeding 30 characters may sit close to adjacent module pills on smaller screens.
+  4. *Framework Runtime Envs*: Standard variables (`NODE_ENV`, `npm_*`) should be added to built-in allowlists.
+
+---
+
 ## Part 1: Automated Pipeline & Metrics per Project
 
 ### Project: `EduZone-master`
