@@ -391,5 +391,37 @@ describe('Mini Evidence Graph UI (Step 14 Part 2)', () => {
       });
       expect(screen.getByText('Node not found in graph for this finding.')).toBeInTheDocument();
     });
+
+    it('never renders snippet key or value from hand-made evidence object in finding detail or mini graph', async () => {
+      const findingWithSnippet: FindingDetailData = {
+        ...(brokenImportFinding.data as any),
+        id: 'finding-snippet-test',
+        evidence: [
+          {
+            file: 'src/config/secret.js',
+            line_start: 42,
+            line_end: 42,
+            specifier: './database',
+            snippet: 'SECRET_API_KEY_NEVER_RENDER_ME = "sk-12345"',
+          },
+        ],
+      };
+
+      render(
+        <MemoryRouter>
+          <FindingDetail finding={findingWithSnippet} />
+        </MemoryRouter>
+      );
+
+      // Verify the file and specifier ARE rendered
+      expect(screen.getAllByText(/src\/config\/secret\.js:42/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/specifier:/)).toBeInTheDocument();
+
+      // Verify snippet key and value are NEVER rendered anywhere in the document
+      expect(screen.queryByText(/SECRET_API_KEY_NEVER_RENDER_ME/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/snippet:/i)).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toContain('SECRET_API_KEY_NEVER_RENDER_ME');
+      expect(document.body.textContent).not.toContain('sk-12345');
+    });
   });
 });

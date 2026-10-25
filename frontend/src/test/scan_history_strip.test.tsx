@@ -38,9 +38,10 @@ describe('ScanHistoryStrip (Step 14 Part 3)', () => {
       screen.getAllByText('Scan history. Timing is a hint, not proof.')[0]
     ).toBeInTheDocument();
 
-    // Two scan items rendered on desktop view
-    expect(screen.getByTestId(`scan-history-item-${twoScans[0].id}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`scan-history-item-${twoScans[1].id}`)).toBeInTheDocument();
+    // Two scan items rendered on desktop view in newest-first order
+    const renderedItems = screen.getAllByTestId(/^scan-history-item-/);
+    expect(renderedItems[0]).toHaveAttribute('data-testid', `scan-history-item-${twoScans[0].id}`);
+    expect(renderedItems[1]).toHaveAttribute('data-testid', `scan-history-item-${twoScans[1].id}`);
 
     // Status as icon plus text
     const completedLabels = screen.getAllByText(/completed/i);

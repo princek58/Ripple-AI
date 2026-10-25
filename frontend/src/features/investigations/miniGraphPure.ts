@@ -12,6 +12,14 @@ import {
   type FlowEdgeData,
 } from '../graph/graphTransform.js';
 
+export interface FrontendEdgeEvidence {
+  file?: string;
+  line_start?: number;
+  line_end?: number;
+  specifier?: string;
+  pattern?: string;
+}
+
 export interface MiniGraphResult {
   flowNodes: FlowNode<FlowNodeData>[];
   flowEdges: FlowEdge<FlowEdgeData>[];
