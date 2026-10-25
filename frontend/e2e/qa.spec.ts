@@ -349,6 +349,17 @@ test.describe('Automated Visual QA Suite', () => {
           }
         }
 
+        // Automated check assertion for Overview card SVG overlaps (UI-1 Part 3)
+        if (r.slug === 'app-overview' || r.slug === 'app-overview-unscanned') {
+          if (checkResult.svgOverlaps && checkResult.svgOverlaps.length > 0) {
+            throw new Error(
+              `[qa-check-fail] Overview L1 SVG card has overlaps on ${fileKey}: ${JSON.stringify(
+                checkResult.svgOverlaps
+              )}`
+            );
+          }
+        }
+
         allChecks[fileKey] = {
           file: screenshotFileName,
           route: targetPath,

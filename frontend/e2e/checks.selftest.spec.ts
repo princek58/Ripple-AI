@@ -267,5 +267,121 @@ test.describe('Automated Checks Self-Test', () => {
     expect(result.unlabeledElements.count).toBe(0);
     expect(result.forbiddenText).toHaveLength(0);
     expect(result.sampleDataCount).toBe(0);
+    expect(result.svgOverlaps).toHaveLength(0);
+  });
+
+  test('proves SVG overlap check detects injected defects (overlapping text, edge through label, pill overflow, chip overlap)', async ({
+    page,
+  }) => {
+    const listeners = setupPageCheckListeners(page);
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <title>SVG Overlap Probe Page</title>
+        </head>
+        <body>
+          <svg aria-label="Level 1 dependency graph visualization" viewBox="0 0 640 440" width="640" height="440">
+            <!-- 1. Injected overlapping text -->
+            <text id="probe-txt1" x="100" y="100">Module Alpha</text>
+            <text id="probe-txt2" x="105" y="102">Module Beta</text>
+
+            <!-- 2. Injected edge passing through a label -->
+            <path class="edge-group" d="M 50 250 L 450 250" stroke="gray" stroke-width="2" />
+            <text id="probe-through" x="250" y="250">Label in Middle</text>
+
+            <!-- 3. Injected chip overlapping another text -->
+            <g class="edge-group" transform="translate(100, 100)">
+              <circle r="9" fill="white" />
+              <text text-anchor="middle" dy="3">5</text>
+            </g>
+
+            <!-- 4. Injected pill overflow: text wider than pill rect -->
+            <g transform="translate(300, 350)">
+              <rect x="-20" y="-10" width="40" height="20" rx="10" />
+              <text text-anchor="middle" dy="3.5" font-size="12">MOST AFFECTED</text>
+            </g>
+          </svg>
+        </body>
+      </html>
+    `);
+
+    const result = await runPageChecks(page, true, false, listeners);
+
+    console.log('\n--- SELF-TEST INJECTED SVG DEFECTS RESULTS ---');
+    console.log('Total SVG overlap defects detected:', result.svgOverlaps.length);
+    for (const defect of result.svgOverlaps) {
+      console.log(`[${defect.type}] ${defect.description}`);
+    }
+    console.log('---------------------------------------------\n');
+
+    expect(result.svgOverlaps.length).toBeGreaterThanOrEqual(3);
+    expect(result.svgOverlaps.some((d) => d.type === 'text-text')).toBe(true);
+    expect(result.svgOverlaps.some((d) => d.type === 'text-path')).toBe(true);
+    expect(result.svgOverlaps.some((d) => d.type === 'pill-overflow')).toBe(true);
+  });
+
+  test('proves clean Overview SVG card passes with zero overlaps or pill overflow', async ({
+    page,
+  }) => {
+    const listeners = setupPageCheckListeners(page);
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <title>Clean SVG Card Page</title>
+        </head>
+        <body>
+          <svg aria-label="Level 1 dependency graph visualization" viewBox="0 0 640 440" width="640" height="440">
+            <!-- Center Project Node -->
+            <g>
+              <circle cx="320" cy="220" r="28" />
+              <rect x="270" y="255" width="100" height="22" rx="4" />
+              <text x="320" y="270" text-anchor="middle" font-size="12">temp_demo_erp</text>
+            </g>
+
+            <!-- Module 1 -->
+            <g>
+              <circle cx="150" cy="100" r="20" />
+              <rect x="115" y="130" width="70" height="18" rx="3" />
+              <text x="150" y="142" text-anchor="middle" font-size="11">shared</text>
+            </g>
+
+            <!-- Module 2 (Most Affected) with properly sized pill -->
+            <g>
+              <circle cx="490" cy="100" r="20" />
+              <circle cx="490" cy="100" r="26" fill="none" stroke="orange" stroke-dasharray="4 2" />
+              <rect x="455" y="136" width="70" height="18" rx="3" />
+              <text x="490" y="148" text-anchor="middle" font-size="11">fees</text>
+              <g transform="translate(490, 66)">
+                <rect x="-44" y="-10" width="88" height="20" rx="10" />
+                <text text-anchor="middle" dy="3.5" font-size="9">MOST AFFECTED</text>
+              </g>
+            </g>
+
+            <!-- Outward curved edge with chip clear of all labels -->
+            <g class="edge-group">
+              <path d="M 150 100 Q 320 20 490 100" stroke="gray" stroke-width="1.5" />
+              <g transform="translate(320, 60)">
+                <circle r="9" fill="white" />
+                <text text-anchor="middle" dy="3" font-size="10">2</text>
+              </g>
+            </g>
+          </svg>
+        </body>
+      </html>
+    `);
+
+    const result = await runPageChecks(page, true, false, listeners);
+
+    console.log('\n--- SELF-TEST CLEAN SVG CARD RESULTS ---');
+    console.log('SVG overlap count on clean card:', result.svgOverlaps.length);
+    console.log('----------------------------------------\n');
+
+    expect(result.svgOverlaps).toHaveLength(0);
   });
 });

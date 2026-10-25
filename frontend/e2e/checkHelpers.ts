@@ -45,6 +45,14 @@ export interface ImpactCheckResult {
   valid: boolean;
 }
 
+export interface SvgOverlapIssue {
+  type: 'text-text' | 'text-chip' | 'text-path' | 'pill-overflow';
+  elementA: string;
+  elementB: string;
+  overlapSize?: string;
+  description: string;
+}
+
 export interface PageCheckResult {
   consoleErrors: string[];
   pageErrors: string[];
@@ -66,6 +74,7 @@ export interface PageCheckResult {
   sampleDataCount: number;
   nodeOverlaps: OverlapIssue[];
   clippingWarnings: ClippingWarning[];
+  svgOverlaps: SvgOverlapIssue[];
   landingCounters?: LandingCountersResult;
   miniGraphCheck?: MiniGraphCheckResult;
   impactCheck?: ImpactCheckResult;
@@ -457,6 +466,209 @@ export async function runPageChecks(
       };
     }
 
+    // 11. SVG Overlap check for Overview Level 1 card
+    // For every <text> element in the card use getBBox and report overlaps with another text,
+    // with a chip, and with a sampled point of any edge path (getPointAtLength every few px, excluding hidden ones);
+    // and check that the "MOST AFFECTED" text box lies inside its pill box.
+    const svgCards = Array.from(
+      document.querySelectorAll<SVGSVGElement>(
+        'svg[aria-label*="Level 1"], svg[aria-label*="dependency graph"], svg[data-testid="overview-l1-svg"]'
+      )
+    );
+    const svgOverlaps: Array<{
+      type: 'text-text' | 'text-chip' | 'text-path' | 'pill-overflow';
+      elementA: string;
+      elementB: string;
+      overlapSize?: string;
+      description: string;
+    }> = [];
+
+    for (const svg of svgCards) {
+      const svgStyle = window.getComputedStyle(svg);
+      if (svgStyle.display === 'none' || svgStyle.visibility === 'hidden') continue;
+
+      const getSvgUserBox = (el: SVGGraphicsElement) => {
+        const b = el.getBBox();
+        const elCtm = el.getCTM();
+        const svgCtm = svg.getCTM();
+        if (elCtm && svgCtm) {
+          const m = svgCtm.inverse().multiply(elCtm);
+          const p1 = svg.createSVGPoint(); p1.x = b.x; p1.y = b.y;
+          const p2 = svg.createSVGPoint(); p2.x = b.x + b.width; p2.y = b.y;
+          const p3 = svg.createSVGPoint(); p3.x = b.x; p3.y = b.y + b.height;
+          const p4 = svg.createSVGPoint(); p4.x = b.x + b.width; p4.y = b.y + b.height;
+          const t1 = p1.matrixTransform(m);
+          const t2 = p2.matrixTransform(m);
+          const t3 = p3.matrixTransform(m);
+          const t4 = p4.matrixTransform(m);
+          const minX = Math.min(t1.x, t2.x, t3.x, t4.x);
+          const maxX = Math.max(t1.x, t2.x, t3.x, t4.x);
+          const minY = Math.min(t1.y, t2.y, t3.y, t4.y);
+          const maxY = Math.max(t1.y, t2.y, t3.y, t4.y);
+          return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
+        return { x: b.x, y: b.y, width: b.width, height: b.height };
+      };
+
+      const allTextEls = Array.from(svg.querySelectorAll<SVGTextElement>('text')).filter((t) => {
+        const s = window.getComputedStyle(t);
+        if (s.display === 'none' || s.visibility === 'hidden') return false;
+        try {
+          const b = t.getBBox();
+          return b.width > 0 && b.height > 0;
+        } catch {
+          return false;
+        }
+      });
+
+      const textsWithBoxes = allTextEls.map((t) => {
+        const box = getSvgUserBox(t);
+        const text = (t.textContent || '').trim();
+        const isChipText = t.closest('.edge-group') !== null && t.parentElement?.querySelector('circle') !== null;
+        const isPillText = text.toUpperCase().includes('MOST AFFECTED');
+        return { el: t, box, text, isChipText, isPillText };
+      });
+
+      // (a) Overlaps between text elements
+      for (let i = 0; i < textsWithBoxes.length; i++) {
+        for (let j = i + 1; j < textsWithBoxes.length; j++) {
+          const a = textsWithBoxes[i];
+          const b = textsWithBoxes[j];
+
+          if (a.el.parentElement && a.el.parentElement === b.el.parentElement) continue;
+
+          const oX = Math.min(a.box.x + a.box.width, b.box.x + b.box.width) - Math.max(a.box.x, b.box.x);
+          const oY = Math.min(a.box.y + a.box.height, b.box.y + b.box.height) - Math.max(a.box.y, b.box.y);
+
+          if (oX > 1 && oY > 1) {
+            svgOverlaps.push({
+              type: 'text-text',
+              elementA: a.text,
+              elementB: b.text,
+              overlapSize: `${Math.round(oX)}x${Math.round(oY)}`,
+              description: `Text "${a.text}" overlaps text "${b.text}" by ${Math.round(oX)}x${Math.round(oY)}px`,
+            });
+          }
+        }
+      }
+
+      // (b) Overlaps between text and chips
+      const chipCircles = Array.from(svg.querySelectorAll<SVGCircleElement>('.edge-group circle, circle[r="9"]')).filter((c) => {
+        const s = window.getComputedStyle(c);
+        return s.display !== 'none' && s.visibility !== 'hidden';
+      });
+
+      const chipsWithBoxes = chipCircles.map((c) => ({
+        el: c,
+        box: getSvgUserBox(c),
+      }));
+
+      for (const t of textsWithBoxes) {
+        if (t.isChipText) continue;
+
+        for (const chip of chipsWithBoxes) {
+          const oX = Math.min(t.box.x + t.box.width, chip.box.x + chip.box.width) - Math.max(t.box.x, chip.box.x);
+          const oY = Math.min(t.box.y + t.box.height, chip.box.y + chip.box.height) - Math.max(t.box.y, chip.box.y);
+
+          if (oX > 1 && oY > 1) {
+            svgOverlaps.push({
+              type: 'text-chip',
+              elementA: t.text,
+              elementB: 'edge-chip',
+              overlapSize: `${Math.round(oX)}x${Math.round(oY)}`,
+              description: `Text "${t.text}" overlaps count chip by ${Math.round(oX)}x${Math.round(oY)}px`,
+            });
+          }
+        }
+      }
+
+      // (c) Overlaps with sampled points of edge paths
+      const edgePaths = Array.from(svg.querySelectorAll<SVGPathElement>('.edge-group path, path[d]')).filter((p) => {
+        const s = window.getComputedStyle(p);
+        return s.display !== 'none' && s.visibility !== 'hidden' && s.stroke !== 'none';
+      });
+
+      for (const pathEl of edgePaths) {
+        try {
+          const totalLen = pathEl.getTotalLength();
+          if (totalLen <= 0) continue;
+
+          const pCtm = pathEl.getCTM();
+          const svgCtm = svg.getCTM();
+          const toSvgMatrix = (pCtm && svgCtm) ? svgCtm.inverse().multiply(pCtm) : null;
+
+          const step = 4;
+          for (let len = 0; len <= totalLen; len += step) {
+            let pt = pathEl.getPointAtLength(len);
+            if (toSvgMatrix) {
+              const svgPt = svg.createSVGPoint();
+              svgPt.x = pt.x;
+              svgPt.y = pt.y;
+              pt = svgPt.matrixTransform(toSvgMatrix);
+            }
+
+            for (const t of textsWithBoxes) {
+              if (t.isChipText || t.text === '?') continue;
+
+              if (
+                pt.x >= t.box.x &&
+                pt.x <= t.box.x + t.box.width &&
+                pt.y >= t.box.y &&
+                pt.y <= t.box.y + t.box.height
+              ) {
+                svgOverlaps.push({
+                  type: 'text-path',
+                  elementA: t.text,
+                  elementB: pathEl.getAttribute('d') || 'edge-path',
+                  description: `Edge path intersects text "${t.text}" at (${Math.round(pt.x)}, ${Math.round(pt.y)})`,
+                });
+                break;
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // (d) Check that "MOST AFFECTED" text box lies inside its pill box
+      for (const t of textsWithBoxes) {
+        if (t.isPillText) {
+          const parentG = t.el.parentElement;
+          const pillRect = parentG?.querySelector('rect');
+          if (pillRect) {
+            try {
+              const tBox = t.el.getBBox();
+              const rBox = pillRect.getBBox();
+
+              const textLeft = tBox.x;
+              const textTop = tBox.y;
+              const textRight = tBox.x + tBox.width;
+              const textBottom = tBox.y + tBox.height;
+
+              const rectLeft = rBox.x;
+              const rectTop = rBox.y;
+              const rectRight = rBox.x + rBox.width;
+              const rectBottom = rBox.y + rBox.height;
+
+              const isInside =
+                textLeft >= rectLeft - 0.5 &&
+                textTop >= rectTop - 0.5 &&
+                textRight <= rectRight + 0.5 &&
+                textBottom <= rectBottom + 0.5;
+
+              if (!isInside) {
+                svgOverlaps.push({
+                  type: 'pill-overflow',
+                  elementA: t.text,
+                  elementB: 'pill-rect',
+                  description: `"MOST AFFECTED" text box extends outside pill box (text: [${Math.round(textLeft)}, ${Math.round(textTop)}, ${Math.round(tBox.width)}, ${Math.round(tBox.height)}], pill: [${Math.round(rectLeft)}, ${Math.round(rectTop)}, ${Math.round(rBox.width)}, ${Math.round(rBox.height)}])`,
+                });
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+
     return {
       horizontalOverflow: hasHorizontalOverflow,
       scrollWidth: scrollW,
@@ -471,6 +683,7 @@ export async function runPageChecks(
       sampleDataCount,
       nodeOverlaps,
       clippingWarnings,
+      svgOverlaps,
       landingCounters,
       miniGraphCheck,
       impactCheck,
@@ -491,6 +704,7 @@ export async function runPageChecks(
     sampleDataCount: domResult.sampleDataCount,
     nodeOverlaps: domResult.nodeOverlaps,
     clippingWarnings: domResult.clippingWarnings,
+    svgOverlaps: domResult.svgOverlaps,
     landingCounters: domResult.landingCounters,
     miniGraphCheck: domResult.miniGraphCheck,
     impactCheck: domResult.impactCheck,
