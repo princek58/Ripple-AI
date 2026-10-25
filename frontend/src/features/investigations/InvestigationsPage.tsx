@@ -11,6 +11,7 @@ import { EmptyState } from '../../components/ui/EmptyState.js';
 import { ErrorState } from '../../components/ui/ErrorState.js';
 import { FindingList } from './FindingList.js';
 import { FindingDetail } from './FindingDetail.js';
+import { ScanHistoryStrip } from './ScanHistoryStrip.js';
 import {
   parseInvestigationsUrl,
   buildInvestigationsUrl,
@@ -364,7 +365,8 @@ export const InvestigationsPage: React.FC = () => {
   // State 5: Scanned project with zero findings unfiltered
   if (!isFindingsLoading && totalFindings === 0 && !hasActiveFilters) {
     return (
-      <div className="p-6" data-testid="zero-findings-state">
+      <div className="p-4 sm:p-6 space-y-4" data-testid="zero-findings-state">
+        {selectedProjectId && <ScanHistoryStrip projectId={selectedProjectId} />}
         <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-dashed border-theme-border bg-theme-surface text-theme-text max-w-xl mx-auto">
           <div className="w-12 h-12 mb-3 rounded-full bg-forest/10 dark:bg-lime/10 flex items-center justify-center text-forest dark:text-lime">
             <AlertCircle className="w-6 h-6" aria-hidden="true" />
@@ -385,7 +387,9 @@ export const InvestigationsPage: React.FC = () => {
   const showMobileDetail = isMobile && Boolean(urlState.findingId);
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col overflow-x-hidden p-4 sm:p-6">
+    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col overflow-x-hidden p-4 sm:p-6 gap-4">
+      {selectedProjectId && <ScanHistoryStrip projectId={selectedProjectId} />}
+
       {/* Two Column Layout on Desktop, Single Column Stack on Phone */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
         {/* Left Column: Finding List (hidden on phone when viewing detail) */}
