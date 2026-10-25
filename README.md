@@ -45,6 +45,8 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
 
 ## Quick start for non-developers
 
+For a 5-minute guided presentation script, see the [Demo Walkthrough](docs/DEMO_WALKTHROUGH.md).
+
 1. Double-click `start-dev.bat` in the project root directory. This launches the backend server on port 4000 and the frontend application on port 3000, and opens http://localhost:3000 in your default web browser.
 2. Navigate to the **Projects** page.
 3. Click **Upload Project** and select `samples/demo-erp-sample.zip`.
@@ -208,4 +210,4 @@ RippleAI/
 
 - **Phase 1**: Complete.
 - **Phase 2**: Not built.
-- **Test suite**: 462 tests passing across 46 test files (92 backend tests, 370 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.
+- **Test suite**: 463 tests passing across 46 test files (92 backend tests, 371 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.
