@@ -647,7 +647,7 @@ describe('Investigations Screen (Step 12a-1 Part 2)', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Scan now/i })).toBeInTheDocument();
     });
 
     // Must NOT show zeros (never zeros for unscanned)

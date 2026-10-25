@@ -449,7 +449,7 @@ describe('Reports Screen (Step 12c Part 3)', () => {
     });
 
     expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-    expect(screen.getByText('Re-scan')).toBeInTheDocument();
+    expect(screen.getByText('Scan now')).toBeInTheDocument();
   });
 
   it('aborts request on project switch and ignores late response', async () => {

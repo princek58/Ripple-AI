@@ -200,7 +200,7 @@ export const OverviewPage: React.FC = () => {
             ) : (
               <>
                 <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-                Run Code Scan
+                Scan now
               </>
             )}
           </Button>

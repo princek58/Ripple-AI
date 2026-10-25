@@ -341,7 +341,7 @@ export const InvestigationsPage: React.FC = () => {
                 className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`}
                 aria-hidden="true"
               />
-              <span>{isScanning ? 'Scanning...' : 'Re-scan'}</span>
+              <span>{isScanning ? 'Scanning...' : 'Scan now'}</span>
             </Button>
           </div>
         </div>

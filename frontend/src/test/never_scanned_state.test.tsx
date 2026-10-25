@@ -58,10 +58,10 @@ describe('Unified Never-Scanned State across All Screens', () => {
       expect(screen.queryByText(/0 critical/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/0 high/i)).not.toBeInTheDocument();
 
-      // Re-scan button must be present
-      expect(
-        screen.getByTestId(`rescan-button-${unscannedProject.id}`)
-      ).toBeInTheDocument();
+      // Scan now button must be present
+      const rescanBtn = screen.getByTestId(`rescan-button-${unscannedProject.id}`);
+      expect(rescanBtn).toBeInTheDocument();
+      expect(rescanBtn).toHaveTextContent('Scan now');
     });
 
     it('shows scan date and severity badges for scanned project', () => {
@@ -82,12 +82,13 @@ describe('Unified Never-Scanned State across All Screens', () => {
       expect(screen.queryByText('Last scan: Not scanned yet')).not.toBeInTheDocument();
       expect(screen.getByTestId('summary-badges')).toBeInTheDocument();
       expect(screen.getByText('1 high')).toBeInTheDocument();
+      expect(screen.getByTestId(`rescan-button-${scannedProject.id}`)).toHaveTextContent('Re-scan');
     });
   });
 
   // 2. Overview Screen
   describe('2. Overview Screen', () => {
-    it('shows "Not scanned yet" card + Re-scan button and NO zero KPIs for unscanned project', async () => {
+    it('shows "Not scanned yet" card + Scan now button and NO zero KPIs for unscanned project', async () => {
       localStorage.setItem(STORAGE_KEY, unscannedProject.id);
       vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
       vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
@@ -113,7 +114,9 @@ describe('Unified Never-Scanned State across All Screens', () => {
         expect(screen.getByTestId('never-scanned-card')).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId('never-scanned-rescan-button')).toBeInTheDocument();
+      const scanNowBtn = screen.getByTestId('never-scanned-rescan-button');
+      expect(scanNowBtn).toBeInTheDocument();
+      expect(scanNowBtn).toHaveTextContent('Scan now');
       expect(screen.queryByTestId('kpi-tiles-grid')).not.toBeInTheDocument();
       expect(screen.queryByText('Open findings')).not.toBeInTheDocument();
     });
@@ -121,7 +124,7 @@ describe('Unified Never-Scanned State across All Screens', () => {
 
   // 3. Graph Screen
   describe('3. Graph Screen', () => {
-    it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
+    it('shows "Not scanned yet" card + Scan now button and NO zeros for unscanned project', async () => {
       localStorage.setItem(STORAGE_KEY, unscannedProject.id);
       vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
       vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
@@ -148,14 +151,16 @@ describe('Unified Never-Scanned State across All Screens', () => {
       });
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-      expect(screen.getByTestId('rescan-graph-btn')).toBeInTheDocument();
+      const rescanBtn = screen.getByTestId('rescan-graph-btn');
+      expect(rescanBtn).toBeInTheDocument();
+      expect(rescanBtn).toHaveTextContent('Scan now');
       expect(screen.queryByTestId('shown-counter')).not.toBeInTheDocument();
     });
   });
 
   // 4. Investigations Screen
   describe('4. Investigations Screen', () => {
-    it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
+    it('shows "Not scanned yet" card + Scan now button and NO zeros for unscanned project', async () => {
       localStorage.setItem(STORAGE_KEY, unscannedProject.id);
       vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
       vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
@@ -179,14 +184,14 @@ describe('Unified Never-Scanned State across All Screens', () => {
       });
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Scan now/i })).toBeInTheDocument();
       expect(screen.queryByText(/0 findings/i)).not.toBeInTheDocument();
     });
   });
 
   // 5. Fixes Screen
   describe('5. Fixes Screen', () => {
-    it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
+    it('shows "Not scanned yet" card + Scan now button and NO zeros for unscanned project', async () => {
       localStorage.setItem(STORAGE_KEY, unscannedProject.id);
       vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
       vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
@@ -209,14 +214,14 @@ describe('Unified Never-Scanned State across All Screens', () => {
         expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
       });
 
-      expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Scan now/i })).toBeInTheDocument();
       expect(screen.queryByText(/0 findings/i)).not.toBeInTheDocument();
     });
   });
 
   // 6. Tests Screen
   describe('6. Tests Screen', () => {
-    it('shows "Not scanned yet" card + Re-scan button and NO zeros for unscanned project', async () => {
+    it('shows "Not scanned yet" card + Scan now button and NO zeros for unscanned project', async () => {
       localStorage.setItem(STORAGE_KEY, unscannedProject.id);
       vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
       vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
@@ -239,7 +244,7 @@ describe('Unified Never-Scanned State across All Screens', () => {
       });
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Scan now/i })).toBeInTheDocument();
       expect(screen.queryByTestId('tile-passed')).not.toBeInTheDocument();
       expect(screen.queryByTestId('tile-failed')).not.toBeInTheDocument();
     });
@@ -247,7 +252,7 @@ describe('Unified Never-Scanned State across All Screens', () => {
 
   // 7. Reports Screen
   describe('7. Reports Screen', () => {
-    it('shows "Not scanned yet" + Re-scan button and DISABLES Generate report for unscanned project', async () => {
+    it('shows "Not scanned yet" + Scan now button and DISABLES Generate report for unscanned project', async () => {
       localStorage.setItem(STORAGE_KEY, unscannedProject.id);
       vi.spyOn(api, 'getProjects').mockResolvedValue([unscannedProject]);
       vi.spyOn(api, 'getSummary').mockResolvedValue(unscannedSummary);
@@ -271,7 +276,7 @@ describe('Unified Never-Scanned State across All Screens', () => {
       });
 
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Re-scan/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Scan now/i })).toBeInTheDocument();
 
       // Generate report button must be disabled for unscanned project
       const generateBtn = screen.getByTestId('generate-report-button');

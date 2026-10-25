@@ -344,7 +344,7 @@ export const GraphPage: React.FC = () => {
               className={`w-4 h-4 mr-2 ${isScanning ? 'animate-spin' : ''}`}
               aria-hidden="true"
             />
-            {isScanning ? 'Scanning...' : 'Re-scan'}
+            {isScanning ? 'Scanning...' : 'Scan now'}
           </Button>
         </div>
       </div>

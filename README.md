@@ -6,10 +6,12 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
 
 - **ZIP upload**: Accepts project source code uploaded as a ZIP archive, unpacks files with ZIP slip protection, and computes language distributions.
 - **Static analysis only**: All analysis is performed using deterministic AST parsers (ts-morph and Babel parser for JavaScript and TypeScript) without running or executing any user code.
-- **Three-level dependency graph**:
+- **Multi-level dependency graph and evidence path**:
   - **Level 1 (project)**: High-level subsystem and module architecture overview with coarse clustering.
   - **Level 2 (module)**: Module-level internal relationships (services, controllers, configuration).
   - **Level 3 (code)**: File and symbol neighborhood dependency view around a focus node with configurable depth (1 to 3 hops).
+  - **Level 4 (evidence path)**: Exists in the finding detail as an interactive, read-only mini graph highlighting the matched investigation path and unresolved stubs with a text alternative.
+- **Scan history strip**: The Investigations screen features a scan history strip displaying the latest 5 scans with timestamps, status, and backend notes.
 - **Six automated checks**:
   1. `circular_dependency`: Detects circular import dependencies between files or modules.
   2. `broken_import`: Detects static import and require statements pointing to non-existent local files or missing modules.
@@ -198,7 +200,6 @@ RippleAI/
 - **Visual QA review**: Visual QA is automated plus an AI review of screenshots and has not been checked by a human designer.
 - **Print layout verification**: Print layout is only checked by the stylesheet test, not by a printed page.
 - **Graph page bundle size**: The `elkjs` layout engine is bundled whole, so the Graph page chunk is about 1.6 MB (uncompressed).
-- **Unbuilt graph features**: The level 4 evidence graph and the scan history strip are not built.
 - **Routerless fixtures**: In architectures without a centralized router file (such as the included `demo-erp` sample), some standalone utility and helper files may be flagged as `isolated_file`.
 - **Local use only**: There is no authentication (local use only); the application is designed for single-user local workstation use.
 - **Browser-built patch download**: Patch download is built in the browser using Blob URLs.
@@ -207,4 +208,4 @@ RippleAI/
 
 - **Phase 1**: Complete.
 - **Phase 2**: Not built.
-- **Test suite**: 420 tests passing across 42 test files (92 backend tests, 328 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.
+- **Test suite**: 462 tests passing across 46 test files (92 backend tests, 370 frontend tests, 0 failures, 4 skipped) as of 2026-10-25.

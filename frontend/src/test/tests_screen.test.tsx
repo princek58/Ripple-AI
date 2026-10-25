@@ -245,7 +245,7 @@ describe('Tests Screen (Step 12c Part 2)', () => {
     });
 
     expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-    expect(screen.getByText('Re-scan')).toBeInTheDocument();
+    expect(screen.getByText('Scan now')).toBeInTheDocument();
 
     // Verify NEVER showing zeros
     expect(screen.queryByTestId('count-pass')).not.toBeInTheDocument();

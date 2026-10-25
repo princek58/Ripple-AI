@@ -225,7 +225,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           data-testid={`rescan-button-${project.id}`}
           disabled={isScanning}
           onClick={handleRescanClick}
-          aria-label={isScanning ? 'Scanning project' : `Re-scan ${project.name}`}
+          aria-label={
+            isScanning
+              ? 'Scanning project'
+              : neverScanned
+                ? `Scan ${project.name} now`
+                : `Re-scan ${project.name}`
+          }
         >
           {isScanning ? (
             <>
@@ -235,7 +241,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           ) : (
             <>
               <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
-              Re-scan
+              {neverScanned ? 'Scan now' : 'Re-scan'}
             </>
           )}
         </Button>

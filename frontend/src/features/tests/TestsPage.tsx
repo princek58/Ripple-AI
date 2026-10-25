@@ -261,7 +261,7 @@ export const TestsPage: React.FC = () => {
             className="gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-            <span>{isScanning ? 'Scanning...' : 'Re-scan'}</span>
+            <span>{isScanning ? 'Scanning...' : 'Scan now'}</span>
           </Button>
         </div>
       </div>

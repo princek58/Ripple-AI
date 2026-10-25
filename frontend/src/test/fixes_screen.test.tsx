@@ -342,7 +342,7 @@ describe('Fixes Screen (Step 12b Part 2)', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Not scanned yet')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /re-scan/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /scan now/i })).toBeInTheDocument();
     });
     // Never show zeros
     expect(screen.queryByText('0 findings')).not.toBeInTheDocument();
