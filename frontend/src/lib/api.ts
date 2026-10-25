@@ -42,6 +42,12 @@ export const REASON_CODE_EXPLANATIONS: Record<string, string> = {
   ZIP_BOMB: 'Archive compression ratio is suspiciously high [ZIP_BOMB]',
   ZIP_TOO_LARGE: 'Extracted archive size exceeds allowed limit [ZIP_TOO_LARGE]',
   IMPACT_NODE_UNSUPPORTED: 'Impact works for files, API endpoints and config items. Choose one inside the module.',
+  GITHUB_URL_INVALID: 'Invalid GitHub repository link',
+  GITHUB_REPO_NOT_FOUND: 'Repository does not exist or is private (only public repositories are supported)',
+  GITHUB_REPO_TOO_LARGE: 'Repository is too large (maximum 50 MB)',
+  GITHUB_UNAVAILABLE: 'GitHub is busy or rate limited, please try again shortly',
+  GITHUB_UNREACHABLE: 'Unable to reach GitHub. Please check your internet connection.',
+  GITHUB_REDIRECT_BLOCKED: 'GitHub download was redirected to an untrusted address',
 };
 
 export function getFriendlyErrorMessage(err: unknown): string {
@@ -55,6 +61,16 @@ export function getFriendlyErrorMessage(err: unknown): string {
     if (err.message === 'This item is not in the selected project') {
       return 'This item is not in the selected project';
     }
+
+    // Check specific known reason codes before generic status fallbacks
+    const code = err.code || '';
+    const msg = err.message || '';
+    for (const [reasonCode, explanation] of Object.entries(REASON_CODE_EXPLANATIONS)) {
+      if (code === reasonCode || msg.includes(reasonCode)) {
+        return explanation;
+      }
+    }
+
     if (err.status === 400) {
       return 'This is not a valid ZIP file';
     }
@@ -62,9 +78,6 @@ export function getFriendlyErrorMessage(err: unknown): string {
       return 'File is too large';
     }
     if (err.status === 409) {
-      if (err.code === 'PROJECT_FILES_MISSING' || err.message?.includes('PROJECT_FILES_MISSING')) {
-        return 'The stored files of this project are missing. Please upload the ZIP again.';
-      }
       if (err.code === 'SCAN_REQUIRED' || err.message?.includes('SCAN_REQUIRED')) {
         return 'Scan the project first';
       }
@@ -73,13 +86,6 @@ export function getFriendlyErrorMessage(err: unknown): string {
     if (err.status === 422) {
       if (err.code === 'NO_AUTOMATIC_FIX' || err.message?.includes('NO_AUTOMATIC_FIX')) {
         return 'Ripple AI cannot build an automatic change for this finding';
-      }
-      const code = err.code || '';
-      const msg = err.message || '';
-      for (const [reasonCode, explanation] of Object.entries(REASON_CODE_EXPLANATIONS)) {
-        if (code === reasonCode || msg.includes(reasonCode)) {
-          return explanation;
-        }
       }
       return 'Archive could not be processed';
     }
@@ -227,6 +233,15 @@ export const api = {
       body: formData,
       signal,
       timeoutMs: 60000,
+    });
+  },
+
+  importGithubProject(url: string, signal?: AbortSignal): Promise<Project> {
+    return apiFetch<Project>('/api/projects/import-github', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+      signal,
+      timeoutMs: 65000,
     });
   },
 

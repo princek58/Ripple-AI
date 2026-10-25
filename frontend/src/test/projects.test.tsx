@@ -15,6 +15,11 @@ import projectScanFixture from './fixtures/api/project_scan.json';
 import projectSummaryFixture from './fixtures/api/project_summary.json';
 import error400Fixture from './fixtures/api/error_400_invalid_zip.json';
 import error404Fixture from './fixtures/api/error_404_not_found.json';
+import githubImportSuccessFixture from './fixtures/api/github_import_success.json';
+import github400Fixture from './fixtures/api/github_error_400.json';
+import github404Fixture from './fixtures/api/github_error_404.json';
+import github413Fixture from './fixtures/api/github_error_413.json';
+import github502Fixture from './fixtures/api/github_error_502.json';
 
 const capturedProjects: Project[] = projectsListFixture.data;
 const capturedUploadProject: Project = projectUploadFixture.data;
@@ -612,7 +617,8 @@ describe('Projects Feature & Selected-Project State (Step 10a)', () => {
     it.runIf(shouldRunContract)(
       'contract test: checks live backend response keys match captured fixture keys',
       async () => {
-        const liveRes = await fetch('http://localhost:4000/api/projects');
+        const port = process.env.TEST_BACKEND_PORT || process.env.PORT || '4000';
+        const liveRes = await fetch(`http://127.0.0.1:${port}/api/projects`);
         expect(liveRes.ok).toBe(true);
 
         const liveJson = await liveRes.json();
@@ -625,7 +631,7 @@ describe('Projects Feature & Selected-Project State (Step 10a)', () => {
 
           // Test live summary endpoint
           const projectId = liveJson.data[0].id;
-          const liveSummaryRes = await fetch(`http://localhost:4000/api/projects/${projectId}/summary`);
+          const liveSummaryRes = await fetch(`http://127.0.0.1:${port}/api/projects/${projectId}/summary`);
           expect(liveSummaryRes.ok).toBe(true);
 
           const liveSummaryJson = await liveSummaryRes.json();
@@ -633,6 +639,79 @@ describe('Projects Feature & Selected-Project State (Step 10a)', () => {
             Object.keys(capturedSummary).sort()
           );
         }
+      }
+    );
+
+    it.runIf(shouldRunContract)(
+      'contract test: checks POST /api/projects/import-github response keys and error body shapes',
+      async () => {
+        const port = process.env.TEST_BACKEND_PORT || process.env.PORT || '4000';
+        const baseUrl = `http://127.0.0.1:${port}`;
+
+        // 1. Success response keys match captured fixture
+        const validRes = await fetch(`${baseUrl}/api/projects/import-github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://github.com/octocat/Hello-World' }),
+        });
+        expect(validRes.status).toBe(201);
+        const validJson = await validRes.json();
+        expect(Object.keys(validJson).sort()).toEqual(Object.keys(githubImportSuccessFixture).sort());
+        expect(Object.keys(validJson.data).sort()).toEqual(
+          Object.keys(githubImportSuccessFixture.data).sort()
+        );
+
+        // 2. 400 error body shape
+        const err400Res = await fetch(`${baseUrl}/api/projects/import-github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://github.com.evil.com/octocat/Hello-World' }),
+        });
+        expect(err400Res.status).toBe(400);
+        const err400Json = await err400Res.json();
+        expect(Object.keys(err400Json).sort()).toEqual(Object.keys(github400Fixture).sort());
+        expect(err400Json.data).toBeNull();
+        expect(typeof err400Json.error).toBe('string');
+        expect(err400Json.error).toContain('GITHUB_URL_INVALID');
+
+        // 3. 404 error body shape
+        const err404Res = await fetch(`${baseUrl}/api/projects/import-github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://github.com/octocat/Missing-Repo' }),
+        });
+        expect(err404Res.status).toBe(404);
+        const err404Json = await err404Res.json();
+        expect(Object.keys(err404Json).sort()).toEqual(Object.keys(github404Fixture).sort());
+        expect(err404Json.data).toBeNull();
+        expect(typeof err404Json.error).toBe('string');
+        expect(err404Json.error).toContain('GITHUB_REPO_NOT_FOUND');
+
+        // 4. 413 error body shape
+        const err413Res = await fetch(`${baseUrl}/api/projects/import-github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://github.com/octocat/Huge-Repo' }),
+        });
+        expect(err413Res.status).toBe(413);
+        const err413Json = await err413Res.json();
+        expect(Object.keys(err413Json).sort()).toEqual(Object.keys(github413Fixture).sort());
+        expect(err413Json.data).toBeNull();
+        expect(typeof err413Json.error).toBe('string');
+        expect(err413Json.error).toContain('GITHUB_REPO_TOO_LARGE');
+
+        // 5. 502 error body shape
+        const err502Res = await fetch(`${baseUrl}/api/projects/import-github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://github.com/octocat/Blocked-Redirect' }),
+        });
+        expect(err502Res.status).toBe(502);
+        const err502Json = await err502Res.json();
+        expect(Object.keys(err502Json).sort()).toEqual(Object.keys(github502Fixture).sort());
+        expect(err502Json.data).toBeNull();
+        expect(typeof err502Json.error).toBe('string');
+        expect(err502Json.error).toContain('GITHUB_REDIRECT_BLOCKED');
       }
     );
   });

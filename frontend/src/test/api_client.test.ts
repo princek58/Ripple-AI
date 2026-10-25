@@ -128,6 +128,41 @@ describe('API Client', () => {
 
     await api.getReports('test-id');
     expect(global.fetch).toHaveBeenCalledWith('/api/projects/test-id/reports', expect.anything());
+
+    await api.importGithubProject('https://github.com/octocat/Hello-World');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/projects/import-github',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ url: 'https://github.com/octocat/Hello-World' }),
+      })
+    );
+  });
+
+  it('getFriendlyErrorMessage returns friendly messages for GitHub error codes', () => {
+    expect(
+      getFriendlyErrorMessage(new ApiClientError('Invalid link [GITHUB_URL_INVALID]', 400, 'GITHUB_URL_INVALID'))
+    ).toBe('Invalid GitHub repository link');
+
+    expect(
+      getFriendlyErrorMessage(new ApiClientError('Not found [GITHUB_REPO_NOT_FOUND]', 404, 'GITHUB_REPO_NOT_FOUND'))
+    ).toBe('Repository does not exist or is private (only public repositories are supported)');
+
+    expect(
+      getFriendlyErrorMessage(new ApiClientError('Too large [GITHUB_REPO_TOO_LARGE]', 413, 'GITHUB_REPO_TOO_LARGE'))
+    ).toBe('Repository is too large (maximum 50 MB)');
+
+    expect(
+      getFriendlyErrorMessage(new ApiClientError('Unavailable [GITHUB_UNAVAILABLE]', 502, 'GITHUB_UNAVAILABLE'))
+    ).toBe('GitHub is busy or rate limited, please try again shortly');
+
+    expect(
+      getFriendlyErrorMessage(new ApiClientError('Unreachable [GITHUB_UNREACHABLE]', 502, 'GITHUB_UNREACHABLE'))
+    ).toBe('Unable to reach GitHub. Please check your internet connection.');
+
+    expect(
+      getFriendlyErrorMessage(new ApiClientError('Blocked [GITHUB_REDIRECT_BLOCKED]', 502, 'GITHUB_REDIRECT_BLOCKED'))
+    ).toBe('GitHub download was redirected to an untrusted address');
   });
 
   it('getFriendlyErrorMessage returns friendly message for PROJECT_FILES_MISSING', () => {
