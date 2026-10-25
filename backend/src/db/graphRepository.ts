@@ -1,5 +1,7 @@
 import path from 'node:path';
 import type Database from 'better-sqlite3';
+import { computeImpact, type ComputeImpactOptions } from '../analysis/impact/index.js';
+import type { ImpactResult } from '../types.js';
 
 export interface GraphNodeRecord {
   id: string;
@@ -878,5 +880,30 @@ export class GraphRepository {
       lineRange: lineStart ? { start: lineStart, end: lineEnd ?? lineStart } : null,
       relatedFindings: relatedFindingsRows,
     };
+  }
+
+  /**
+   * Computes change impact analysis for a node in a project
+   */
+  getImpact(
+    projectId: string,
+    nodeId: string,
+    options: ComputeImpactOptions = {}
+  ): ImpactResult | null {
+    const node = this.db
+      .prepare('SELECT * FROM nodes WHERE id = ? AND project_id = ?')
+      .get(nodeId, projectId) as GraphNodeRecord | undefined;
+
+    if (!node) return null;
+
+    const nodes = this.db
+      .prepare('SELECT * FROM nodes WHERE project_id = ?')
+      .all(projectId) as GraphNodeRecord[];
+
+    const edges = this.db
+      .prepare('SELECT * FROM edges WHERE project_id = ?')
+      .all(projectId) as GraphEdgeRecord[];
+
+    return computeImpact({ nodes, edges }, nodeId, options);
   }
 }

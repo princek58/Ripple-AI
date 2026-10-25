@@ -528,6 +528,12 @@ const nodeDetailsParamsSchema = z.object({
   nodeId: z.string().uuid({ message: 'Invalid node ID format, must be a UUID' }),
 });
 
+const impactQuerySchema = z.object({
+  node: z.string().uuid({ message: 'Invalid node ID format, must be a UUID' }),
+  depth: z.coerce.number().int().min(1).max(10).default(10),
+  maxNodes: z.coerce.number().int().min(1).max(500).default(300),
+});
+
 // GET /api/projects/:id/graph/search - Search nodes with filters
 router.get(
   '/projects/:id/graph/search',
@@ -611,6 +617,64 @@ router.get(
 
     if (!result) {
       return sendError(res, 'Graph node not found in project', 404);
+    }
+
+    return sendSuccess(res, result);
+  }
+);
+
+// GET /api/projects/:id/impact - Change impact analysis for a node
+router.get(
+  '/projects/:id/impact',
+  validate({ params: projectIdParamsSchema, query: impactQuerySchema }),
+  (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { node, depth, maxNodes } = req.query as unknown as {
+      node: string;
+      depth: number;
+      maxNodes: number;
+    };
+
+    const db = getDatabase();
+    const projectsRepo = new ProjectsRepository(db);
+    const graphRepo = new GraphRepository(db);
+
+    const project = projectsRepo.findById(id);
+    if (!project) {
+      return sendError(res, 'Project not found', 404);
+    }
+
+    // Check if project has undergone a real analysis scan (SAME never-scanned rule as reports route)
+    const { nodeCount } = db
+      .prepare('SELECT COUNT(*) as nodeCount FROM nodes WHERE project_id = ?')
+      .get(id) as { nodeCount: number };
+
+    if (nodeCount === 0) {
+      return sendError(res, 'Scan the project first [SCAN_REQUIRED]', 409, 'SCAN_REQUIRED');
+    }
+
+    // Check node exists globally and in this project
+    const rawNode = db
+      .prepare('SELECT id, project_id, type FROM nodes WHERE id = ?')
+      .get(node) as { id: string; project_id: string; type: string } | undefined;
+
+    if (!rawNode || rawNode.project_id !== id) {
+      return sendError(res, 'Node not found', 404);
+    }
+
+    // Module nodes are not supported as start node in Phase 2 feature A
+    if (rawNode.type === 'module' || rawNode.type === 'project') {
+      return sendError(
+        res,
+        'Choose a file, API or config node [IMPACT_NODE_UNSUPPORTED]',
+        400,
+        'IMPACT_NODE_UNSUPPORTED'
+      );
+    }
+
+    const result = graphRepo.getImpact(id, node, { depth, maxNodes });
+    if (!result) {
+      return sendError(res, 'Node not found', 404);
     }
 
     return sendSuccess(res, result);

@@ -62,6 +62,7 @@ RippleAI/
 - GET/POST /api/findings/:id/fixes · GET /api/projects/:id/fixes?status=&page=&pageSize= · POST /api/fixes/:id/approve · POST /api/fixes/:id/reject
 - GET /api/projects/:id/tests -> { data: { items: [{ id, name, status }], counts: { pass, fail, skipped, not_run }, note }, error }
 - POST /api/projects/:id/reports -> { data: Report, error } (fails with 409 SCAN_REQUIRED if project has no analysis scan; scanned project with 0 findings still produces a report) · GET /api/projects/:id/reports?page=1&pageSize=25 -> { data: { items: [{ id, project_id, created_at }], total, page, pageSize }, error } (newest first, without markdown, zod validated, bad values return 400) · GET /api/reports/:id?format=md -> JSON or raw Markdown
+- GET /api/projects/:id/impact?node=<nodeId>&depth=<n>&maxNodes=<n> -> { data: ImpactResult, error } (zod validated; depth 1-10 default 10, maxNodes default 300 hard max 500; unknown project or node gives 404; foreign project node gives 404; module node gives 400 IMPACT_NODE_UNSUPPORTED; never-scanned project gives 409 SCAN_REQUIRED; returns start, affected, counts, by_module, tests_to_review, truncated, unresolved_nearby, notes)
 Every response uses { data, error } shape. Validate all input with zod.
 
 ## 6. ZIP safety (implement in the upload step)
@@ -74,6 +75,19 @@ Max ZIP 50 MB, max 5,000 files, max total uncompressed 200 MB, max single file 5
 - Level 3: files, functions, imports, routes, callers.
 - Every edge stores relation, status, confidence and evidence. Unresolvable references become unresolved edges.
 - Graph API never returns the whole project at once: lazy expansion, shown/total counts, clustering for large groups.
+
+### Edge direction and change impact dependencies
+For an edge `(source, target)`, the default rule is that `source` depends on `target` (e.g., consumer depends on provider), EXCEPT for `serves` and `configures` where `target` depends on `source`. When node X changes, its dependents are:
+
+| Relation | Edge Source | Edge Target | Who Depends on Whom | Traversal Rule (If X changes, next dependent is) |
+| :--- | :--- | :--- | :--- | :--- |
+| `imports` | Importing file | Imported file | Source depends on Target | If `target === X`, then `source` is affected |
+| `tests` | Test file | Tested file | Source depends on Target | If `target === X`, then `source` is affected |
+| `calls` | Caller file | API endpoint | Source depends on Target | If `target === X`, then `source` is affected |
+| `serves` | Route file | API endpoint | **Target depends on Source** | If `source === X`, then `target` is affected |
+| `reads` | Code file | Config node | Source depends on Target | If `target === X`, then `source` is affected |
+| `writes` | Code file | Database / model | Source depends on Target | If `target === X`, then `source` is affected |
+| `configures` | Config file | Configured module/service | **Target depends on Source** | If `source === X`, then `target` is affected |
 
 ## 8. Phase 1 checks and fixes (each creates findings with evidence)
 - circular_dependency: strongly connected components over resolved import edges. Severity low, confidence confirmed. not_confirmed: runtime failure.

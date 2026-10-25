@@ -140,3 +140,62 @@ export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
 }
+
+export type ImpactCertainty = 'proven' | 'possible';
+
+export interface ImpactVia {
+  relation: EdgeRelation;
+  status: EdgeStatus;
+}
+
+export interface ImpactStartNode {
+  id: string;
+  label: string;
+  type: NodeType;
+  path: string;
+  module: string | null;
+}
+
+export interface ImpactAffectedNode {
+  id: string;
+  label: string;
+  type: NodeType;
+  path: string;
+  module: string | null;
+  distance: number;
+  certainty: ImpactCertainty;
+  via: ImpactVia;
+}
+
+export interface ImpactCounts {
+  files: number;
+  api_endpoints: number;
+  config: number;
+  tests: number;
+  modules: number;
+}
+
+export interface ImpactByModule {
+  module: string;
+  count: number;
+}
+
+export interface ImpactTestReviewNode {
+  id: string;
+  label: string;
+  path: string;
+  distance: number;
+  certainty: ImpactCertainty;
+  note: string;
+}
+
+export interface ImpactResult {
+  start: ImpactStartNode;
+  affected: ImpactAffectedNode[];
+  counts: ImpactCounts;
+  by_module: ImpactByModule[];
+  tests_to_review: ImpactTestReviewNode[];
+  truncated: boolean;
+  unresolved_nearby: number;
+  notes: string[];
+}
