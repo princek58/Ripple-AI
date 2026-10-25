@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiFetch, ApiClientError, api, getFriendlyErrorMessage } from '../lib/api.js';
+import impactNoticeServiceFixture from './fixtures/api/impact_notice_service.json';
+import impactModule400Fixture from './fixtures/api/impact_module_node_400.json';
+import impactUnscanned409Fixture from './fixtures/api/impact_unscanned_project_409.json';
+import impactUnknown404Fixture from './fixtures/api/impact_unknown_node_404.json';
 
 describe('API Client', () => {
   beforeEach(() => {
@@ -143,5 +147,69 @@ describe('API Client', () => {
     expect(getFriendlyErrorMessage(errorWithMessageOnly)).toBe(
       'The stored files of this project are missing. Please upload the ZIP again.'
     );
+  });
+
+  describe('api.getImpact', () => {
+    it('fetches impact data successfully using real fixture', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'application/json' },
+        json: vi.fn().mockResolvedValue(impactNoticeServiceFixture),
+      } as unknown as Response);
+
+      const result = await api.getImpact('proj-123', 'node-abc', { depth: 3, maxNodes: 50 });
+
+      expect(result).toEqual(impactNoticeServiceFixture.data);
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/projects/proj-123/impact?node=node-abc&depth=3&maxNodes=50',
+        expect.anything()
+      );
+    });
+
+    it('maps 400 IMPACT_NODE_UNSUPPORTED to friendly message', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: { get: () => 'application/json' },
+        json: vi.fn().mockResolvedValue(impactModule400Fixture),
+      } as unknown as Response);
+
+      await expect(api.getImpact('proj-123', 'mod-node')).rejects.toThrow(
+        'Impact works for files, API endpoints and config items. Choose one inside the module.'
+      );
+    });
+
+    it('maps 409 SCAN_REQUIRED to friendly message', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        headers: { get: () => 'application/json' },
+        json: vi.fn().mockResolvedValue(impactUnscanned409Fixture),
+      } as unknown as Response);
+
+      await expect(api.getImpact('proj-123', 'node-abc')).rejects.toThrow('Scan the project first');
+    });
+
+    it('maps 404 to friendly message', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: { get: () => 'application/json' },
+        json: vi.fn().mockResolvedValue(impactUnknown404Fixture),
+      } as unknown as Response);
+
+      await expect(api.getImpact('proj-123', 'node-unknown')).rejects.toThrow(
+        'This item is not in the selected project'
+      );
+    });
+
+    it('maps network failure to friendly message', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+
+      await expect(api.getImpact('proj-123', 'node-abc')).rejects.toThrow(
+        'Backend is not reachable'
+      );
+    });
   });
 });

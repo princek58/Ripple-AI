@@ -13,6 +13,7 @@ import type {
   Report,
   PaginatedReportsResult,
   ApiResponse,
+  ImpactResult,
 } from '../../../shared/types.js';
 import type { ProjectFixesResult } from '../features/fixes/fixesTypes.js';
 import type { ProjectTestsData } from '../features/tests/testsTypes.js';
@@ -40,12 +41,19 @@ export const REASON_CODE_EXPLANATIONS: Record<string, string> = {
   ZIP_TOO_MANY_FILES: 'Archive contains too many files [ZIP_TOO_MANY_FILES]',
   ZIP_BOMB: 'Archive compression ratio is suspiciously high [ZIP_BOMB]',
   ZIP_TOO_LARGE: 'Extracted archive size exceeds allowed limit [ZIP_TOO_LARGE]',
+  IMPACT_NODE_UNSUPPORTED: 'Impact works for files, API endpoints and config items. Choose one inside the module.',
 };
 
 export function getFriendlyErrorMessage(err: unknown): string {
   if (err instanceof ApiClientError) {
+    if (err.code === 'IMPACT_NODE_UNSUPPORTED' || err.message?.includes('IMPACT_NODE_UNSUPPORTED')) {
+      return 'Impact works for files, API endpoints and config items. Choose one inside the module.';
+    }
     if (err.code === 'PROJECT_FILES_MISSING' || err.message?.includes('PROJECT_FILES_MISSING')) {
       return 'The stored files of this project are missing. Please upload the ZIP again.';
+    }
+    if (err.message === 'This item is not in the selected project') {
+      return 'This item is not in the selected project';
     }
     if (err.status === 400) {
       return 'This is not a valid ZIP file';
@@ -391,5 +399,44 @@ export const api = {
   getReport(id: string, format?: 'md', signal?: AbortSignal): Promise<Report | string> {
     const qs = format === 'md' ? '?format=md' : '';
     return apiFetch<Report | string>(`/api/reports/${id}${qs}`, { signal });
+  },
+
+  getImpact(
+    projectId: string,
+    nodeId: string,
+    options?: { depth?: number; maxNodes?: number },
+    signal?: AbortSignal
+  ): Promise<ImpactResult> {
+    const searchParams = new URLSearchParams();
+    searchParams.set('node', nodeId);
+    if (options?.depth !== undefined) searchParams.set('depth', String(options.depth));
+    if (options?.maxNodes !== undefined) searchParams.set('maxNodes', String(options.maxNodes));
+    const qs = searchParams.toString();
+    return apiFetch<ImpactResult>(`/api/projects/${projectId}/impact?${qs}`, { signal }).catch(
+      (err: unknown) => {
+        if (err instanceof ApiClientError) {
+          if (
+            err.status === 400 &&
+            (err.code === 'IMPACT_NODE_UNSUPPORTED' || err.message?.includes('IMPACT_NODE_UNSUPPORTED'))
+          ) {
+            throw new ApiClientError(
+              'Impact works for files, API endpoints and config items. Choose one inside the module.',
+              400,
+              'IMPACT_NODE_UNSUPPORTED'
+            );
+          }
+          if (err.status === 409 || err.code === 'SCAN_REQUIRED' || err.message?.includes('SCAN_REQUIRED')) {
+            throw new ApiClientError('Scan the project first', 409, 'SCAN_REQUIRED');
+          }
+          if (err.status === 404) {
+            throw new ApiClientError('This item is not in the selected project', 404);
+          }
+          if (!err.status || err.status === 0 || err.code === 'NETWORK_ERROR' || err.status >= 500) {
+            throw new ApiClientError('Backend is not reachable', err.status || 0, 'NETWORK_ERROR');
+          }
+        }
+        throw err;
+      }
+    );
   },
 };
