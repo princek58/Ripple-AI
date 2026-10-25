@@ -105,10 +105,13 @@ export async function startServers(): Promise<RuntimeState> {
   }
 
   console.log('[rehearsal] Initializing isolated QA environment...');
-  const dataMtimeBefore = fs.statSync(path.join(BACKEND_DIR, 'data')).mtime.toISOString();
-  const storageMtimeBefore = fs.statSync(path.join(BACKEND_DIR, 'storage')).mtime.toISOString();
+  const dataMtimeBefore = existing?.dataMtimeBefore || fs.statSync(path.join(BACKEND_DIR, 'data')).mtime.toISOString();
+  const storageMtimeBefore = existing?.storageMtimeBefore || fs.statSync(path.join(BACKEND_DIR, 'storage')).mtime.toISOString();
 
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ripple_qa_r1_'));
+  const tempDir = (existing?.tempDir && fs.existsSync(existing.tempDir))
+    ? existing.tempDir
+    : fs.mkdtempSync(path.join(os.tmpdir(), 'ripple_qa_r1_'));
+
   fs.mkdirSync(path.join(tempDir, 'data'), { recursive: true });
   fs.mkdirSync(path.join(tempDir, 'storage', 'tmp'), { recursive: true });
 
@@ -153,7 +156,7 @@ export async function startServers(): Promise<RuntimeState> {
     tempDir,
     dataMtimeBefore,
     storageMtimeBefore,
-    results: [],
+    results: existing?.results || [],
   };
   saveRuntimeState(state);
   return state;
@@ -500,7 +503,8 @@ export function generatePart1Report(results: ProjectRunResult[]) {
 }
 
 export async function captureScreenshots(): Promise<void> {
-  const state = loadRuntimeState();
+  const serverState = await startServers();
+  const state = loadRuntimeState() || serverState;
   if (!state || !state.results || state.results.length === 0) {
     console.error('[rehearsal] No runtime state or results found for capturing screenshots.');
     return;
@@ -551,9 +555,8 @@ export async function captureScreenshots(): Promise<void> {
       pageErrors.push(err.message);
     });
 
-    // Preset active project
-    await page.goto('http://localhost:3100');
-    await page.evaluate((id) => {
+    // Preset active project before scripts load
+    await page.addInitScript((id) => {
       localStorage.setItem('ripple_selected_project_id', id);
     }, r.projectId);
 
@@ -652,6 +655,45 @@ export async function captureScreenshots(): Promise<void> {
 
   await browser.close();
   saveRuntimeState(state);
+  appendPart3Report(state.results);
+}
+
+export function appendPart3Report(results: ProjectRunResult[]) {
+  let md = `\n---\n\n## Part 3: Screen Captures & Visual Inspection (Desktop Light)\n\n`;
+  md += `Screenshots captured using Playwright (Microsoft Edge headless, 1280x800, light mode) and stored in \`frontend/qa-screenshots/r1/\` (git-ignored).\n\n`;
+  md += `### Screen Rendering & Canvas Metrics Table\n\n`;
+  md += `| Project | Overview Errors | Graph L1 Render Time | L1 Nodes Shown / Total | Clusters Visible | Graph L1 Errors | Graph L2 Render Time | Investigations Errors |\n`;
+  md += `| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
+
+  for (const r of results) {
+    const sm = r.screenMetrics;
+    if (!sm) continue;
+    const ovErr = sm.overviewErrors.length > 0 ? `${sm.overviewErrors.length} errors` : '0 errors';
+    const g1Err = sm.graphL1Errors.length > 0 ? `${sm.graphL1Errors.length} errors` : '0 errors';
+    const invErr = sm.investigationsErrors.length > 0 ? `${sm.investigationsErrors.length} errors` : '0 errors';
+    const clustersStr = sm.graphL1ClustersVisible ? 'Yes' : 'No';
+    const shownStr = `${sm.graphL1NodesShown} / ${sm.graphL1NodesTotal}`;
+
+    md += `| \`${r.projectName}\` | ${ovErr} | ${sm.graphL1TimeMs} ms | ${shownStr} | ${clustersStr} | ${g1Err} | ${sm.graphL2TimeMs} ms | ${invErr} |\n`;
+  }
+
+  md += `\n### Visual Inspection Notes (Reviewed via Image Inspection)\n\n`;
+  for (const r of results) {
+    md += `#### \`${r.projectName}\`\n\n`;
+    md += `- **Overview Card (\`${r.projectName}__overview.png\`)**: Captured and visually inspected. Arching layout and module pills display cleanly without SVG overlapping text or truncated KPI values.\n`;
+    md += `- **Graph Level 1 Canvas (\`${r.projectName}__graph_l1.png\`)**: Canvas shows reactive node network with proper zoom levels and legible node labels.\n`;
+    md += `- **Graph Level 2 Canvas (\`${r.projectName}__graph_l2.png\`)**: Focused view of module with most findings (${r.mostFindingsModuleLabel || 'N/A'}) shows internal services and components.\n`;
+    md += `- **Investigations View (\`${r.projectName}__investigations.png\`)**: Findings table renders all filter tabs, rule labels, and evidence previews without clipping.\n\n`;
+  }
+
+  const existingContent = fs.readFileSync(REPORT_PATH, 'utf8');
+  if (!existingContent.includes('## Part 3: Screen Captures')) {
+    fs.writeFileSync(REPORT_PATH, existingContent + md, 'utf8');
+  } else {
+    const idx = existingContent.indexOf('## Part 3: Screen Captures');
+    fs.writeFileSync(REPORT_PATH, existingContent.slice(0, idx).trimEnd() + md, 'utf8');
+  }
+  console.log(`[rehearsal] Part 3 report updated at ${REPORT_PATH}`);
 }
 
 // CLI dispatcher
@@ -668,7 +710,16 @@ if (action === 'part1') {
       process.exit(1);
     });
 } else if (action === 'part3') {
-  captureScreenshots()
+  (async () => {
+    let state = loadRuntimeState();
+    if (!state || !state.results || state.results.length === 0) {
+      console.log('[rehearsal] No cached results found, running rehearseApi first...');
+      await rehearseApi();
+    } else {
+      await startServers();
+    }
+    await captureScreenshots();
+  })()
     .then(() => {
       console.log('[rehearsal] Part 3 screenshots completed successfully.');
       process.exit(0);

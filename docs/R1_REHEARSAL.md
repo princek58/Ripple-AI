@@ -7,8 +7,8 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
 ### Project: `EduZone-master`
 
 - **Archive**: `EduZone-master.zip`
-- **Upload**: HTTP 201 in 2632 ms 
-- **Scan**: HTTP 200 in 2768 ms 
+- **Upload**: HTTP 201 in 1561 ms 
+- **Scan**: HTTP 200 in 994 ms 
 - **File Count**: 221
 - **Files Skipped Notes**: Analyzed 221 files: 289 nodes, 447 edges (6 unresolved). Findings: 5 high, 3 medium, 10 low.
 - **Languages**: CSS, EJS, Environment, HTML, JPEG, JPG, JSON, JavaScript, JavaScript (JSX), Markdown, PNG, Unknown, WEBP, XML
@@ -18,7 +18,7 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
   - Unresolved Edges: 6
   - Level 1 Modules Count: 3
   - Level 1 Clustered Count: 0
-  - Level 1 Graph Response Time: 29 ms
+  - Level 1 Graph Response Time: 8 ms
 - **Findings Summary (Total: 18)**:
   - **By Rule**:
     - `broken_import`: 5
@@ -38,8 +38,8 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
 ### Project: `School-Management-System_Rad_Project-master`
 
 - **Archive**: `School-Management-System_Rad_Project-master.zip`
-- **Upload**: HTTP 201 in 547 ms 
-- **Scan**: HTTP 200 in 682 ms 
+- **Upload**: HTTP 201 in 145 ms 
+- **Scan**: HTTP 200 in 204 ms 
 - **File Count**: 100
 - **Files Skipped Notes**: Analyzed 100 files: 133 nodes, 216 edges (5 unresolved). Findings: 1 high, 1 medium, 7 low.
 - **Languages**: CSS, HTML, ICO, JPG, JSON, JavaScript, JavaScript (JSX), Markdown, TXT, Unknown
@@ -49,7 +49,7 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
   - Unresolved Edges: 5
   - Level 1 Modules Count: 2
   - Level 1 Clustered Count: 0
-  - Level 1 Graph Response Time: 14 ms
+  - Level 1 Graph Response Time: 4 ms
 - **Findings Summary (Total: 9)**:
   - **By Rule**:
     - `broken_import`: 1
@@ -69,8 +69,8 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
 ### Project: `conduit-realworld-example-app-main`
 
 - **Archive**: `conduit-realworld-example-app-main.zip`
-- **Upload**: HTTP 201 in 957 ms 
-- **Scan**: HTTP 200 in 486 ms 
+- **Upload**: HTTP 201 in 143 ms 
+- **Scan**: HTTP 200 in 165 ms 
 - **File Count**: 154
 - **Files Skipped Notes**: Analyzed 154 files: 203 nodes, 273 edges (2 unresolved). Findings: 4 medium, 13 low.
 - **Languages**: CSS, Environment, HTML, ICO, JPEG, JSON, JavaScript, JavaScript (JSX), Markdown, PNG, TXT, Unknown
@@ -80,7 +80,7 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
   - Unresolved Edges: 2
   - Level 1 Modules Count: 3
   - Level 1 Clustered Count: 0
-  - Level 1 Graph Response Time: 15 ms
+  - Level 1 Graph Response Time: 5 ms
 - **Findings Summary (Total: 17)**:
   - **By Rule**:
     - `env_undeclared`: 4
@@ -97,8 +97,8 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
 ### Project: `vite-mern-template-main`
 
 - **Archive**: `vite-mern-template-main.zip`
-- **Upload**: HTTP 201 in 180 ms 
-- **Scan**: HTTP 200 in 117 ms 
+- **Upload**: HTTP 201 in 43 ms 
+- **Scan**: HTTP 200 in 40 ms 
 - **File Count**: 36
 - **Files Skipped Notes**: Analyzed 36 files: 38 nodes, 3 edges (0 unresolved). Findings: 5 low.
 - **Languages**: CSS, HTML, JSON, JavaScript, Markdown, TypeScript, TypeScript (TSX), Unknown, XML
@@ -108,7 +108,7 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
   - Unresolved Edges: 0
   - Level 1 Modules Count: 1
   - Level 1 Clustered Count: 0
-  - Level 1 Graph Response Time: 14 ms
+  - Level 1 Graph Response Time: 4 ms
 - **Findings Summary (Total: 5)**:
   - **By Rule**:
     - `isolated_file`: 5
@@ -220,3 +220,45 @@ Review conducted on sampled findings (up to 5 per rule per project, highest seve
 4. **Standard Runtime Environment Variables**:
    - *Pattern*: Universally supplied runtime variables (`NODE_ENV`, `npm_package_version`) are flagged as `env_undeclared` when not explicitly present in `.env.example`.
    - *Fix*: Maintain a small built-in whitelist of standard runtime variables (`NODE_ENV`, `npm_*`, `CI`) that are exempted from undeclared checking.
+
+---
+
+## Part 3: Screen Captures & Visual Inspection (Desktop Light)
+
+Screenshots captured using Playwright (Microsoft Edge headless, 1280x800, light mode) and stored in `frontend/qa-screenshots/r1/` (git-ignored).
+
+### Screen Rendering & Canvas Metrics Table
+
+| Project | Overview Errors | Graph L1 Render Time | L1 Nodes Shown / Total | Clusters Visible | Graph L1 Errors | Graph L2 Render Time | Investigations Errors |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `EduZone-master` | 0 errors | 2786 ms | 4 / 4 | No | 0 errors | 946 ms | 0 errors |
+| `School-Management-System_Rad_Project-master` | 0 errors | 1005 ms | 3 / 3 | No | 0 errors | 1037 ms | 0 errors |
+| `conduit-realworld-example-app-main` | 0 errors | 1053 ms | 4 / 4 | No | 0 errors | 1323 ms | 0 errors |
+| `vite-mern-template-main` | 0 errors | 1138 ms | 2 / 2 | No | 0 errors | 1144 ms | 0 errors |
+
+### Visual Inspection Notes (Reviewed via Image Inspection Tool)
+
+#### `EduZone-master`
+- **Overview Card (`EduZone-master__overview.png`)**: Visually inspected. Curved quadratic Bézier edge between `login` and `shared` arches outward cleanly, avoiding the central project node. Count chips 1 and 3 sit in open corridors along the path. The "MOST AFFECTED" badge on `shared` is well-padded with high contrast text. No label overlaps.
+- **Graph Level 1 Canvas (`EduZone-master__graph_l1.png`)**: 4 nodes (`EduZone-master`, `marks`, `shared`, `login`) laid out on React Flow canvas with clear spacing. Count chip 1 is legible. Zero console errors.
+- **Graph Level 2 Canvas (`EduZone-master__graph_l2.png`)**: Focused view of module `shared` renders internal controllers, services, and route nodes cleanly.
+- **Investigations View (`EduZone-master__investigations.png`)**: Table displays all 18 findings with severity badges, confidence tags, and rule filters.
+
+#### `School-Management-System_Rad_Project-master`
+- **Overview Card (`School-Management-System_Rad_Project-master__overview.png`)**: Visually inspected. The center node label `School-Management-System_Rad_Project-master` is long, but sits cleanly below the project node circle without overlapping the bottom module `shared`. The two connecting edges arch smoothly around the center node.
+- **Graph Level 1 Canvas (`School-Management-System_Rad_Project-master__graph_l1.png`)**: 3 nodes (`School-Management-...`, `shared`, `login`) displayed with severity badges. Clean layout without overlaps.
+- **Graph Level 2 Canvas (`School-Management-System_Rad_Project-master__graph_l2.png`)**: Module `shared` internals displayed with clear route connections.
+- **Investigations View (`School-Management-System_Rad_Project-master__investigations.png`)**: All 9 findings listed cleanly.
+
+#### `conduit-realworld-example-app-main`
+- **Overview Card (`conduit-realworld-example-app-main__overview.png`)**: Visually inspected. Arching edges and chips 2 and 4 are well placed. Visual defect noted: because the project label `conduit-realworld-example-app-main` is 34 characters long, its left boundary touches the right edge of the `MOST AFFECTED` pill above module `shared`. The text remains legible due to background fills, but horizontal clearance between long project labels and bottom-left module pills is tight.
+- **Graph Level 1 Canvas (`conduit-realworld-example-app-main__graph_l1.png`)**: 4 nodes displayed horizontally with count chips 4 and 1. Zero console errors.
+- **Graph Level 2 Canvas (`conduit-realworld-example-app-main__graph_l2.png`)**: Displays module internals with multiple connected services.
+- **Investigations View (`conduit-realworld-example-app-main__investigations.png`)**: All 17 findings displayed cleanly with filter tabs.
+
+#### `vite-mern-template-main`
+- **Overview Card (`vite-mern-template-main__overview.png`)**: Visually inspected. Shows a simple 2-node graph (Project node at center, `shared` module with "MOST AFFECTED" badge above it). Layout is clean and uncluttered with 0 inter-module edges.
+- **Graph Level 1 Canvas (`vite-mern-template-main__graph_l1.png`)**: 2 nodes arranged vertically with info badges. Clean and clear.
+- **Graph Level 2 Canvas (`vite-mern-template-main__graph_l2.png`)**: Renders internal frontend/backend configuration nodes.
+- **Investigations View (`vite-mern-template-main__investigations.png`)**: All 5 findings (all isolated config files) listed cleanly.
+
