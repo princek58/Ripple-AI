@@ -36,4 +36,6 @@ This document tracks known limitations, technical debt, security advisories, and
 | **B-19** | Backend Architecture | `backend/src/routes/projects.ts` keeps growing; move the graph and impact routes to their own router file later. | Minor | Open |
 | **B-20** | Benchmarking & Scale | Impact analysis was checked only on the small `demo-erp` fixture; bigger real projects are measured in rehearsal R1. | Minor | Open |
 | **B-21** | Localization | Impact text has no Hinglish version yet (the chatbox will explain in Hinglish). | Minor | Open |
+| **B-22** | QA Methodology | Overview L1 card: the earlier AI QA marked it OK; the overlap check did not cover SVG cards; fixed in UI-1; keep the SVG check in QA | Minor | Open |
+| **B-23** | QA Methodology | AI review of screenshots misses small overlaps; human screenshots remain necessary | Minor | Open |
 
