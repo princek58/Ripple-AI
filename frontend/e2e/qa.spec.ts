@@ -31,6 +31,11 @@ const routes: RouteDef[] = [
     pathBuilder: (seed) => `/app/investigations?finding=${seed.brokenImportFindingId}`,
     projectType: 'scanned',
   },
+  {
+    slug: 'app-investigations-minigraph',
+    pathBuilder: (seed) => `/app/investigations?finding=${seed.brokenImportFindingId}`,
+    projectType: 'scanned',
+  },
   { slug: 'app-fixes', pathBuilder: () => '/app/fixes', projectType: 'scanned' },
   { slug: 'app-tests', pathBuilder: () => '/app/tests', projectType: 'scanned' },
   { slug: 'app-reports', pathBuilder: () => '/app/reports', projectType: 'scanned' },
@@ -200,6 +205,20 @@ test.describe('Automated Visual QA Suite', () => {
           } catch {}
           await page.evaluate(() => window.scrollTo(0, 0));
           await page.waitForTimeout(400);
+        }
+
+        // Open Evidence path mini graph if on app-investigations-minigraph route
+        if (r.slug === 'app-investigations-minigraph') {
+          const evidenceSummary = page.locator('[data-testid="evidence-path-summary"]');
+          try {
+            await evidenceSummary.waitFor({ state: 'visible', timeout: 6000 });
+            await evidenceSummary.click();
+            const miniGraph = page.locator('[data-testid="mini-graph-container"]');
+            await miniGraph.waitFor({ state: 'visible', timeout: 10000 });
+            await page.waitForTimeout(600);
+          } catch (e) {
+            console.warn('[qa] Failed to open mini evidence graph:', e);
+          }
         }
 
         await page.screenshot({ path: screenshotFilePath, fullPage: true });

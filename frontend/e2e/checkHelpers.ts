@@ -301,19 +301,23 @@ export async function runPageChecks(
       if (style.display === 'none' || style.visibility === 'hidden') continue;
       if (el.clientWidth === 0 && el.clientHeight === 0) continue;
 
-      const isOverflowHidden =
-        style.overflow === 'hidden' ||
-        style.overflow === 'clip' ||
-        style.overflowX === 'hidden' ||
-        style.overflowX === 'clip' ||
-        style.overflowY === 'hidden' ||
-        style.overflowY === 'clip';
+      const ox = style.overflowX;
+      const oy = style.overflowY;
+      const o = style.overflow;
 
-      if (!isOverflowHidden) continue;
+      // Must only consider elements whose computed overflow is hidden or clip (not auto or scroll)
+      if (o === 'auto' || o === 'scroll' || ox === 'auto' || ox === 'scroll' || oy === 'auto' || oy === 'scroll') {
+        continue;
+      }
+
+      const isXHidden = ox === 'hidden' || ox === 'clip';
+      const isYHidden = oy === 'hidden' || oy === 'clip';
+
+      if (!isXHidden && !isYHidden) continue;
 
       // Check exemptions:
       const classStr = el.className && typeof el.className === 'string' ? el.className : '';
-      const hasLineClamp = classStr.includes('line-clamp') || style.webkitLineClamp !== '' && style.webkitLineClamp !== 'none';
+      const hasLineClamp = classStr.includes('line-clamp') || (style.webkitLineClamp !== '' && style.webkitLineClamp !== 'none');
       const hasTruncate = classStr.includes('truncate');
       const hasTitle = el.hasAttribute('title') && Boolean(el.getAttribute('title')?.trim());
 
@@ -321,8 +325,8 @@ export async function runPageChecks(
         continue;
       }
 
-      const isScrollHeightClipped = el.scrollHeight > el.clientHeight + 1;
-      const isScrollWidthClipped = el.scrollWidth > el.clientWidth + 1;
+      const isScrollHeightClipped = isYHidden && el.scrollHeight > el.clientHeight + 1;
+      const isScrollWidthClipped = isXHidden && el.scrollWidth > el.clientWidth + 1;
 
       if (isScrollHeightClipped || isScrollWidthClipped) {
         const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40);

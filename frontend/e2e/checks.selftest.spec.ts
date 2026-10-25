@@ -47,6 +47,13 @@ test.describe('Automated Checks Self-Test', () => {
             <p>Line 3 of likely cause explanation that gets cut off</p>
           </div>
 
+          <!-- Scroll container with overflow: auto whose content overflows (must NOT be reported as clipping warning) -->
+          <div id="defect-scroll-container" style="width: 200px; height: 30px; overflow: auto; background: lightgray;">
+            <p>Scrollable line 1</p>
+            <p>Scrollable line 2 overflowing container</p>
+            <p>Scrollable line 3</p>
+          </div>
+
           <!-- Named horizontal overflow element on phone viewport -->
           <div id="defect-overflow-div" class="overflow-box">Wide overflow content</div>
 
@@ -107,9 +114,10 @@ test.describe('Automated Checks Self-Test', () => {
     expect(overlap.overlapX).toBeGreaterThan(1);
     expect(overlap.overlapY).toBeGreaterThan(1);
 
-    // Clipping assertion: must detect unexempted clipping
+    // Clipping assertion: must detect unexempted clipping on hidden/clip, but NOT on overflow:auto scroll containers
     expect(result.clippingWarnings.length).toBeGreaterThanOrEqual(1);
     expect(result.clippingWarnings.some((w) => w.selector.includes('defect-clipped-card') || w.selector.includes('clipped-box'))).toBe(true);
+    expect(result.clippingWarnings.some((w) => w.selector.includes('defect-scroll-container'))).toBe(false);
 
     // Landing counters assertion: must detect invalid zeros
     expect(result.landingCounters).toBeDefined();
@@ -155,6 +163,12 @@ test.describe('Automated Checks Self-Test', () => {
           </div>
           <div style="overflow: hidden; width: 80px;" title="Tooltip Title">
             Overflow with title
+          </div>
+          <!-- Scroll container with overflow: auto (must NOT trigger clipping warnings) -->
+          <div id="clean-scroll-box" style="width: 150px; height: 35px; overflow: auto;">
+            <p>Clean scrollable line 1</p>
+            <p>Clean scrollable line 2</p>
+            <p>Clean scrollable line 3</p>
           </div>
 
           <!-- Valid landing counters -->
