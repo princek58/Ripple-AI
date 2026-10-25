@@ -38,6 +38,8 @@ export function generateContactSheet(screenshotsDir = 'C:\\RippleAI\\frontend\\q
     { slug: 'app-graph-impact-helpers', title: 'Architecture Graph - Impact View: helpers.js (Circular)', path: '/app/graph?focus=<helpersId>&impact=<helpersId>' },
     { slug: 'app-graph-impact-legacyreport', title: 'Architecture Graph - Impact View: legacyReport.js (Zero Impact)', path: '/app/graph?focus=<legacyReportId>&impact=<legacyReportId>' },
     { slug: 'app-graph-impact-noticeservice-round3', title: 'Architecture Graph - Impact View: noticeService.js (Round 3 State)', path: '/app/graph?focus=<noticeServiceId>&impact=<noticeServiceId>' },
+    { slug: 'app-projects-upload-github-empty', title: 'Projects Screen - Upload Dialog (GitHub Tab Empty)', path: '/app/projects' },
+    { slug: 'app-projects-upload-github-invalid', title: 'Projects Screen - Upload Dialog (GitHub Tab Invalid URL Error)', path: '/app/projects' },
   ];
 
   function formatChecks(check: any) {

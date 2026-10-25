@@ -17,14 +17,20 @@ This guide is designed for a non-technical presenter or product specialist demon
 
 ## 5-Step Demonstration Script
 
-### Step 1: Upload the Project (`demo-erp-sample.zip`)
-- **Exact Action**:
+### Step 1: Upload the Project (`demo-erp-sample.zip` or Public GitHub URL)
+- **Exact Action (ZIP Upload)**:
   - In the top navigation bar, click **Projects**.
-  - Click the **Upload Project** button.
+  - Click the **Upload project** button.
   - In the file dialog, choose `samples/demo-erp-sample.zip` from the repository root.
   - Wait 2–3 seconds while Ripple AI extracts the ZIP archive (with ZIP-slip protection and secret redaction) and automatically initiates deterministic static AST parsing.
+- **Alternative Action (GitHub URL Import)**:
+  - In the Upload dialog, switch to the **From GitHub URL** tab.
+  - Enter a public GitHub repository URL (e.g. `https://github.com/octocat/Hello-World`).
+  - Click **Import and scan**.
+  - Ripple AI downloads a ZIP copy from GitHub directly to local storage, runs safe ZIP extraction, and scans it statically without executing code.
+  - *Note*: Public repositories only. Needs internet connection. Subject to 50 MB archive and 5,000 files limits. GitHub may refuse or throttle requests. No private repositories are supported; no tokens or credentials are stored. Offline fallback: if you have no internet, download the ZIP from GitHub in your browser and use the Upload ZIP tab.
 - **What to Say**:
-  > *"Ripple AI immediately ingests the project ZIP locally, safely unpacks 17 source files without running any code, and builds an evidence-based architectural graph using static analysis."*
+  > *"Ripple AI ingests project source code locally—either from a local ZIP or by importing any public GitHub repository URL—safely unpacks files without running any code, and builds an evidence-based architectural graph using static analysis."*
 
 ### Step 2: Overview Dashboard & System KPIs
 - **Exact Action**:
@@ -94,6 +100,8 @@ To maintain complete credibility, never make any of the following claims during 
    - The platform has been tested on small-to-medium demo repositories (`demo-erp`, 17 files, 30 nodes); do not claim real-time enterprise repository indexing.
 7. **Change Impact is Not Guaranteed**:
    - Do not claim: that the impact list is complete or guaranteed. Impact is a static estimate from code connections, and unresolved dynamic references or runtime reflection can hide more.
+8. **Public Repositories Only**:
+   - Do not claim: private repositories are supported. Ripple AI only imports public repositories by URL without authentication tokens or stored credentials.
 
 ---
 

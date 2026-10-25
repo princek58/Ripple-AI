@@ -137,6 +137,16 @@ const routes: RouteDef[] = [
     projectType: 'scanned',
     variantsOnly: [{ device: 'desktop', theme: 'light' }],
   },
+  {
+    slug: 'app-projects-upload-github-empty',
+    pathBuilder: () => '/app/projects',
+    projectType: 'scanned',
+  },
+  {
+    slug: 'app-projects-upload-github-invalid',
+    pathBuilder: () => '/app/projects',
+    projectType: 'scanned',
+  },
 ];
 
 interface VariantDef {
@@ -316,6 +326,36 @@ test.describe('Automated Visual QA Suite', () => {
             } catch (e) {
               console.warn(`[qa] Failed advancing to round 3:`, e);
             }
+          }
+        }
+
+        // GitHub URL import dialog captures (Step G1 Part 5)
+        if (
+          r.slug === 'app-projects-upload-github-empty' ||
+          r.slug === 'app-projects-upload-github-invalid'
+        ) {
+          const uploadBtn = page.locator('[data-testid="upload-project-header-button"]');
+          try {
+            await uploadBtn.waitFor({ state: 'visible', timeout: 8000 });
+            await uploadBtn.click();
+
+            const githubTab = page.locator('[data-testid="tab-github"]');
+            await githubTab.waitFor({ state: 'visible', timeout: 8000 });
+            await githubTab.click();
+
+            const githubInput = page.locator('[data-testid="github-url-input"]');
+            await githubInput.waitFor({ state: 'visible', timeout: 8000 });
+
+            if (r.slug === 'app-projects-upload-github-invalid') {
+              await githubInput.fill('https://github.com.evil.com/owner/repo');
+              const importBtn = page.locator('button:has-text("Import and scan")');
+              await importBtn.click();
+              await page.locator('[role="alert"]').waitFor({ state: 'visible', timeout: 8000 });
+            }
+
+            await page.waitForTimeout(400);
+          } catch (e) {
+            console.warn(`[qa] Failed opening GitHub upload dialog on ${r.slug}:`, e);
           }
         }
 

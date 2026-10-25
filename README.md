@@ -35,13 +35,21 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
   - Fix suggestions are never applied automatically to source files; approving a fix only writes a `.patch` file to `backend/storage/patches/`.
 - **Markdown analysis reports**: Generates comprehensive audit summaries in Markdown containing project statistics, findings tables, and notes.
 - **Template-based plain-language guidance**: Explanations and remediation tips in English and Hinglish are generated from static predefined templates; no AI or external large language models are used.
+- **Public GitHub repository import**:
+  - Direct URL import for public repositories (`https://github.com/<owner>/<repo>` with optional `.git` suffix, trailing slash, and `/tree/<branch>`).
+  - Downloads a ZIP archive copy directly to local storage via GitHub codeload without executing any code.
+  - Limits: 50 MB archive limit and 5,000 files limit.
+  - Public repositories only: private repositories are NOT supported (no tokens or credentials stored).
+  - Requires internet access; GitHub may refuse or throttle (HTTP 429).
+  - Offline fallback: if you have no internet or GitHub throttles the connection, download the ZIP archive from GitHub and use the "Upload ZIP" tab.
+  - Do not claim: private repositories are supported.
 
 ## What Phase 1 does NOT do
 
 - **No code execution**: Uploaded code is never executed, imported, or run in any runtime environment.
 - **No tests are run**: Test files are catalogued by the scanner but never executed. Nothing is ever marked "verified" by Phase 1.
 - **No test generation**: Phase 1 does not generate test suites or test files.
-- **No GitHub or CI/CD connection**: No repository webhooks, pull-request bots, GitHub Actions, or CI/CD pipeline integrations exist.
+- **No private GitHub repositories, webhooks, or CI/CD connection**: Only public GitHub repository URLs are supported. No private repositories, repository webhooks, pull-request bots, GitHub Actions, or CI/CD pipeline integrations exist. No personal access tokens or credentials are requested or stored. Do not claim: private repositories are supported.
 - **No AI explanations or LLM generation**: All explanations and remediation guidance are deterministic templates.
 - **No timeline or project memory**: The platform does not track revision history across git commits or remember past project scans.
 - **Language support**: Only JavaScript and TypeScript files are parsed for imports, calls, and AST structure; other files appear as plain file nodes. Python and other languages are not analyzed in Phase 1.
@@ -214,4 +222,4 @@ RippleAI/
 
 - **Phase 1**: Complete.
 - **Phase 2A (Change Impact)**: Complete.
-- **Test suite**: 521 tests passing across 51 test files (102 backend tests, 419 frontend tests, 0 failures, 4 skipped) as of 2026-10-26.
+- **Test suite**: 655 tests passing across 55 test files (176 backend tests, 479 frontend tests, 0 failures, 5 skipped) as of 2026-10-26.
