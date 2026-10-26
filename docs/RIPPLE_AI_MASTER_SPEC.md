@@ -10,7 +10,7 @@ Non-negotiable principles:
 2. Read-only by default. Never modify the uploaded project. Fixes are previews/diffs; applying needs explicit approval and writes a patch copy, never the original.
 3. Uploaded code is NEVER executed (Phase 1 executes nothing at all).
 4. Graph is built by static analysis only. AI never creates nodes or edges; AI only explains and suggests.
-5. Never expose secrets: report variable NAMES and file paths, never values.
+5. Never expose secrets: report variable NAMES and file paths, never values. In AI snippets, any secret-like pattern or 8+ character literal assignment drops the whole snippet completely (no redaction).
 6. No false guarantees: "verified" only with real evidence. No single health score; show verification coverage as counts.
 7. Severity, confidence and verification are three SEPARATE fields everywhere.
 8. Sample data must carry a visible "Sample data" tag.
@@ -71,7 +71,7 @@ RippleAI/
 - PUT /api/projects/:id/ai-settings -> { data: ProjectAISettings, error: null } (body: { ai_enabled?: boolean, share_code?: boolean, consent_version?: string | null }; ai_enabled: true requires consent_version === AI_CONSENT_VERSION else 400 AI_CONSENT_REQUIRED; share_code: true requires ai_enabled: true else 400 AI_CONSENT_REQUIRED; turning ai_enabled off sets share_code to false)
 - POST /api/projects/:id/chat -> { data: { text: string, source: "gemini" | "ai" | "saved", provider: string, model: string }, error: null }
   - Body (zod strict): message (string 1-1500), screen (enum: overview, projects, graph, investigations, fixes, tests, reports, landing, general), finding_id (UUID optional), node_id (UUID optional), fix_id (UUID optional), report_id (UUID optional), history (array <= 6 items { role: "user" | "assistant", text: string <= 1000 }), lang (optional "en" | "hi").
-  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 2000, context cap 6000 chars, individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true.
+  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 2000, context cap 6000 chars, individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true. Strict snippet rule: if any snippet line matches scanner secret patterns (private key headers, cloud keys) or an assignment of an 8+ character string literal to a name containing password, secret, token, api_key or apikey, the whole snippet is dropped (returns null); no [REDACTED] replacement.
   - Final error codes and HTTP statuses:
     - 400: Validation error / bad UUID / foreign entity mismatch / missing consent on enable (`AI_CONSENT_REQUIRED`)
     - 403: `AI_DISABLED [CONSENT_REQUIRED]` (when project AI switch is off)

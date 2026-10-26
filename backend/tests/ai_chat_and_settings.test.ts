@@ -233,7 +233,7 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
   });
 
   describe('Context Builder & Code Snippet Rules (7 lines window & redaction)', () => {
-    it('9. extractCodeSnippet extracts at most 7 lines around target and redacts secrets', () => {
+    it('9. extractCodeSnippet extracts at most 7 lines around target on clean code', () => {
       const testProj = 'test-proj-123';
       const filesDir = path.join(tempStorage, testProj, 'files');
       fs.mkdirSync(filesDir, { recursive: true });
@@ -242,7 +242,7 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
         'line 1: import os',
         'line 2: import sys',
         'line 3: const user = "admin";',
-        'line 4: const apiKey = "super-secret-token-12345";',
+        'line 4: const status = "active";',
         'line 5: function doWork() {',
         'line 6:   console.log("running");',
         'line 7: }',
@@ -260,14 +260,109 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
       const lines = snippet!.split('\n');
       expect(lines.length).toBeLessThanOrEqual(7);
       expect(lines[0]).toBe('2: line 2: import sys');
-      expect(snippet).not.toContain('super-secret-token-12345');
-      expect(snippet).toContain('[REDACTED]');
+      expect(snippet).not.toContain('[REDACTED]');
+    });
+
+    it('9a. extractCodeSnippet drops whole snippet for assignment format name = "x"', () => {
+      const testProj = 'test-proj-assign-double';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const fakeSecret = 'my_secret_' + 'token_12345';
+      const content = `const password = "${fakeSecret}";\nexport default password;\n`;
+      fs.writeFileSync(path.join(filesDir, 'auth.ts'), content, 'utf-8');
+
+      const snippet = extractCodeSnippet('auth.ts', 1, tempStorage, testProj);
+      expect(snippet).toBeNull();
+    });
+
+    it('9b. extractCodeSnippet drops whole snippet for assignment format name: "x"', () => {
+      const testProj = 'test-proj-assign-colon-double';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const fakeKey = 'super_secret_' + 'api_key_88';
+      const content = `const config = {\n  apiKey: "${fakeKey}"\n};\n`;
+      fs.writeFileSync(path.join(filesDir, 'config.ts'), content, 'utf-8');
+
+      const snippet = extractCodeSnippet('config.ts', 2, tempStorage, testProj);
+      expect(snippet).toBeNull();
+    });
+
+    it('9c. extractCodeSnippet drops whole snippet for assignment format name = \'x\'', () => {
+      const testProj = 'test-proj-assign-single';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const fakeToken = 'auth_token_' + 'abcdef999';
+      const content = `let token = '${fakeToken}';\nreturn token;\n`;
+      fs.writeFileSync(path.join(filesDir, 'token.ts'), content, 'utf-8');
+
+      const snippet = extractCodeSnippet('token.ts', 1, tempStorage, testProj);
+      expect(snippet).toBeNull();
+    });
+
+    it('9d. extractCodeSnippet drops whole snippet for assignment format name = `x`', () => {
+      const testProj = 'test-proj-assign-backtick';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const fakeSecret = 'template_secret_' + 'xyz123';
+      const content = `const secret = \`${fakeSecret}\`;\n`;
+      fs.writeFileSync(path.join(filesDir, 'key.ts'), content, 'utf-8');
+
+      const snippet = extractCodeSnippet('key.ts', 1, tempStorage, testProj);
+      expect(snippet).toBeNull();
+    });
+
+    it('9e. extractCodeSnippet drops whole snippet on benign line const apiKeyHeader = "x-api-key" with 9 character literal (dropping is accepted false positive)', () => {
+      const testProj = 'test-proj-benign-fp';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const content = `const apiKeyHeader = "x-api-key";\nexport default apiKeyHeader;\n`;
+      fs.writeFileSync(path.join(filesDir, 'headers.ts'), content, 'utf-8');
+
+      const snippet = extractCodeSnippet('headers.ts', 1, tempStorage, testProj);
+      expect(snippet).toBeNull();
+    });
+
+    it('9f. extractCodeSnippet does not drop snippet for process.env.TOKEN lookup or short/empty literals', () => {
+      const testProj = 'test-proj-env-short';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const content = [
+        'const token = process.env.TOKEN;',
+        'const secret = "short";',
+        'const password = "";',
+        'export { token, secret, password };',
+      ].join('\n');
+      fs.writeFileSync(path.join(filesDir, 'envLookup.ts'), content, 'utf-8');
+
+      const snippet = extractCodeSnippet('envLookup.ts', 1, tempStorage, testProj);
+      expect(snippet).not.toBeNull();
+      expect(snippet).toContain('process.env.TOKEN');
+      expect(snippet).toContain('"short"');
+    });
+
+    it('9g. extractCodeSnippet drops whole snippet when line contains private key header or cloud key shape', () => {
+      const testProj = 'test-proj-key-shapes';
+      const filesDir = path.join(tempStorage, testProj, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+
+      // Private key header (assembled at runtime)
+      const privHeader = '-----BEGIN ' + 'RSA PRIVATE KEY-----';
+      fs.writeFileSync(path.join(filesDir, 'priv.pem'), `// Key\n${privHeader}\n`, 'utf-8');
+      const snippetPriv = extractCodeSnippet('priv.pem', 2, tempStorage, testProj);
+      expect(snippetPriv).toBeNull();
+
+      // Cloud key shape (assembled at runtime)
+      const cloudKey = 'AKIA' + '1234567890ABCDEF';
+      fs.writeFileSync(path.join(filesDir, 'cloud.ts'), `const key = "${cloudKey}";\n`, 'utf-8');
+      const snippetCloud = extractCodeSnippet('cloud.ts', 1, tempStorage, testProj);
+      expect(snippetCloud).toBeNull();
     });
 
     it('10. extractCodeSnippet prevents path traversal attacks', () => {
       const testProj = 'test-proj-traversal';
       const filesDir = path.join(tempStorage, testProj, 'files');
       fs.mkdirSync(filesDir, { recursive: true });
+      fs.writeFileSync(path.join(tempStorage, 'secret.txt'), 'ROOT_SECRET_OUTSIDE_DIR\n', 'utf-8');
 
       const snippet = extractCodeSnippet('../../secret.txt', 1, tempStorage, testProj);
       expect(snippet).toBeNull();
@@ -516,6 +611,40 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
       expect(capturedPrompt).toContain('13: line 13');
       expect(capturedPrompt).not.toContain('6: line 6');
       expect(capturedPrompt).not.toContain('14: line 14');
+
+      spy.mockRestore();
+    });
+
+    it('20b. dropped snippet due to secret rule means chat prompt contains no code block at all on mock request', async () => {
+      const filesDir = path.join(tempStorage, projId, 'files', 'src');
+      fs.mkdirSync(filesDir, { recursive: true });
+      const fakeSecret = 'live_secret_' + 'token_123456';
+      const linesContent = [
+        'line 1: import express from "express";',
+        `line 2: const apiKey = "${fakeSecret}";`,
+        'line 3: export default apiKey;',
+      ].join('\n');
+      fs.writeFileSync(path.join(filesDir, 'main.ts'), linesContent, 'utf-8');
+
+      let capturedPrompt = '';
+      const mockAdapter = {
+        provider: 'gemini' as const,
+        generate: vi.fn().mockImplementation(async (req: any) => {
+          capturedPrompt = req.userPrompt;
+          return { text: 'analysis answer', provider: 'gemini' as const, model: 'gemini-1.5-flash' };
+        }),
+      };
+      const spy = vi.spyOn(aiServiceModule, 'createAIAdapter').mockReturnValue(mockAdapter);
+
+      updateProjectAISettings(projId, { ai_enabled: true, share_code: true, consent_version: AI_CONSENT_VERSION });
+      const res = await request(app)
+        .post(`/api/projects/${projId}/chat`)
+        .send({ message: 'Explain this finding', screen: 'investigations', finding_id: findingId });
+
+      expect(res.status).toBe(200);
+      expect(capturedPrompt).not.toContain('Code excerpt');
+      expect(capturedPrompt).not.toContain(fakeSecret);
+      expect(capturedPrompt).not.toContain('line 2:');
 
       spy.mockRestore();
     });

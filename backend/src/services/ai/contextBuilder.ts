@@ -5,6 +5,8 @@ import config from '../../config.js';
 import { FindingsRepository } from '../../db/findingsRepository.js';
 import { GraphRepository } from '../../db/graphRepository.js';
 
+import { PRIVATE_KEY_PATTERN, CLOUD_KEY_PATTERN } from '../../checks/secret_pattern.js';
+
 export interface FindingContext {
   findingId: string;
   projectId: string;
@@ -21,10 +23,20 @@ export interface FindingContext {
   codeSnippet: string | null;
 }
 
-const SECRET_PATTERN_REGEX = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})/i;
+/**
+ * Matches an assignment of a string literal of 8 or more characters to a name containing
+ * password, secret, token, api_key or apikey (case-insensitive).
+ * Formats: name = "x", name: "x", name = 'x', name = `x` (and name: 'x', name: `x`).
+ */
+export const SECRET_ASSIGNMENT_PATTERN =
+  /\b[a-zA-Z0-9_$]*(?:password|secret|token|api_?key)[a-zA-Z0-9_$]*\s*[:=]\s*(?:"[^"\r\n]{8,}"|'[^'\r\n]{8,}'|`[^`\r\n]{8,}`)/i;
 
 export function matchesSecretPattern(text: string): boolean {
-  return SECRET_PATTERN_REGEX.test(text);
+  return (
+    PRIVATE_KEY_PATTERN.test(text) ||
+    CLOUD_KEY_PATTERN.test(text) ||
+    SECRET_ASSIGNMENT_PATTERN.test(text)
+  );
 }
 
 /**
@@ -33,7 +45,9 @@ export function matchesSecretPattern(text: string): boolean {
  * Rules:
  * - Up to 7 lines (lineStart +/- 3)
  * - Never for sensitive, .env, binary or over-1-MB files or paths that escape backend/storage/<id>/files
- * - The whole snippet is dropped if any line matches a secret pattern.
+ * - The whole snippet is dropped (return null, never redacted) if ANY line matches the scanner's
+ *   secret patterns (private keys, cloud keys) or an assignment of an 8+ character string literal
+ *   to a name containing password/secret/token/api_key/apikey.
  */
 export function extractCodeSnippet(
   filePath: string,
@@ -87,13 +101,11 @@ export function extractCodeSnippet(
 
     const snippetLines: string[] = [];
     for (let i = startLine; i <= endLine; i++) {
-      let lineText = lines[i - 1] ?? '';
-      // If any line matches a secret pattern (e.g. private key or AWS access key), drop the entire snippet
+      const lineText = lines[i - 1] ?? '';
+      // If ANY returned line matches a secret pattern or secret assignment, drop the WHOLE snippet (return null)
       if (matchesSecretPattern(lineText)) {
         return null;
       }
-      // Redact credential-shaped tokens
-      lineText = lineText.replace(/(password|secret|api[_-]?key|token)\s*[:=]\s*['"][^'"]+['"]/gi, '$1="[REDACTED]"');
       snippetLines.push(`${i}: ${lineText}`);
     }
 

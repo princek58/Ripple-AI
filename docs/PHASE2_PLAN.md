@@ -4,7 +4,7 @@
 
 Phase 1 established the core foundation of Ripple AI: deterministic static AST analysis, multi-level dependency graphs (L1–L4), automated rule checks, scan history strip, template-based plain-language explanations, and visual QA testing across desktop and mobile viewports. In Phase 1, analysis is strictly static, read-only, and executes zero lines of uploaded user code.
 
-Phase 2 builds upon this foundation by introducing incremental capabilities one feature at a time. Every Phase 2 feature must be accompanied by thorough unit and integration test coverage, explicit boundary checks, and automated QA verification. Non-negotiable principles—evidence-first architecture, read-only guarantees, secret redaction, and deterministic static analysis—remain strictly enforced.
+Phase 2 builds upon this foundation by introducing incremental capabilities one feature at a time. Every Phase 2 feature must be accompanied by thorough unit and integration test coverage, explicit boundary checks, and automated QA verification. Non-negotiable principles—evidence-first architecture, read-only guarantees, secret protection (strict snippet drop), and deterministic static analysis—remain strictly enforced.
 
 ---
 

@@ -1,9 +1,9 @@
 import crypto from 'node:crypto';
 import type { CheckContext, CheckFinding } from './types.js';
 
-const PRIVATE_KEY_PATTERN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
-const CLOUD_KEY_PATTERN = /(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}/;
-const TOKEN_ASSIGNMENT_PATTERN = /(?:password|secret|token|api_key|apikey)\s*[:=]\s*['"][a-zA-Z0-9_\-\.]{16,}['"]/i;
+export const PRIVATE_KEY_PATTERN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
+export const CLOUD_KEY_PATTERN = /(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}/;
+export const TOKEN_ASSIGNMENT_PATTERN = /(?:password|secret|token|api_key|apikey)\s*[:=]\s*['"][a-zA-Z0-9_\-\.]{16,}['"]/i;
 
 const PLACEHOLDER_PATTERN = /(?:example|changeme|your_|your-|placeholder|dummy|xxx|<.*>|TODO)/i;
 
