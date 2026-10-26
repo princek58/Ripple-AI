@@ -388,3 +388,52 @@ export interface ImpactResult {
   notes: string[];
 }
 
+export type AIScreen =
+  | 'overview'
+  | 'projects'
+  | 'graph'
+  | 'investigations'
+  | 'fixes'
+  | 'tests'
+  | 'reports'
+  | 'landing'
+  | 'general';
+
+export interface ProjectAISettings {
+  ai_enabled: boolean;
+  share_code: boolean;
+  consent_version: string | null;
+  current_consent_version: string;
+  consent_text: string;
+}
+
+export interface AIStatusData {
+  configured: boolean;
+  provider: string;
+  model: string | null;
+}
+
+export interface AIChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface AIChatRequest {
+  message: string;
+  screen: AIScreen;
+  finding_id?: string;
+  node_id?: string;
+  fix_id?: string;
+  report_id?: string;
+  history?: AIChatMessage[];
+  lang?: 'en' | 'hi';
+}
+
+export interface AIChatResponseData {
+  text: string;
+  source: 'gemini' | 'openai' | 'ai' | 'saved';
+  provider: string;
+  model: string;
+}
+
+
