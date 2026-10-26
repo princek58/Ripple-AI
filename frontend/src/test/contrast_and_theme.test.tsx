@@ -154,6 +154,15 @@ describe('Contrast and Theme Integrity (Step 11c Part A)', () => {
       expect(pillBg).toBeTruthy();
       expect(pillText).toBeTruthy();
       expect(getContrastRatio(pillText, pillBg)).toBeGreaterThanOrEqual(4.5);
+
+      // 15. Chat Circle tokens (K2: icon against circle >= 3:1 in both themes)
+      const chatCircleBg = resolve(theme, '--chat-circle-bg');
+      const chatCircleFg = resolve(theme, '--chat-circle-fg');
+      const chatCircleRing = resolve(theme, '--chat-circle-ring');
+      expect(chatCircleBg).toBeTruthy();
+      expect(chatCircleFg).toBeTruthy();
+      expect(chatCircleRing).toBeTruthy();
+      expect(getContrastRatio(chatCircleFg, chatCircleBg)).toBeGreaterThanOrEqual(3.0);
     }
   });
 

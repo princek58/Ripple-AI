@@ -62,7 +62,11 @@ export interface ChatContextValue {
   }) => Promise<void>;
 }
 
-const ChatContext = createContext<ChatContextValue | null>(null);
+export const ChatContext = createContext<ChatContextValue | null>(null);
+
+export function useChatSafe(): ChatContextValue | null {
+  return useContext(ChatContext);
+}
 
 let msgCounter = 0;
 function uniqueMsgId(prefix: string): string {

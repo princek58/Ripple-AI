@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useChat } from './ChatProvider.js';
+import { useChatSafe } from './ChatProvider.js';
 import { useProjects } from '../../lib/projectContext.js';
 import { contextIdsFromUrl } from './urlHelpers.js';
 import { ChatSettings } from './ChatSettings.js';
@@ -90,6 +90,8 @@ function getScreenExamples(screen: string, lang: 'en' | 'hi'): string[] {
 }
 
 export const ChatPanel: React.FC = () => {
+  const chat = useChatSafe();
+  if (!chat) return null;
   const {
     isOpen,
     setIsOpen,
@@ -102,7 +104,7 @@ export const ChatPanel: React.FC = () => {
     sendMessage,
     stopRequest,
     retryLastMessage,
-  } = useChat();
+  } = chat;
 
   const { selectedProjectId } = useProjects();
   const location = useLocation();

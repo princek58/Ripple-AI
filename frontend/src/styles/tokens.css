@@ -60,6 +60,11 @@
   --diff-line-number: #475569;
   --diff-gutter-bg: #F1F5F9;
 
+  /* Chat Circle Tokens - Light Theme (contrast >= 3:1) */
+  --chat-circle-bg: #0B3B2C;
+  --chat-circle-fg: #F6F6F1;
+  --chat-circle-ring: #E3F57A;
+
   /* Typography */
   --font-space-grotesk: 'Space Grotesk', sans-serif;
   --font-inter: 'Inter', sans-serif;
@@ -107,6 +112,11 @@
   --diff-del-text: #FCA5A5;
   --diff-line-number: #94A3B8;
   --diff-gutter-bg: #1A2E26;
+
+  /* Chat Circle Tokens - Dark Theme (contrast >= 3:1) */
+  --chat-circle-bg: #E3F57A;
+  --chat-circle-fg: #0B3B2C;
+  --chat-circle-ring: #0B3B2C;
 }
 
 /* Native select & option elements styled with tokens for dark/light readability */
@@ -155,4 +165,32 @@ html {
     stroke-dashoffset: 0 !important;
   }
 }
+
+@keyframes chatRippleWave {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+.animate-chat-ripple-1 {
+  animation: chatRippleWave 1.2s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+.animate-chat-ripple-2 {
+  animation: chatRippleWave 1.2s cubic-bezier(0, 0, 0.2, 1) 0.3s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-chat-ripple-1,
+  .animate-chat-ripple-2 {
+    animation: none !important;
+    display: none !important;
+  }
+}
+
 

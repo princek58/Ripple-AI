@@ -74,6 +74,11 @@ export default {
           'most-affected-bg': 'var(--pill-most-affected-bg)',
           'most-affected-text': 'var(--pill-most-affected-text)',
         },
+        'chat-circle': {
+          bg: 'var(--chat-circle-bg)',
+          fg: 'var(--chat-circle-fg)',
+          ring: 'var(--chat-circle-ring)',
+        },
       },
       fontFamily: {
         heading: ['var(--font-space-grotesk)', 'sans-serif'],

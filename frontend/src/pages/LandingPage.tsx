@@ -12,6 +12,7 @@ import {
   Footer,
 } from '../features/landing/index.js';
 import { usePrefersReducedMotion } from '../lib/usePrefersReducedMotion.js';
+import { ChatCircle, ChatPanel } from '../features/chat/index.js';
 
 export const LandingPage: React.FC = () => {
   const reducedMotion = usePrefersReducedMotion();
@@ -49,6 +50,10 @@ export const LandingPage: React.FC = () => {
 
       {/* 10. Footer */}
       <Footer />
+
+      {/* Ripple AI Chat */}
+      <ChatCircle />
+      <ChatPanel />
     </div>
   );
 };

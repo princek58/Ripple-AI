@@ -4,6 +4,7 @@ import { Search, Bell, Layers } from 'lucide-react';
 import { TopPillNav } from './TopPillNav.js';
 import { ProjectSwitcher } from './ProjectSwitcher.js';
 import { ThemeToggle } from '../../lib/theme.js';
+import { ChatCircle, ChatPanel } from '../../features/chat/index.js';
 
 export const AppShell: React.FC = () => {
   return (
@@ -86,6 +87,10 @@ export const AppShell: React.FC = () => {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Outlet />
       </main>
+
+      {/* Ripple AI Chat */}
+      <ChatCircle />
+      <ChatPanel />
     </div>
   );
 };
