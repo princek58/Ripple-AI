@@ -5,6 +5,7 @@ import projectsRouter from './routes/projects.js';
 import findingsRouter from './routes/findings.js';
 import fixesRouter from './routes/fixes.js';
 import reportsRouter from './routes/reports.js';
+import aiRouter from './routes/ai.js';
 import { notFoundHandler, errorHandler } from './utils/errors.js';
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api', projectsRouter);
 app.use('/api', findingsRouter);
 app.use('/api', fixesRouter);
 app.use('/api', reportsRouter);
+app.use('/api', aiRouter);
 
 // 404 Handler for undefined routes
 app.use(notFoundHandler);
