@@ -63,6 +63,7 @@ export const ChatCircle: React.FC = () => {
 
       <button
         id="ripple-chat-circle"
+        data-testid="chat-circle-button"
         type="button"
         onClick={toggleOpen}
         aria-label={accessibleName}

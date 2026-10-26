@@ -53,6 +53,21 @@ export interface SvgOverlapIssue {
   description: string;
 }
 
+export interface ChatCircleCheckResult {
+  found: boolean;
+  insideViewport: boolean;
+  overlapsInteractive: boolean;
+  overlappingElements: string[];
+  valid: boolean;
+}
+
+export interface ChatPanelCheckResult {
+  found: boolean;
+  noHorizontalOverflow: boolean;
+  inputReachable: boolean;
+  valid: boolean;
+}
+
 export interface PageCheckResult {
   consoleErrors: string[];
   pageErrors: string[];
@@ -78,6 +93,8 @@ export interface PageCheckResult {
   landingCounters?: LandingCountersResult;
   miniGraphCheck?: MiniGraphCheckResult;
   impactCheck?: ImpactCheckResult;
+  chatCircleCheck?: ChatCircleCheckResult;
+  chatPanelCheck?: ChatPanelCheckResult;
 }
 
 export function setupPageCheckListeners(page: Page) {
@@ -669,6 +686,102 @@ export async function runPageChecks(
       }
     }
 
+    // (5) Chat Circle Check
+    let chatCircleCheck: ChatCircleCheckResult | undefined = undefined;
+    const circleBtn = (document.querySelector('[data-testid="chat-circle-button"]') ||
+      document.querySelector('button[aria-label*="Ripple AI chat"]')) as HTMLElement | null;
+
+    if (circleBtn) {
+      const b = circleBtn.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const insideViewport =
+        b.top >= -1 && b.left >= -1 && b.right <= vw + 1 && b.bottom <= vh + 1 && b.width > 0 && b.height > 0;
+
+      // Check overlap against other interactive elements
+      const interactiveEls = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          'button, a[href], input, select, textarea, [role="button"]'
+        )
+      );
+
+      const overlappingElements: string[] = [];
+      for (const el of interactiveEls) {
+        if (el === circleBtn || circleBtn.contains(el) || el.contains(circleBtn)) continue;
+        const panelEl = document.querySelector('[data-testid="chat-panel"]');
+        if (panelEl && panelEl.contains(el)) continue;
+
+        // Skip graph canvas nodes and table/list cards in background scroll flow
+        if (el.closest('.react-flow__node') || el.classList.contains('react-flow__node')) continue;
+        if (el.closest('[data-testid^="finding-row"]') || el.getAttribute('data-testid')?.startsWith('finding-row')) continue;
+
+        const s = window.getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') continue;
+
+        const o = el.getBoundingClientRect();
+        if (o.width <= 0 || o.height <= 0) continue;
+
+        const oX = Math.min(b.right, o.right) - Math.max(b.left, o.left);
+        const oY = Math.min(b.bottom, o.bottom) - Math.max(b.top, o.top);
+
+        if (oX > 2 && oY > 2) {
+          const desc =
+            el.getAttribute('aria-label') || el.getAttribute('data-testid') || el.id || el.tagName.toLowerCase();
+          overlappingElements.push(`${desc} (${Math.round(oX)}x${Math.round(oY)}px)`);
+        }
+      }
+
+      chatCircleCheck = {
+        found: true,
+        insideViewport,
+        overlapsInteractive: overlappingElements.length > 0,
+        overlappingElements,
+        valid: insideViewport && overlappingElements.length === 0,
+      };
+    }
+
+    // (6) Chat Panel Check (when open)
+    let chatPanelCheck: ChatPanelCheckResult | undefined = undefined;
+    const panel = document.querySelector('[data-testid="chat-panel"]') as HTMLElement | null;
+    if (panel) {
+      const pRect = panel.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const panelVisible = pRect.width > 0 && pRect.height > 0;
+
+      const noHorizontalOverflow =
+        !isPhoneViewport || (pRect.right <= vw + 1 && panel.scrollWidth <= panel.clientWidth + 1);
+
+      const isSettingsOpen = Boolean(panel.querySelector('[data-testid="chat-settings-section"]'));
+
+      const inputEl = (panel.querySelector('[data-testid="chat-input"]') ||
+        panel.querySelector('textarea')) as HTMLElement | null;
+
+      let inputReachable = false;
+      if (isSettingsOpen) {
+        inputReachable = true;
+      } else if (inputEl) {
+        const iRect = inputEl.getBoundingClientRect();
+        const s = window.getComputedStyle(inputEl);
+        inputReachable =
+          s.display !== 'none' &&
+          s.visibility !== 'hidden' &&
+          iRect.width > 0 &&
+          iRect.height > 0 &&
+          iRect.top >= 0 &&
+          iRect.left >= 0 &&
+          iRect.bottom <= vh + 1 &&
+          iRect.right <= vw + 1;
+      }
+
+      chatPanelCheck = {
+        found: true,
+        noHorizontalOverflow,
+        inputReachable,
+        valid: panelVisible && noHorizontalOverflow && inputReachable,
+      };
+    }
+
     return {
       horizontalOverflow: hasHorizontalOverflow,
       scrollWidth: scrollW,
@@ -687,6 +800,8 @@ export async function runPageChecks(
       landingCounters,
       miniGraphCheck,
       impactCheck,
+      chatCircleCheck,
+      chatPanelCheck,
     };
   }, { isApp: isAppRoute, isPhoneViewport: isPhone });
 
@@ -708,5 +823,7 @@ export async function runPageChecks(
     landingCounters: domResult.landingCounters,
     miniGraphCheck: domResult.miniGraphCheck,
     impactCheck: domResult.impactCheck,
+    chatCircleCheck: domResult.chatCircleCheck,
+    chatPanelCheck: domResult.chatPanelCheck,
   };
 }

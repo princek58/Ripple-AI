@@ -54,17 +54,19 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
 - **No timeline or project memory**: The platform does not track revision history across git commits or remember past project scans.
 - **Language support**: Only JavaScript and TypeScript files are parsed for imports, calls, and AST structure; other files appear as plain file nodes. Python and other languages are not analyzed in Phase 1.
 
-## Ripple AI chat (backend)
+## Ripple AI chat
 
-The chat backend provides interactive, conversational assistance powered by external AI services (Gemini or OpenAI-compatible models):
+The Ripple AI chatbox provides on-screen assistance with instant offline architectural help and optional external AI:
 
-- **Off by default and per project**: Every project starts with AI disabled (`ai_enabled: false`). Enabling it requires explicit user consent per project.
-- **What is sent**: Only the user question and structured metadata about the active screen and selected entities (rule identifier, severity, relative file path, line numbers). Code lines (up to a 7-line window around the cited line) are sent only when the project's code-sharing switch (`share_code`) is explicitly turned on.
+- **What the user sees**: An original round floating button (56 px) at the bottom-right of every screen with an "Ask Ripple AI" pill label on desktop. Clicking opens a focused chatbox (floating panel on desktop, full-screen on mobile) with screen-specific suggestions, En/Hinglish language toggle, message history, and settings controls.
+- **Offline help always works**: Matches architectural terms (37 glossary entries) and findings immediately from local rule guidance. Never requires an API key, internet access, or running backend AI services. Clearly labeled as "Offline help" and never claimed as AI.
+- **AI is off by default per project**: Every project starts with AI disabled (`ai_enabled: false`). Enabling it requires explicit user consent per project through the in-panel Chat settings.
+- **What is sent**: Only the user prompt, screen context, and selected entity identifiers (finding, node, or fix UUIDs). Code lines (up to a 7-line window around the cited line) are sent only when the project's code-sharing switch (`share_code`) is explicitly turned on.
 - **What is never sent**: The whole file, environment values (`.env` contents), secret tokens or credential patterns, and project names are never sent to external AI providers.
 - **Free-tier privacy warning**: Free tiers of third-party AI services may use submitted text to train models and human reviewers may read it. Never enable AI for sensitive, proprietary, or unowned source code.
+- **The circle on every screen**: Fixed at the bottom right across all 7 app screens and the landing page, with safe margins avoiding primary controls and automatic raising when the Impact view is active.
+- **Session-only history**: Messages are kept in memory for the active browser session only; switching projects or reloading clears the conversation. Nothing is stored on disk or in the database.
 - **Requires your own API key in `backend/.env`**: Supported variable names (names only, never commit keys): `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_API_BASE`, or the fallbacks `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_BASE`.
-- **Offline fallback**: If AI is unconfigured or unreachable, the system falls back to offline template explanations without failure.
-- **Not visible in the screens yet**: The chat interface UI is developed in Step K2; the backend endpoints (`/api/projects/:id/ai-settings` and `/api/projects/:id/chat`) are fully tested and functional.
 
 ## Quick start for non-developers
 
@@ -239,5 +241,6 @@ RippleAI/
 - **Phase 1**: Complete.
 - **Phase 2A (Change Impact)**: Complete.
 - **Step K1c (Chat Backend)**: Complete.
-- **Test suite**: 714 tests passing across 55 test files (235 backend tests, 479 frontend tests, 0 failures, 5 skipped) as of 2026-10-26.
+- **Step K2 (Chatbox UI)**: Complete.
+- **Test suite**: 832 tests passing across 61 test files (235 backend tests, 597 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
 

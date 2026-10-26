@@ -220,6 +220,7 @@ export const ChatPanel: React.FC = () => {
     <div
       ref={panelRef}
       id="ripple-chat-panel"
+      data-testid="chat-panel"
       role="dialog"
       aria-label="Ripple AI chat"
       onKeyDown={handlePanelKeyDown}
@@ -422,6 +423,7 @@ export const ChatPanel: React.FC = () => {
             <div className="relative rounded-xl border border-theme-border bg-theme-surface-active/30 focus-within:ring-1 focus-within:ring-theme-primary focus-within:border-theme-primary transition-all">
               <textarea
                 ref={inputRef}
+                data-testid="chat-input"
                 value={input}
                 maxLength={1500}
                 disabled={busy}
@@ -454,6 +456,7 @@ export const ChatPanel: React.FC = () => {
                   ) : (
                     <button
                       type="button"
+                      data-testid="chat-send-btn"
                       disabled={!input.trim()}
                       onClick={handleSend}
                       className="px-3 py-1 text-xs font-medium rounded-lg bg-theme-primary text-theme-surface hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"

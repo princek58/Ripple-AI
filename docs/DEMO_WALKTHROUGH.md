@@ -80,6 +80,17 @@ This guide is designed for a non-technical presenter or product specialist demon
 - **What to Say**:
   > *"Ripple AI proposes safe, deterministic diffs that are never applied automatically, and every generated audit report includes a mandatory 'What was not checked' section for absolute honesty."*
 
+### Step 7: Ripple AI Chat (Circle Button, Offline Help & Per-Project AI)
+- **Exact Action**:
+  - Open the circle, ask 'circular dependency kya hai', then turn on AI only for the demo project.
+  - Notice the instant welcome card with clickable architectural questions.
+  - Observe the instant offline glossary explanation with the clear "Offline help" badge.
+  - Open the in-panel Chat settings (gear icon) and review the consent text before enabling external AI.
+- **What to Say**:
+  > *"The Ripple AI chat is accessible on every screen. Offline architectural help works immediately without any external services or API keys. External AI is strictly opt-in per project, requiring explicit user consent."*
+- **Important**:
+  - Do not claim: the chat is always AI-powered or always correct.
+
 ---
 
 ## What NOT to Claim ("Do Not Claim")
@@ -102,6 +113,8 @@ To maintain complete credibility, never make any of the following claims during 
    - Do not claim: that the impact list is complete or guaranteed. Impact is a static estimate from code connections, and unresolved dynamic references or runtime reflection can hide more.
 8. **Public Repositories Only**:
    - Do not claim: private repositories are supported. Ripple AI only imports public repositories by URL without authentication tokens or stored credentials.
+9. **Chat Accuracy and AI Claims**:
+   - Do not claim: the chat is always AI-powered or always correct. Offline help answers are rule-based glossary explanations, and external AI responses are unverified by Ripple and may contain errors.
 
 ---
 

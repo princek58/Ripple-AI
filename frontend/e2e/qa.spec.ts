@@ -147,6 +147,22 @@ const routes: RouteDef[] = [
     pathBuilder: () => '/app/projects',
     projectType: 'scanned',
   },
+  // Ripple AI Chat captures (Step K2 Part 4)
+  {
+    slug: 'app-chat-welcome',
+    pathBuilder: () => '/app/overview',
+    projectType: 'scanned',
+  },
+  {
+    slug: 'app-chat-answer',
+    pathBuilder: () => '/app/overview',
+    projectType: 'scanned',
+  },
+  {
+    slug: 'app-chat-settings',
+    pathBuilder: () => '/app/overview',
+    projectType: 'scanned',
+  },
 ];
 
 interface VariantDef {
@@ -359,6 +375,40 @@ test.describe('Automated Visual QA Suite', () => {
           }
         }
 
+        // Ripple AI Chat captures (Step K2 Part 4)
+        if (
+          r.slug === 'app-chat-welcome' ||
+          r.slug === 'app-chat-answer' ||
+          r.slug === 'app-chat-settings'
+        ) {
+          const circleBtn = page.locator('[data-testid="chat-circle-button"]');
+          try {
+            await circleBtn.waitFor({ state: 'visible', timeout: 8000 });
+            await circleBtn.click();
+            const panel = page.locator('[data-testid="chat-panel"]');
+            await panel.waitFor({ state: 'visible', timeout: 8000 });
+            await page.waitForTimeout(400);
+
+            if (r.slug === 'app-chat-answer') {
+              const input = page.locator('[data-testid="chat-input"]');
+              await input.waitFor({ state: 'visible', timeout: 5000 });
+              await input.fill('circular dependency kya hai');
+              const sendBtn = page.locator('[data-testid="chat-send-btn"]');
+              await sendBtn.click();
+              await page.locator('text=Offline help').first().waitFor({ state: 'visible', timeout: 8000 });
+              await page.waitForTimeout(400);
+            } else if (r.slug === 'app-chat-settings') {
+              const settingsBtn = page.locator('button[aria-label="Chat settings"]');
+              await settingsBtn.waitFor({ state: 'visible', timeout: 5000 });
+              await settingsBtn.click();
+              await page.locator('[data-testid="chat-settings-section"]').waitFor({ state: 'visible', timeout: 5000 });
+              await page.waitForTimeout(400);
+            }
+          } catch (e) {
+            console.warn(`[qa] Failed interacting with chat panel on ${r.slug}:`, e);
+          }
+        }
+
         await page.screenshot({ path: screenshotFilePath, fullPage: true });
 
         const checkResult = await runPageChecks(page, isAppRoute, v.device === 'phone', listeners);
@@ -400,6 +450,29 @@ test.describe('Automated Visual QA Suite', () => {
           }
         }
 
+        // Automated check assertion for Chat Circle and Panel (Step K2 Part 4 Item 10)
+        if (checkResult.chatCircleCheck && checkResult.chatCircleCheck.found) {
+          if (!checkResult.chatCircleCheck.insideViewport) {
+            throw new Error(`[qa-check-fail] chat circle is outside viewport on ${fileKey}`);
+          }
+          if (checkResult.chatCircleCheck.overlapsInteractive) {
+            throw new Error(
+              `[qa-check-fail] chat circle overlaps interactive element(s) on ${fileKey}: ${checkResult.chatCircleCheck.overlappingElements.join(
+                ', '
+              )}`
+            );
+          }
+        }
+
+        if (checkResult.chatPanelCheck && checkResult.chatPanelCheck.found) {
+          if (v.device === 'phone' && !checkResult.chatPanelCheck.noHorizontalOverflow) {
+            throw new Error(`[qa-check-fail] chat panel has horizontal overflow on phone for ${fileKey}`);
+          }
+          if (!checkResult.chatPanelCheck.inputReachable) {
+            throw new Error(`[qa-check-fail] chat input is not reachable on ${fileKey}`);
+          }
+        }
+
         allChecks[fileKey] = {
           file: screenshotFileName,
           route: targetPath,
@@ -408,9 +481,8 @@ test.describe('Automated Visual QA Suite', () => {
           isAppRoute,
           ...checkResult,
         };
+        fs.writeFileSync(checksJsonPath, JSON.stringify(allChecks, null, 2), 'utf8');
       }
-
-      fs.writeFileSync(checksJsonPath, JSON.stringify(allChecks, null, 2), 'utf8');
     });
   }
 });

@@ -45,5 +45,8 @@ This document tracks known limitations, technical debt, security advisories, and
 | **K-05** | Database Schema | Old global ai_settings table is unused, remove later in a future migration cleanup. | Minor | Open |
 | **K-06** | AI Model Discovery | Google retires model ids for new accounts; the configured model id must be re-checked (see K1c script idea) when chat returns AI_MODEL_NOT_FOUND | Minor | Open |
 | **K-07** | Code Snippets | snippets with any secret-like assignment are dropped completely, accepting false positives | Minor | Open |
+| **K-08** | AI Chat | Chat history is not saved; client session is ephemeral and clears on refresh or project switch. | Minor | Open |
+| **K-09** | Demo Quality | Demo saved answers for offline walkthrough are planned in K3. | Minor | Open |
+| **K-10** | AI Reliability | AI answers depend on a free preview model that may be unavailable or rate limited. | Minor | Open |
 
 

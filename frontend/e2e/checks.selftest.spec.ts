@@ -384,4 +384,103 @@ test.describe('Automated Checks Self-Test', () => {
 
     expect(result.svgOverlaps).toHaveLength(0);
   });
+
+  test('proves that automated checks detect chat circle and chat panel defects (circle overlap, circle out of viewport, panel horizontal overflow, unreachable input)', async ({
+    page,
+  }) => {
+    const listeners = setupPageCheckListeners(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // 1. Defect: Circle overlapping another interactive button
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Circle Overlap Probe</title></head>
+        <body style="margin: 0; position: relative;">
+          <button id="primary-action-btn" style="position: fixed; right: 16px; bottom: 16px; width: 60px; height: 60px;">Action</button>
+          <button data-testid="chat-circle-button" aria-label="Open Ripple AI chat" style="position: fixed; right: 16px; bottom: 16px; width: 56px; height: 56px;">Chat</button>
+        </body>
+      </html>
+    `);
+
+    const overlapResult = await runPageChecks(page, true, true, listeners);
+    expect(overlapResult.chatCircleCheck).toBeDefined();
+    expect(overlapResult.chatCircleCheck?.found).toBe(true);
+    expect(overlapResult.chatCircleCheck?.overlapsInteractive).toBe(true);
+    expect(overlapResult.chatCircleCheck?.valid).toBe(false);
+
+    // 2. Defect: Circle out of viewport
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Circle Viewport Probe</title></head>
+        <body style="margin: 0; position: relative;">
+          <button data-testid="chat-circle-button" aria-label="Open Ripple AI chat" style="position: fixed; right: -50px; bottom: 16px; width: 56px; height: 56px;">Chat</button>
+        </body>
+      </html>
+    `);
+
+    const outViewportResult = await runPageChecks(page, true, true, listeners);
+    expect(outViewportResult.chatCircleCheck).toBeDefined();
+    expect(outViewportResult.chatCircleCheck?.insideViewport).toBe(false);
+    expect(outViewportResult.chatCircleCheck?.valid).toBe(false);
+
+    // 3. Defect: Chat panel with horizontal overflow on mobile
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Panel Overflow Probe</title></head>
+        <body style="margin: 0; position: relative;">
+          <div data-testid="chat-panel" style="position: fixed; inset: 0; width: 450px; overflow-x: auto;">
+            <div style="width: 500px; height: 100px;">Wide Content</div>
+            <textarea data-testid="chat-input" style="width: 100%; height: 40px;"></textarea>
+          </div>
+        </body>
+      </html>
+    `);
+
+    const panelOverflowResult = await runPageChecks(page, true, true, listeners);
+    expect(panelOverflowResult.chatPanelCheck).toBeDefined();
+    expect(panelOverflowResult.chatPanelCheck?.found).toBe(true);
+    expect(panelOverflowResult.chatPanelCheck?.noHorizontalOverflow).toBe(false);
+    expect(panelOverflowResult.chatPanelCheck?.valid).toBe(false);
+
+    // 4. Defect: Chat panel with unreachable input (e.g. display: none)
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Panel Unreachable Input Probe</title></head>
+        <body style="margin: 0; position: relative;">
+          <div data-testid="chat-panel" style="position: fixed; inset: 0; width: 390px;">
+            <textarea data-testid="chat-input" style="display: none;"></textarea>
+          </div>
+        </body>
+      </html>
+    `);
+
+    const unreachableResult = await runPageChecks(page, true, true, listeners);
+    expect(unreachableResult.chatPanelCheck).toBeDefined();
+    expect(unreachableResult.chatPanelCheck?.found).toBe(true);
+    expect(unreachableResult.chatPanelCheck?.inputReachable).toBe(false);
+    expect(unreachableResult.chatPanelCheck?.valid).toBe(false);
+
+    // 5. Clean / Valid circle and panel
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Clean Circle and Panel</title></head>
+        <body style="margin: 0; position: relative;">
+          <div data-testid="chat-panel" style="position: fixed; inset: 0; width: 390px; height: 844px; overflow: hidden;">
+            <textarea data-testid="chat-input" style="position: absolute; bottom: 16px; left: 16px; width: 358px; height: 40px;"></textarea>
+          </div>
+          <button data-testid="chat-circle-button" aria-label="Close Ripple AI chat" style="position: fixed; right: 16px; bottom: 16px; width: 56px; height: 56px;">Chat</button>
+        </body>
+      </html>
+    `);
+
+    const cleanResult = await runPageChecks(page, true, true, listeners);
+    expect(cleanResult.chatCircleCheck?.valid).toBe(true);
+    expect(cleanResult.chatPanelCheck?.valid).toBe(true);
+  });
 });
