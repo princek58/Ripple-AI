@@ -1,6 +1,24 @@
 // Chat feature – public API surface
 export { screenFromPath, contextIdsFromUrl } from './urlHelpers.js';
 export { chatErrorMessage } from './errorMessages.js';
-export { GLOSSARY, offlineAnswer } from './glossary.js';
+export { GLOSSARY, offlineAnswer, hasGlossaryMatch, matchGlossaryEntries } from './glossary.js';
 export { trimHistory } from './trimHistory.js';
-export type { ChatScreen, ContextIds, ChatLang, HistoryEntry } from './types.js';
+export { ChatProvider, useChat } from './ChatProvider.js';
+export type { ChatMessage, ChatContextValue } from './ChatProvider.js';
+export { ChatPanel } from './ChatPanel.js';
+export { ChatSettings } from './ChatSettings.js';
+export {
+  fetchAiStatus,
+  fetchProjectAiSettings,
+  putProjectAiSettings,
+  postChatMessage,
+} from './chatApi.js';
+export type {
+  ChatScreen,
+  ContextIds,
+  ChatLang,
+  HistoryEntry,
+  AiStatusData,
+  ProjectAiSettings,
+  ChatResponseData,
+} from './types.js';

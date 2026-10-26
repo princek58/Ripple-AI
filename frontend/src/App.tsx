@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './lib/theme.js';
 import { ProjectProvider } from './lib/projectContext.js';
+import { ChatProvider } from './features/chat/ChatProvider.js';
 import { AppShell } from './components/layout/AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
 import { OverviewPage } from './features/overview/OverviewPage.js';
@@ -21,7 +22,8 @@ const ReportsPage = React.lazy(() => import('./features/reports/ReportsPage.js')
 export function AppRoutes() {
   return (
     <ProjectProvider>
-      <Routes>
+      <ChatProvider>
+        <Routes>
         {/* Landing Page */}
         <Route path="/" element={<LandingPage />} />
 
@@ -113,7 +115,8 @@ export function AppRoutes() {
         {/* 404 Not Found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </ProjectProvider>
+    </ChatProvider>
+  </ProjectProvider>
   );
 }
 

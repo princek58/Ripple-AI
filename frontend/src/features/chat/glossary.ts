@@ -417,11 +417,15 @@ const searchIndex: Array<{ entry: GlossaryEntry; keys: string[] }> = GLOSSARY.ma
  * Find glossary entries that match the question text.
  * Matching: any key is a substring of the lowercased question.
  */
-function matchGlossaryEntries(question: string): GlossaryEntry[] {
+export function matchGlossaryEntries(question: string): GlossaryEntry[] {
   const q = question.toLowerCase();
   return searchIndex
     .filter(({ keys }) => keys.some((k) => q.includes(k)))
     .map(({ entry }) => entry);
+}
+
+export function hasGlossaryMatch(question: string): boolean {
+  return matchGlossaryEntries(question).length > 0;
 }
 
 /**
