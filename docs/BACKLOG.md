@@ -38,4 +38,10 @@ This document tracks known limitations, technical debt, security advisories, and
 | **B-21** | Localization | Impact text has no Hinglish version yet (the chatbox will explain in Hinglish). | Minor | Open |
 | **B-22** | QA Methodology | Overview L1 card: the earlier AI QA marked it OK; the overlap check did not cover SVG cards; fixed in UI-1; keep the SVG check in QA | Minor | Open |
 | **B-23** | QA Methodology | AI review of screenshots misses small overlaps; human screenshots remain necessary | Minor | Open |
+| **K-01** | AI Chat | Chat history is not saved on the server; client maintains ephemeral session context up to 6 messages. | Minor | Open |
+| **K-02** | Rate Limiting | The rate limit is in memory and resets on restart; single-process deployment assumption. | Minor | Open |
+| **K-03** | AI Providers | Only Gemini and OpenAI-compatible providers are supported; additional LLM backends require custom adapters. | Minor | Open |
+| **K-04** | AI Reliability | Answers come from a model and may be wrong; static analysis evidence remains authoritative source of truth. | Minor | Open |
+| **K-05** | Database Schema | Old global ai_settings table is unused, remove later in a future migration cleanup. | Minor | Open |
+
 

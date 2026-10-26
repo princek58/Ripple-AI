@@ -49,8 +49,11 @@ RippleAI/
 - fixes(id, finding_id, diff_text, files_json, status, approved_at) status: proposed | approved | rejected
 - test_runs(id, project_id, scan_id, name, status, created_at) status: pass | fail | skipped | not_run (Phase 1: everything not_run)
 - reports(id, project_id, created_at, markdown)
+- project_ai_settings(project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE, ai_enabled INTEGER NOT NULL DEFAULT 0, share_code INTEGER NOT NULL DEFAULT 0, consent_version TEXT, updated_at TEXT)
+- ai_cache(cache_key TEXT PRIMARY KEY, response_text TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL)
+- Note: old global ai_settings table is unused and retained for backward migration compatibility (Backlog K-05).
 
-## 5. Backend API (Phase 1)
+## 5. Backend API (Phase 1 & AI Backend)
 - GET /api/health
 - POST /api/projects (multipart ZIP) · POST /api/projects/import-github (JSON { url }) · GET /api/projects · GET /api/projects/:id · DELETE /api/projects/:id · GET /api/projects/:id/files?page=1&pageSize=50&q= -> { items: [{ id, path, size, language, sensitive }], page, pageSize, total }
 - POST /api/projects/:id/scan -> { data: Scan, error } · GET /api/projects/:id/scans -> { data: Scan[], error } (newest first)
@@ -63,11 +66,47 @@ RippleAI/
 - GET /api/projects/:id/tests -> { data: { items: [{ id, name, status }], counts: { pass, fail, skipped, not_run }, note }, error }
 - POST /api/projects/:id/reports -> { data: Report, error } (fails with 409 SCAN_REQUIRED if project has no analysis scan; scanned project with 0 findings still produces a report) · GET /api/projects/:id/reports?page=1&pageSize=25 -> { data: { items: [{ id, project_id, created_at }], total, page, pageSize }, error } (newest first, without markdown, zod validated, bad values return 400) · GET /api/reports/:id?format=md -> JSON or raw Markdown
 - GET /api/projects/:id/impact?node=<nodeId>&depth=<n>&maxNodes=<n> -> { data: ImpactResult, error } (zod validated; depth 1-10 default 10, maxNodes default 300 hard max 500; unknown project or node gives 404; foreign project node gives 404; module node gives 400 IMPACT_NODE_UNSUPPORTED; never-scanned project gives 409 SCAN_REQUIRED; returns start, affected, counts, by_module, tests_to_review, truncated, unresolved_nearby, notes)
+- GET /api/ai/status -> { data: { configured: boolean, provider: "gemini" | "openai_compatible", model: string | null }, error: null } (never returns keys)
+- GET /api/projects/:id/ai-settings -> { data: { ai_enabled: boolean, share_code: boolean, consent_version: string | null, current_consent_version: string, consent_text: string }, error: null }
+- PUT /api/projects/:id/ai-settings -> { data: ProjectAISettings, error: null } (body: { ai_enabled?: boolean, share_code?: boolean, consent_version?: string | null }; ai_enabled: true requires consent_version === AI_CONSENT_VERSION else 400 AI_CONSENT_REQUIRED; share_code: true requires ai_enabled: true else 400 AI_CONSENT_REQUIRED; turning ai_enabled off sets share_code to false)
+- POST /api/projects/:id/chat -> { data: { text: string, source: "gemini" | "ai" | "saved", provider: string, model: string }, error: null }
+  - Body (zod strict): message (string 1-1500), screen (enum: overview, projects, graph, investigations, fixes, tests, reports, landing, general), finding_id (UUID optional), node_id (UUID optional), fix_id (UUID optional), report_id (UUID optional), history (array <= 6 items { role: "user" | "assistant", text: string <= 1000 }), lang (optional "en" | "hi").
+  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 2000, context cap 6000 chars, individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true.
+  - Final error codes and HTTP statuses:
+    - 400: Validation error / bad UUID / foreign entity mismatch / missing consent on enable (`AI_CONSENT_REQUIRED`)
+    - 403: `AI_DISABLED [CONSENT_REQUIRED]` (when project AI switch is off)
+    - 404: Unknown project or foreign entity ID not belonging to project
+    - 429: `AI_RATE_LIMITED [LOCAL_LIMIT_EXCEEDED]` (local in-memory limiter with `Retry-After` header)
+    - 429: `AI_QUOTA_EXHAUSTED [<UPSTREAM_REASON>]` (upstream provider 429 quota exhaustion)
+    - 503: `AI_NOT_CONFIGURED` (no API key configured in backend/.env)
+    - Upstream adapter error mappings:
+      - `AI_REQUEST_REJECTED` (upstream 400 / 401 / 403)
+      - `AI_AUTH_FAILED` (upstream authentication failure)
+      - `AI_MODEL_NOT_FOUND` (upstream 404)
+      - `AI_UNAVAILABLE` (upstream 5xx)
+      - `AI_UNREACHABLE` (network unreachable / connection refused)
+      - `AI_NO_ANSWER` (empty response / safety blocked)
+      - `AI_TIMEOUT` (request exceeded timeout limit)
 Every response uses { data, error } shape. Validate all input with zod.
 
-## 6. ZIP safety (implement in the upload step)
+## 6. ZIP safety and AI Environment Variables
 Max ZIP 50 MB, max 5,000 files, max total uncompressed 200 MB, max single file 5 MB, compression-ratio limit (zip-bomb), reject zip-slip paths (.., absolute paths, symlinks), skip node_modules, .git, dist, build, .next, __pycache__, venv. Extract with streams, never execute anything, never require/import uploaded files.
 Public GitHub repository ZIP downloads use the base URL from GITHUB_CODELOAD_BASE (default https://codeload.github.com, configurable so tests can point to a local mock server). Redirects are capped at 3 and restricted to the configured base host, github.com or codeload.github.com. Streamed downloads strictly enforce the 50 MB ZIP limit (GITHUB_REPO_TOO_LARGE) regardless of Content-Length accuracy, verify the PK magic bytes, and delete partial files on any failure.
+
+### AI Environment Variables & Consent Version
+The backend supports provider-neutral AI configuration via `backend/.env` (parsed on server startup in non-test environments; secrets are never logged, returned, or printed):
+- `AI_PROVIDER`: "gemini" or "openai_compatible" (default: "gemini")
+- `AI_API_KEY`: API key for the active provider
+- `AI_MODEL`: Model identifier (e.g. "gemini-1.5-flash" or "gpt-4o")
+- `AI_API_BASE`: Optional custom base endpoint URL
+- `GEMINI_API_KEY`: Fallback Gemini API key
+- `GEMINI_MODEL`: Fallback Gemini model name (default: "gemini-1.5-flash")
+- `GEMINI_API_BASE`: Fallback Gemini base URL
+- `AI_RATE_PER_MINUTE`: Maximum chat requests per minute (default: 10)
+- `AI_TIMEOUT_MS`: Request timeout in milliseconds (default: 30000)
+- `AI_MAX_OUTPUT_CHARS`: Maximum character length of response text (default: 2000)
+- `AI_CONSENT_VERSION`: `"2026-10-v1"`
+
 
 ## 7. Parser and graph builder
 - Walk extracted files; for JS/TS use ts-morph to read imports/exports, Express routes (app.get/post/..., router.*), fetch/axios calls with string URLs, process.env.X names.

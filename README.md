@@ -54,6 +54,18 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
 - **No timeline or project memory**: The platform does not track revision history across git commits or remember past project scans.
 - **Language support**: Only JavaScript and TypeScript files are parsed for imports, calls, and AST structure; other files appear as plain file nodes. Python and other languages are not analyzed in Phase 1.
 
+## Ripple AI chat (backend)
+
+The chat backend provides interactive, conversational assistance powered by external AI services (Gemini or OpenAI-compatible models):
+
+- **Off by default and per project**: Every project starts with AI disabled (`ai_enabled: false`). Enabling it requires explicit user consent per project.
+- **What is sent**: Only the user question and structured metadata about the active screen and selected entities (rule identifier, severity, relative file path, line numbers). Code lines (up to a 7-line window around the cited line) are sent only when the project's code-sharing switch (`share_code`) is explicitly turned on.
+- **What is never sent**: The whole file, environment values (`.env` contents), secret tokens or credential patterns, and project names are never sent to external AI providers.
+- **Free-tier privacy warning**: Free tiers of third-party AI services may use submitted text to train models and human reviewers may read it. Never enable AI for sensitive, proprietary, or unowned source code.
+- **Requires your own API key in `backend/.env`**: Supported variable names (names only, never commit keys): `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_API_BASE`, or the fallbacks `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_BASE`.
+- **Offline fallback**: If AI is unconfigured or unreachable, the system falls back to offline template explanations without failure.
+- **Not visible in the screens yet**: The chat interface UI is developed in Step K2; the backend endpoints (`/api/projects/:id/ai-settings` and `/api/projects/:id/chat`) are fully tested and functional.
+
 ## Quick start for non-developers
 
 For a 5-minute guided presentation script, see the [Demo Walkthrough](docs/DEMO_WALKTHROUGH.md).
@@ -222,4 +234,6 @@ RippleAI/
 
 - **Phase 1**: Complete.
 - **Phase 2A (Change Impact)**: Complete.
-- **Test suite**: 655 tests passing across 55 test files (176 backend tests, 479 frontend tests, 0 failures, 5 skipped) as of 2026-10-26.
+- **Step K1b (Chat Backend)**: Complete.
+- **Test suite**: 706 tests passing across 55 test files (227 backend tests, 479 frontend tests, 0 failures, 5 skipped) as of 2026-10-26.
+
