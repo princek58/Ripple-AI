@@ -81,9 +81,12 @@ describe('Environment Loader (Addendum v2 Step 1)', () => {
     const bodyStr = JSON.stringify(res.body);
     expect(bodyStr).not.toContain(secretKey);
     expect(res.body).toEqual({
-      configured: true,
-      provider: 'gemini',
-      model: 'gemini-1.5-flash',
+      data: {
+        configured: true,
+        provider: 'gemini',
+        model: 'gemini-1.5-flash',
+      },
+      error: null,
     });
 
     // Verify key was never logged to console

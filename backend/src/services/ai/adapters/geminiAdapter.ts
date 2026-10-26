@@ -68,9 +68,11 @@ export class GeminiAdapter implements AIAdapter {
         body: JSON.stringify(body),
         signal: controller.signal,
       });
-    } catch {
+    } catch (err: any) {
       clearTimeout(timeout);
-      // Fixed typed error: never leaks underlying fetch error which might contain URL or credentials
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        throw new AIServiceError('AI_TIMEOUT');
+      }
       throw new AIServiceError('AI_UNREACHABLE');
     } finally {
       clearTimeout(timeout);

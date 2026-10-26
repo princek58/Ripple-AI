@@ -1,6 +1,6 @@
 import type { AIAdapter, AIConfig, AIRequest, AIResponse } from '../types.js';
 import { AIServiceError, mapHttpStatusToAiError, extractSafeErrorDetails } from '../errors.js';
-import { getOpenAIModelOptions } from '../modelOptions.js';
+import { isOpenAIReasoningModel } from '../modelOptions.js';
 
 export class OpenAICompatibleAdapter implements AIAdapter {
   readonly provider = 'openai_compatible' as const;
@@ -15,29 +15,50 @@ export class OpenAICompatibleAdapter implements AIAdapter {
       throw new AIServiceError('AI_REQUEST_REJECTED');
     }
 
-    const url = `${this.config.apiBase.replace(/\/+$/, '')}/chat/completions`;
-    const modelOpts = getOpenAIModelOptions(
-      this.config.model,
-      request.maxTokens,
-      request.temperature
-    );
+    const baseUrl = this.config.apiBase.replace(/\/+$/, '');
+    const url = `${baseUrl}/chat/completions`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
+
     if (request.systemPrompt) {
-      messages.push({ role: 'system', content: request.systemPrompt });
+      messages.push({
+        role: 'system',
+        content: request.systemPrompt,
+      });
     }
+
     if (request.history && request.history.length > 0) {
-      for (const msg of request.history) {
-        messages.push({ role: msg.role, content: msg.content });
+      for (const turn of request.history) {
+        messages.push({
+          role: turn.role,
+          content: turn.content,
+        });
       }
     }
-    messages.push({ role: 'user', content: request.userPrompt });
 
-    const payload = {
+    messages.push({
+      role: 'user',
+      content: request.userPrompt,
+    });
+
+    const isReasoning = isOpenAIReasoningModel(this.config.model);
+
+    const payload: Record<string, any> = {
       model: this.config.model,
       messages,
-      ...modelOpts,
     };
+
+    if (typeof request.maxTokens === 'number') {
+      if (isReasoning) {
+        payload.max_completion_tokens = request.maxTokens;
+      } else {
+        payload.max_tokens = request.maxTokens;
+      }
+    }
+
+    if (!isReasoning && typeof request.temperature === 'number') {
+      payload.temperature = request.temperature;
+    }
 
     let res: Response;
     const controller = new AbortController();
@@ -53,9 +74,11 @@ export class OpenAICompatibleAdapter implements AIAdapter {
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
-    } catch {
+    } catch (err: any) {
       clearTimeout(timeout);
-      // Fixed typed error: never leaks underlying fetch error which might contain URL or credentials
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        throw new AIServiceError('AI_TIMEOUT');
+      }
       throw new AIServiceError('AI_UNREACHABLE');
     } finally {
       clearTimeout(timeout);

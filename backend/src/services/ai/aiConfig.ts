@@ -50,7 +50,7 @@ export function getAIConfig(): AIConfig {
 
   const ratePerMinute = process.env.AI_RATE_PER_MINUTE
     ? parseInt(process.env.AI_RATE_PER_MINUTE, 10)
-    : 15;
+    : 10;
 
   const timeoutMs = process.env.AI_TIMEOUT_MS
     ? parseInt(process.env.AI_TIMEOUT_MS, 10)
@@ -58,7 +58,7 @@ export function getAIConfig(): AIConfig {
 
   const maxOutputChars = process.env.AI_MAX_OUTPUT_CHARS
     ? parseInt(process.env.AI_MAX_OUTPUT_CHARS, 10)
-    : 4000;
+    : 2000;
 
   const configured = Boolean(apiKey && model);
 
@@ -75,9 +75,52 @@ export function getAIConfig(): AIConfig {
 }
 
 /**
- * Builds an AI cache key that strictly includes provider and model.
+ * Builds an AI cache key that strictly includes provider, model, and payload hash.
  */
 export function createAICacheKey(provider: string, model: string, inputPayload: string): string {
   const hash = crypto.createHash('sha256').update(inputPayload).digest('hex');
   return `${provider}:${model}:${hash}`;
+}
+
+export interface ProjectAICacheKeyParams {
+  provider: string;
+  model: string;
+  projectId: string;
+  scanId: string | null;
+  screen: string;
+  findingId?: string | null;
+  nodeId?: string | null;
+  fixId?: string | null;
+  reportId?: string | null;
+  shareCode: boolean;
+  lang?: string | null;
+  message: string;
+  history?: Array<{ role: string; text: string }>;
+}
+
+/**
+ * Builds cache key as sha256 of:
+ * provider, model, project id, scan id, screen, ids, share_code, lang, normalised message and history text.
+ * A changed scan id will never hit the cache.
+ */
+export function createProjectAICacheKey(params: ProjectAICacheKeyParams): string {
+  const normalized = {
+    provider: params.provider,
+    model: params.model,
+    projectId: params.projectId,
+    scanId: params.scanId || 'never_scanned',
+    screen: params.screen,
+    findingId: params.findingId || null,
+    nodeId: params.nodeId || null,
+    fixId: params.fixId || null,
+    reportId: params.reportId || null,
+    shareCode: Boolean(params.shareCode),
+    lang: params.lang || 'en',
+    message: params.message.trim().toLowerCase(),
+    history: (params.history || []).map((h) => ({
+      role: h.role,
+      text: h.text.trim().toLowerCase(),
+    })),
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }

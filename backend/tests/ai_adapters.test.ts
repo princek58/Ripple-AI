@@ -99,6 +99,13 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
       expect(extracted.statusWord).toBe('INVALID_ARGUMENT');
       expect(extracted.reason).toBe('API_KEY_INVALID');
     });
+
+    it('creates AI_AUTH_FAILED error with sanitized reason', () => {
+      const err = new AIServiceError('AI_AUTH_FAILED', 401, 'INVALID_API_KEY');
+      expect(err.code).toBe('AI_AUTH_FAILED');
+      expect(err.upstream_status).toBe(401);
+      expect(err.shortCode).toBe('AI_AUTH_FAILED [INVALID_API_KEY]');
+    });
   });
 
   describe('Gemini Adapter (Step 2a & 2b Fixes)', () => {
@@ -254,6 +261,29 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
         expect(err.message).not.toContain('HOSTILE');
       }
     });
+
+    it('aborts on timeout and throws AI_TIMEOUT', async () => {
+      const adapter = new GeminiAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+        timeoutMs: 50,
+      });
+
+      mockHandler = (_req, res) => {
+        setTimeout(() => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'delayed' }] } }] }));
+        }, 150);
+      };
+
+      try {
+        await adapter.generate({ userPrompt: 'test timeout' });
+        expect.fail('Expected timeout error');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AIServiceError);
+        expect(err.code).toBe('AI_TIMEOUT');
+      }
+    });
   });
 
   describe('OpenAI-compatible Adapter (Step 2a & 2b Fixes)', () => {
@@ -381,6 +411,29 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
       };
 
       await expect(adapter.generate({ userPrompt: 'test' })).rejects.toThrow('AI_NO_ANSWER');
+    });
+
+    it('aborts on timeout and throws AI_TIMEOUT for openai compatible adapter', async () => {
+      const adapter = new OpenAICompatibleAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+        timeoutMs: 50,
+      });
+
+      mockHandler = (_req, res) => {
+        setTimeout(() => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ choices: [{ message: { content: 'delayed' } }] }));
+        }, 150);
+      };
+
+      try {
+        await adapter.generate({ userPrompt: 'test timeout' });
+        expect.fail('Expected timeout error');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AIServiceError);
+        expect(err.code).toBe('AI_TIMEOUT');
+      }
     });
   });
 

@@ -1,10 +1,12 @@
 export type AIErrorCode =
   | 'AI_REQUEST_REJECTED'
+  | 'AI_AUTH_FAILED'
   | 'AI_QUOTA_EXHAUSTED'
   | 'AI_MODEL_NOT_FOUND'
   | 'AI_UNAVAILABLE'
   | 'AI_UNREACHABLE'
-  | 'AI_NO_ANSWER';
+  | 'AI_NO_ANSWER'
+  | 'AI_TIMEOUT';
 
 const ENUM_REGEX = /^[A-Z_]{3,64}$/;
 

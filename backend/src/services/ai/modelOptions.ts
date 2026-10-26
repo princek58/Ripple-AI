@@ -1,4 +1,11 @@
 /**
+ * Checks whether a model is an OpenAI reasoning model (e.g. o1, o3, o3-mini).
+ */
+export function isOpenAIReasoningModel(model: string): boolean {
+  return /^(o1|o3)/i.test(model.trim());
+}
+
+/**
  * Resolves model-specific token limit and temperature parameters for OpenAI-compatible chat completions.
  *
  * Based on OpenAI Chat Completions API specifications:
@@ -14,7 +21,7 @@ export function getOpenAIModelOptions(
   maxTokens?: number,
   temperature?: number
 ): Record<string, any> {
-  const isReasoning = /^(o1|o3)/i.test(model.trim());
+  const isReasoning = isOpenAIReasoningModel(model);
   const options: Record<string, any> = {};
 
   if (isReasoning) {
