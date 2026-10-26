@@ -110,6 +110,10 @@ npm run dev:frontend
 
 Alternatively, run both from root using `start-dev.bat` on Windows.
 
+### Ripple AI chat (backend)
+
+Ripple AI includes an optional, read-only AI chat assistant for explaining static findings and answering questions about project code. Google AI Studio keys now start with "AQ." and that the model id in backend/.env must be one that is available for your account. Configure `GEMINI_API_KEY` and `GEMINI_MODEL` (e.g. `gemini-3.1-flash-lite`) in `backend/.env`.
+
 ### Running Tests
 
 Execute unit, integration, and UI component test suites:
@@ -234,6 +238,6 @@ RippleAI/
 
 - **Phase 1**: Complete.
 - **Phase 2A (Change Impact)**: Complete.
-- **Step K1b (Chat Backend)**: Complete.
-- **Test suite**: 706 tests passing across 55 test files (227 backend tests, 479 frontend tests, 0 failures, 5 skipped) as of 2026-10-26.
+- **Step K1c (Chat Backend)**: Complete.
+- **Test suite**: 714 tests passing across 55 test files (235 backend tests, 479 frontend tests, 0 failures, 5 skipped) as of 2026-10-26.
 

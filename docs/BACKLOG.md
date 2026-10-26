@@ -43,5 +43,7 @@ This document tracks known limitations, technical debt, security advisories, and
 | **K-03** | AI Providers | Only Gemini and OpenAI-compatible providers are supported; additional LLM backends require custom adapters. | Minor | Open |
 | **K-04** | AI Reliability | Answers come from a model and may be wrong; static analysis evidence remains authoritative source of truth. | Minor | Open |
 | **K-05** | Database Schema | Old global ai_settings table is unused, remove later in a future migration cleanup. | Minor | Open |
+| **K-06** | AI Model Discovery | Google retires model ids for new accounts; the configured model id must be re-checked (see K1c script idea) when chat returns AI_MODEL_NOT_FOUND | Minor | Open |
+| **K-07** | Code Snippets | snippets with any secret-like assignment are dropped completely, accepting false positives | Minor | Open |
 
 
