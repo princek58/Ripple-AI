@@ -80,16 +80,22 @@ This guide is designed for a non-technical presenter or product specialist demon
 - **What to Say**:
   > *"Ripple AI proposes safe, deterministic diffs that are never applied automatically, and every generated audit report includes a mandatory 'What was not checked' section for absolute honesty."*
 
-### Step 7: Ripple AI Chat (Circle Button, Offline Help & Per-Project AI)
+### Step 7: Ripple AI Chat (Circle Button, Offline Data Answers & Per-Project AI)
 - **Exact Action**:
-  - Open the circle, ask 'circular dependency kya hai', then turn on AI only for the demo project.
-  - Notice the instant welcome card with clickable architectural questions.
-  - Observe the instant offline glossary explanation with the clear "Offline help" badge.
+  - Open the circle button at the bottom-right of the screen.
+  - Ask: `"kitni findings hain"` (or in English: `"how many findings"`).
+  - Observe the instant breakdown of findings across severities and rules computed directly from the project's analysis data.
+  - Ask: `"pehle kya theek karun"` (or in English: `"what should I fix first"`).
+  - Observe the top 3 prioritized findings with titles, file paths, and line numbers, followed by the sentence: *"This order comes from severity and confidence, it is not a guarantee."*
+  - Notice the footer label: *"Offline help from Ripple's own data. Not AI-written."*
+  - Ask `'circular dependency kya hai'` to demonstrate the instant offline glossary explanation.
   - Open the in-panel Chat settings (gear icon) and review the consent text before enabling external AI.
 - **What to Say**:
-  > *"The Ripple AI chat is accessible on every screen. Offline architectural help works immediately without any external services or API keys. External AI is strictly opt-in per project, requiring explicit user consent."*
+  > *"Say: this answer comes from Ripple's own data, not from AI."*
+  > *"The Ripple AI chat is accessible on every screen. Offline architectural help and deterministic data answers work immediately without any external services or API keys. External AI is strictly opt-in per project, requiring explicit user consent."*
 - **Important**:
   - Do not claim: the chat is always AI-powered or always correct.
+  - Say: this answer comes from Ripple's own data, not from AI.
 
 ---
 

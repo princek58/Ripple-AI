@@ -59,7 +59,9 @@ Ripple AI is a web-only project-analysis and debugging assistant. User uploads a
 The Ripple AI chatbox provides on-screen assistance with instant offline architectural help and optional external AI:
 
 - **What the user sees**: An original round floating button (56 px) at the bottom-right of every screen with an "Ask Ripple AI" pill label on desktop. Clicking opens a focused chatbox (floating panel on desktop, full-screen on mobile) with screen-specific suggestions, En/Hinglish language toggle, message history, and settings controls.
+- **Lazy loading on first click**: The chat panel and everything it needs (glossary, offline logic, settings) load on first click with dynamic import (`React.lazy`), keeping the main bundle lightweight; if the chunk fails to load, a retry button is shown.
 - **Offline help always works**: Matches architectural terms (37 glossary entries) and findings immediately from local rule guidance. Never requires an API key, internet access, or running backend AI services. Clearly labeled as "Offline help" and never claimed as AI.
+- **Offline data answers**: Deterministic answers computed from Ripple's own analysis data for the active project (counts by severity and rule, most risky module, top 3 prioritized fixes, last scan timestamp, fixed Phase 1 limits, and rule guidance with evidence paths). Matched in English and Hinglish, and clearly labeled as "Offline help from Ripple's own data. Not AI-written."
 - **AI is off by default per project**: Every project starts with AI disabled (`ai_enabled: false`). Enabling it requires explicit user consent per project through the in-panel Chat settings.
 - **What is sent**: Only the user prompt, screen context, and selected entity identifiers (finding, node, or fix UUIDs). Code lines (up to a 7-line window around the cited line) are sent only when the project's code-sharing switch (`share_code`) is explicitly turned on.
 - **What is never sent**: The whole file, environment values (`.env` contents), secret tokens or credential patterns, and project names are never sent to external AI providers.
@@ -242,5 +244,6 @@ RippleAI/
 - **Phase 2A (Change Impact)**: Complete.
 - **Step K1c (Chat Backend)**: Complete.
 - **Step K2 (Chatbox UI)**: Complete.
-- **Test suite**: 832 tests passing across 61 test files (235 backend tests, 597 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
+- **Step K3 (Chatbox Demo-Ready)**: Complete.
+- **Test suite**: 856 tests passing across 62 test files (235 backend tests, 621 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
 

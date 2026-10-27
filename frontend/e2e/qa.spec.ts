@@ -163,6 +163,17 @@ const routes: RouteDef[] = [
     pathBuilder: () => '/app/overview',
     projectType: 'scanned',
   },
+  // Ripple AI Chat offline data answers (Step K3 Part 4)
+  {
+    slug: 'app-chat-data-findings',
+    pathBuilder: () => '/app/overview',
+    projectType: 'scanned',
+  },
+  {
+    slug: 'app-chat-data-fix-first',
+    pathBuilder: () => '/app/overview',
+    projectType: 'scanned',
+  },
 ];
 
 interface VariantDef {
@@ -379,7 +390,9 @@ test.describe('Automated Visual QA Suite', () => {
         if (
           r.slug === 'app-chat-welcome' ||
           r.slug === 'app-chat-answer' ||
-          r.slug === 'app-chat-settings'
+          r.slug === 'app-chat-settings' ||
+          r.slug === 'app-chat-data-findings' ||
+          r.slug === 'app-chat-data-fix-first'
         ) {
           const circleBtn = page.locator('[data-testid="chat-circle-button"]');
           try {
@@ -396,6 +409,22 @@ test.describe('Automated Visual QA Suite', () => {
               const sendBtn = page.locator('[data-testid="chat-send-btn"]');
               await sendBtn.click();
               await page.locator('text=Offline help').first().waitFor({ state: 'visible', timeout: 8000 });
+              await page.waitForTimeout(400);
+            } else if (r.slug === 'app-chat-data-findings') {
+              const input = page.locator('[data-testid="chat-input"]');
+              await input.waitFor({ state: 'visible', timeout: 5000 });
+              await input.fill('kitni findings hain');
+              const sendBtn = page.locator('[data-testid="chat-send-btn"]');
+              await sendBtn.click();
+              await page.locator('text=Offline help from Ripple').first().waitFor({ state: 'visible', timeout: 8000 });
+              await page.waitForTimeout(400);
+            } else if (r.slug === 'app-chat-data-fix-first') {
+              const input = page.locator('[data-testid="chat-input"]');
+              await input.waitFor({ state: 'visible', timeout: 5000 });
+              await input.fill('pehle kya theek karun');
+              const sendBtn = page.locator('[data-testid="chat-send-btn"]');
+              await sendBtn.click();
+              await page.locator('text=Offline help from Ripple').first().waitFor({ state: 'visible', timeout: 8000 });
               await page.waitForTimeout(400);
             } else if (r.slug === 'app-chat-settings') {
               const settingsBtn = page.locator('button[aria-label="Chat settings"]');
