@@ -48,5 +48,5 @@ This document tracks known limitations, technical debt, security advisories, and
 | **K-08** | AI Chat | Chat history is not saved; client session is ephemeral and clears on refresh or project switch. | Minor | Open |
 | **K-09** | Demo Quality | Demo saved answers for offline walkthrough are planned in K3. | Minor | Open |
 | **K-10** | AI Reliability | AI answers depend on a free preview model that may be unavailable or rate limited. | Minor | Open |
-
-
+| **L-01** | Landing Page | Docs link on the landing page is disabled until a real Docs page exists. | Minor | Open |
+| **L-02** | Git Maintenance | landing-wip branch holds unreviewed edits, not merged. | Minor | Open |
