@@ -110,19 +110,14 @@ export const ChatPanelContent: React.FC = () => {
     sendMessage,
     stopRequest,
     retryLastMessage,
-    enableAiWithConsent,
   } = chat;
 
-  const { selectedProjectId, selectedProject } = useProjects();
+  const { selectedProjectId } = useProjects();
   const location = useLocation();
 
   const [input, setInput] = useState<string>('');
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const [consentUnderstood, setConsentUnderstood] = useState<boolean>(false);
-  const [isSubmittingConsent, setIsSubmittingConsent] = useState<boolean>(false);
-  const [consentError, setConsentError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -130,50 +125,13 @@ export const ChatPanelContent: React.FC = () => {
   const ctx = contextIdsFromUrl(location.pathname, location.search);
   const screenExamples = getScreenExamples(ctx.screen, lang);
 
-  const isConfigured = aiStatus?.configured === true;
-  const isScanned = Boolean(selectedProject?.last_scan_at);
-  const hasProject = Boolean(selectedProjectId);
-
-  const isConsentOutdated = Boolean(
-    aiSettings?.consent_version &&
-    aiSettings?.consent_version !== aiSettings?.current_consent_version
-  );
-
-  const isAiOffOrOutdated =
-    hasProject &&
-    isScanned &&
-    isConfigured &&
-    (!aiSettings?.ai_enabled || isConsentOutdated);
-
-  const handleConsentCardSubmit = async () => {
-    if (!consentUnderstood || isSubmittingConsent) return;
-    setIsSubmittingConsent(true);
-    setConsentError(null);
-    try {
-      if (enableAiWithConsent) {
-        await enableAiWithConsent();
-      } else {
-        await chat.updateSettings({
-          ai_enabled: true,
-          share_code: false,
-          consent_version: aiSettings?.current_consent_version || '2026-10-v2',
-        });
-      }
-      setConsentUnderstood(false);
-    } catch (err: any) {
-      setConsentError(err?.message || 'Failed to enable AI. Please try again.');
-    } finally {
-      setIsSubmittingConsent(false);
-    }
-  };
-
   // Status badge
   let statusText = 'Offline help only';
   if (!selectedProjectId) {
     statusText = 'Offline help only';
   } else if (aiStatus?.configured === false) {
     statusText = 'AI not set up';
-  } else if (!aiSettings?.ai_enabled || isConsentOutdated) {
+  } else if (aiSettings && !aiSettings.ai_enabled) {
     statusText = 'AI off for this project';
   } else {
     statusText = 'AI on';
@@ -324,10 +282,13 @@ export const ChatPanelContent: React.FC = () => {
                 return (
                   <div
                     key={m.id}
-                    className="flex justify-end"
+                    className="flex flex-col items-end gap-1"
                     data-testid="chat-user-message"
                   >
-                    <div className="bg-theme-primary text-theme-surface rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%] text-xs whitespace-pre-wrap font-sans break-words shadow-sm">
+                    <span className="text-[10px] font-semibold text-theme-text-muted uppercase tracking-wider pr-1">
+                      You
+                    </span>
+                    <div className="bg-forest text-cream dark:bg-lime dark:text-forest rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%] text-xs whitespace-pre-wrap font-sans break-words shadow-sm font-medium">
                       {m.text}
                     </div>
                   </div>
@@ -407,51 +368,6 @@ export const ChatPanelContent: React.FC = () => {
                 </div>
               );
             })}
-
-            {/* One-click consent card inside panel when AI is configured but off or outdated */}
-            {isAiOffOrOutdated && (
-              <div
-                data-testid="chat-consent-card"
-                className="p-3.5 rounded-xl bg-theme-surface border border-theme-border space-y-3 my-2 shadow-sm"
-              >
-                <div className="text-xs font-semibold text-theme-text">
-                  {isConsentOutdated
-                    ? 'Updated AI Consent Required'
-                    : 'Turn on Ripple AI for this project'}
-                </div>
-                <div
-                  data-testid="consent-card-text"
-                  className="text-xs text-theme-text-muted leading-relaxed whitespace-pre-wrap max-h-36 overflow-y-auto p-2.5 rounded-lg bg-theme-surface-active/60 border border-theme-border"
-                >
-                  {aiSettings?.consent_text ||
-                    'Turning this on sends the question and a short summary of the selected finding or file to the AI service configured in this app. The chat may also send the names and counts of modules and the titles of the top findings of the screen you are on.'}
-                </div>
-                <label className="flex items-center gap-2 text-xs text-theme-text cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    data-testid="consent-card-checkbox"
-                    checked={consentUnderstood}
-                    onChange={(e) => setConsentUnderstood(e.target.checked)}
-                    className="w-4 h-4 rounded border-theme-border text-theme-primary focus:ring-theme-primary cursor-pointer"
-                  />
-                  <span>I understand</span>
-                </label>
-                {consentError && (
-                  <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
-                    {consentError}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  data-testid="consent-card-submit-btn"
-                  disabled={!consentUnderstood || isSubmittingConsent}
-                  onClick={handleConsentCardSubmit}
-                  className="w-full py-2 px-3 text-xs font-medium rounded-lg bg-theme-primary text-theme-surface hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  {isSubmittingConsent ? 'Turning on AI...' : 'Turn on AI for this project'}
-                </button>
-              </div>
-            )}
 
             <div ref={messagesEndRef} />
           </div>

@@ -285,17 +285,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const currentSettings = aiSettingsRef.current || aiSettings;
       const isConfigured = aiStatus?.configured === true;
-      const isAiOn = currentSettings?.ai_enabled === true;
-      const currentConsentVer = currentSettings?.current_consent_version || '2026-10-v2';
-      const storedConsentVer = currentSettings?.consent_version || null;
-      const isConsentCurrent = Boolean(storedConsentVer) && storedConsentVer === currentConsentVer;
+      const isAiOn = currentSettings ? currentSettings.ai_enabled === true : true;
       const isScanned = Boolean(selectedProject?.last_scan_at);
       const currentProjectId = selectedProjectId;
       const hasProject = Boolean(currentProjectId);
 
-      const canUseAi = hasProject && isScanned && isConfigured && isAiOn && isConsentCurrent;
+      const canUseAi = hasProject && isScanned && isConfigured && isAiOn;
 
-      // When AI is off, not configured or consent is outdated: offline answers only with one-line reason and consent card below
+      // When AI is off, not configured or project not scanned: offline answers only
       if (!canUseAi) {
         pendingQuestionRef.current = clean;
         setPendingQuestion(clean);
@@ -337,8 +334,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           reason = chatErrorMessage('AI_NOT_CONFIGURED', lang);
         } else if (!isAiOn) {
           reason = chatErrorMessage('AI_DISABLED', lang);
-        } else if (!isConsentCurrent) {
-          reason = chatErrorMessage('AI_DISABLED [CONSENT_OUTDATED]', lang);
         }
 
         const fullOfflineText = reason ? (offText ? `${offText}\n\n${reason}` : reason) : offText;
@@ -371,7 +366,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      let timedOut25 = false;
+      let timedOut40 = false;
       const timer12 = setTimeout(() => {
         setMessages((prev) =>
           prev.map((m) =>
@@ -388,10 +383,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
       }, 12000);
 
-      const timer25 = setTimeout(() => {
-        timedOut25 = true;
+      const timer40 = setTimeout(() => {
+        timedOut40 = true;
         controller.abort('AI_TIMEOUT');
-      }, 25000);
+      }, 40000);
 
       // Prepare history: at most last 6 turns, each cut at 1000 chars
       const historySource = [...messages, userMsg]
@@ -416,7 +411,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
 
         clearTimeout(timer12);
-        clearTimeout(timer25);
+        clearTimeout(timer40);
 
         // Success: replace thinkingMsg with AI answer
         setMessages((prev) =>
@@ -436,17 +431,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
       } catch (err: any) {
         clearTimeout(timer12);
-        clearTimeout(timer25);
+        clearTimeout(timer40);
 
         let errorText = '';
         let canRetry = true;
         const isUserCancelled =
           controller.signal.aborted &&
-          !timedOut25 &&
+          !timedOut40 &&
           controller.signal.reason !== 'AI_TIMEOUT';
 
         if (
-          timedOut25 ||
+          timedOut40 ||
           (controller.signal.aborted && controller.signal.reason === 'AI_TIMEOUT')
         ) {
           errorText = chatErrorMessage('AI_TIMEOUT', lang);
@@ -473,25 +468,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             )
           );
         } else {
-          // If request fails or reaches 25-second abort:
-          // Show the friendly message for the code AND the offline answer labelled "Offline help"
+          // When AI fails or times out: ONLY show friendly error banner + Retry button
+          // and only show offline answer if question actually matched a real glossary term or data query
+          const hasRealMatch = Boolean(
+            offlineDataType || (chatModules?.glossary && chatModules.glossary.hasGlossaryMatch(clean))
+          );
+
           let offText = '';
-          try {
-            if (offlineDataType && activeAnswers && isScanned && currentProjectId) {
-              offText = await activeAnswers.getOfflineDataAnswer(
-                offlineDataType,
-                {
-                  projectId: currentProjectId,
-                  isScanned,
-                  lang,
-                  screen: ctx.screen,
-                  findingId: ctx.finding_id,
-                }
-              );
-            } else if (chatModules?.glossary) {
-              offText = chatModules.glossary.offlineAnswer(clean, ctx, lang);
-            }
-          } catch {}
+          if (hasRealMatch) {
+            try {
+              if (offlineDataType && activeAnswers && isScanned && currentProjectId) {
+                offText = await activeAnswers.getOfflineDataAnswer(
+                  offlineDataType,
+                  {
+                    projectId: currentProjectId,
+                    isScanned,
+                    lang,
+                    screen: ctx.screen,
+                    findingId: ctx.finding_id,
+                  }
+                );
+              } else if (chatModules?.glossary && chatModules.glossary.hasGlossaryMatch(clean)) {
+                offText = chatModules.glossary.offlineAnswer(clean, ctx, lang);
+              }
+            } catch {}
+          }
 
           const errorMsg: ChatMessage = {
             id: thinkingId,
@@ -501,18 +502,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             canRetry,
           };
 
-          const offMsg: ChatMessage = {
-            id: uniqueMsgId('offline'),
-            role: 'assistant',
-            text: offText || 'Offline help is available for architecture and findings.',
-            type: 'offline',
-          };
+          const offMsg: ChatMessage | null = offText
+            ? {
+                id: uniqueMsgId('offline'),
+                role: 'assistant',
+                text: offText,
+                type: 'offline',
+              }
+            : null;
 
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.id === thinkingId);
-            if (idx === -1) return [...prev, offMsg, errorMsg];
+            if (idx === -1) {
+              return offMsg ? [...prev, offMsg, errorMsg] : [...prev, errorMsg];
+            }
             const next = [...prev];
-            next.splice(idx, 1, offMsg, errorMsg);
+            if (offMsg) {
+              next.splice(idx, 1, offMsg, errorMsg);
+            } else {
+              next.splice(idx, 1, errorMsg);
+            }
             return next;
           });
         }

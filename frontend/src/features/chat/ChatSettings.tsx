@@ -19,30 +19,23 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
   const isScanned = Boolean(selectedProject?.last_scan_at);
   const canEdit = hasProject && isScanned;
 
-  const aiEnabled = Boolean(aiSettings?.ai_enabled);
-  const shareCode = Boolean(aiSettings?.share_code);
+  const aiEnabled = aiSettings ? Boolean(aiSettings.ai_enabled) : true;
+  const shareCode = aiSettings ? Boolean(aiSettings.share_code) : true;
 
   const handleToggleAi = async () => {
     setErrorMessage(null);
-    if (!aiEnabled) {
-      // Need consent before enabling
-      setShowConsentFlow(true);
-      setUnderstood(false);
-    } else {
-      // Turn off
-      setIsSaving(true);
-      try {
-        await updateSettings({
-          ai_enabled: false,
-          share_code: false,
-          consent_version: aiSettings?.current_consent_version || '2026-10-v2',
-        });
-        setShowConsentFlow(false);
-      } catch (err: any) {
-        setErrorMessage(err?.message || 'Failed to update settings. Please try again.');
-      } finally {
-        setIsSaving(false);
-      }
+    setIsSaving(true);
+    try {
+      await updateSettings({
+        ai_enabled: !aiEnabled,
+        share_code: !aiEnabled ? shareCode : false,
+        consent_version: aiSettings?.current_consent_version || '2026-10-v2',
+      });
+      setShowConsentFlow(false);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to update settings. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
