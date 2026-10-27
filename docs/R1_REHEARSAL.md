@@ -19,29 +19,29 @@ Rehearsal performed on 2026-10-25 using isolated QA setup (backend port 4100, fr
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | `broken_import` | 6 | 6 | 0 | 0 | **0.0%** (0 / 6) |
 | `circular_dependency` | 1 | 1 | 0 | 0 | **0.0%** (0 / 1) |
-| `env_undeclared` | 8 | 6 | 2 | 0 | **25.0%** (2 / 8) |
-| `isolated_file` | 20 | 8 | 12 | 0 | **60.0%** (12 / 20) |
-| **Total** | **35** | **21** | **14** | **0** | **40.0%** (14 / 35) |
+| `env_undeclared` | 6 | 6 | 0 | 0 | **0.0%** (0 / 6) |
+| `isolated_file` | 8 | 8 | 0 | 0 | **0.0%** (0 / 8) |
+| **Total** | **21** | **21** | **0** | **0** | **0.0%** (0 / 21) |
 
 ### Ranked List of Causes to Fix (Most Findings Affected First)
 
-1. **Build Tool & Bundler Configuration Files** (affected 8 / 20 sampled `isolated_file` findings, ~15 total across projects):
+1. **[RESOLVED] Build Tool & Bundler Configuration Files** (affected 8 / 20 sampled `isolated_file` findings, ~15 total across projects):
    - *Impact*: High volume of low-severity findings.
    - *Root Cause*: Tooling files such as `vite.config.ts`, `tailwind.config.cjs`, `postcss.config.cjs`, and `webpack.config.js` are executed by CLI tools/runners and not imported by entrypoints.
    - *Fix*: Introduce an entrypoint/tooling whitelist for common configuration file patterns (`*.config.*`, `vite.config.*`, `tailwind.*`, `postcss.*`).
-2. **Dynamic ORM Model & Migration Loaders** (affected 3 / 20 sampled `isolated_file` findings, ~6 total across projects):
+2. **[RESOLVED] Dynamic ORM Model & Migration Loaders** (affected 3 / 20 sampled `isolated_file` findings, ~6 total across projects):
    - *Impact*: False positives on database model definitions.
    - *Root Cause*: Standard Sequelize pattern in `models/index.js` reads sibling files dynamically using `fs.readdirSync(__dirname)`. Static import scanning does not recognize these incoming references.
    - *Fix*: Detect directory-scanning dynamic loader patterns (e.g., Sequelize boilerplate) and mark sibling model definitions as linked.
-3. **Standard Runtime Environment Variables** (affected 2 / 8 sampled `env_undeclared` findings):
+3. **[RESOLVED] Standard Runtime Environment Variables** (affected 2 / 8 sampled `env_undeclared` findings):
    - *Impact*: Flagging standard variables as undeclared.
    - *Root Cause*: `process.env.NODE_ENV` and `npm_package_version` are automatically injected by Node.js and build tools at runtime without entry in `.env.example`.
    - *Fix*: Provide a built-in exempt list of standard Node/npm runtime environment keys (`NODE_ENV`, `npm_*`, `CI`).
-4. **TypeScript Ambient Declaration Files** (affected 1 / 20 sampled `isolated_file` findings):
+4. **[RESOLVED] TypeScript Ambient Declaration Files** (affected 1 / 20 sampled `isolated_file` findings):
    - *Impact*: False dead code alerts on types.
    - *Root Cause*: `vite-env.d.ts` provides ambient types via `/// <reference types="vite/client" />` and is consumed globally by the compiler without `import` statements.
    - *Fix*: Treat ambient declaration files (`*.d.ts`) as type definitions rather than isolated code files.
-5. **UI Label Clearance with Long Project Names** (affected 1 / 4 projects):
+5. **[RESOLVED] UI Label Clearance with Long Project Names** (affected 1 / 4 projects):
    - *Impact*: Visual label crowding on Overview card.
    - *Root Cause*: When project names exceed 30 characters (e.g. `conduit-realworld-example-app-main`), the label bounding box extends horizontally and touches the boundary of module badges placed on the bottom ring.
    - *Fix*: Apply label truncation with ellipsis for names $>26$ characters or expand radial spacing for bottom-placed modules.

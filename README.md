@@ -277,5 +277,6 @@ In honest plain words, the following expansions and improvements are planned for
 - **Step K5 (Chat Self-Aware Assistant & Always-On AI)**: Complete.
 - **Step DEP1 (Deploy Ready & One Service)**: Complete.
 - **Step K6 (Multi-Key Failover, Project Brief, Saved Chat History, Draggable Panel)**: Complete.
-- **Test suite**: 925 tests passing across 71 test files (286 backend tests, 639 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
+- **Step R2 (False Alarms Fixed & Presentation UI Polished)**: Complete.
+- **Test suite**: 930 tests passing across 71 test files (290 backend tests, 640 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
 
