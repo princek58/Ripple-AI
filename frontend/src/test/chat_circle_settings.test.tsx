@@ -377,7 +377,7 @@ describe('ChatCircle and ChatSettings (K2 Part 3 & ADDENDUM K2-icon)', () => {
       expect(capturedPutBody).not.toBeNull();
     });
     expect(capturedPutBody.ai_enabled).toBe(true);
-    expect(capturedPutBody.consent_version).toBe('2026-10-v1');
+    expect(capturedPutBody.consent_version).toBe('2026-10-v2');
   });
 
   it('8. settings: code switch is disabled until AI is on and carries warning', async () => {

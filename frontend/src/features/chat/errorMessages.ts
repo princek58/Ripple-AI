@@ -79,6 +79,11 @@ const DEFAULT_MESSAGE: Record<ChatLang, string> = {
  * Falls back to a safe default for unknown codes.
  */
 export function chatErrorMessage(code: string, lang: ChatLang = 'en'): string {
+  if (code.includes('CONSENT_OUTDATED')) {
+    return lang === 'hi'
+      ? 'AI privacy note update ho gaya hai. AI use karne ke liye ise dobara accept karein.'
+      : 'The AI privacy note was updated. Please accept it again to use AI.';
+  }
   // Strip any bracketed reason suffix: "AI_DISABLED [CONSENT_REQUIRED]" → "AI_DISABLED"
   const baseCode = code.split(' ')[0].trim();
   const entry = messages[baseCode];

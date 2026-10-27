@@ -35,7 +35,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
         await updateSettings({
           ai_enabled: false,
           share_code: false,
-          consent_version: aiSettings?.current_consent_version || '2026-10-v1',
+          consent_version: aiSettings?.current_consent_version || '2026-10-v2',
         });
         setShowConsentFlow(false);
       } catch (err: any) {
@@ -54,7 +54,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
       await updateSettings({
         ai_enabled: true,
         share_code: shareCode,
-        consent_version: aiSettings?.current_consent_version || '2026-10-v1',
+        consent_version: aiSettings?.current_consent_version || '2026-10-v2',
       });
       setShowConsentFlow(false);
     } catch (err: any) {
@@ -72,7 +72,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
       await updateSettings({
         ai_enabled: true,
         share_code: !shareCode,
-        consent_version: aiSettings?.current_consent_version || '2026-10-v1',
+        consent_version: aiSettings?.current_consent_version || '2026-10-v2',
       });
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to update code sharing setting.');

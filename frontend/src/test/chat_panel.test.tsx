@@ -182,8 +182,10 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     expect(screen.getByTestId('chat-user-message')).toHaveTextContent('What is a circular dependency?');
   });
 
-  it('2. offline answer appears immediately for "circular dependency kya hai"', async () => {
-    setupFetchMock();
+  it('2. offline answer appears immediately for "circular dependency kya hai" when AI is off', async () => {
+    setupFetchMock({
+      '/ai-settings': aiSettingsDefaultFixture,
+    });
     render(<TestHarness initialEntries={['/app/overview']} />);
 
     fireEvent.click(screen.getByTestId('toggle-panel-btn'));
@@ -290,11 +292,13 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
       'The AI service is slow or busy right now. Offline help is shown below.'
     );
     expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
+    expect(screen.getByTestId('chat-offline-message')).toBeInTheDocument();
   });
 
   it('6. maps every error code with friendly message and keeps offline answer intact', async () => {
     const errorCodes = [
       { code: 'AI_DISABLED', expected: 'AI is off for this project. Turn it on in the chat settings' },
+      { code: 'AI_DISABLED [CONSENT_OUTDATED]', expected: 'The AI privacy note was updated. Please accept it again to use AI.' },
       { code: 'AI_RATE_LIMITED', expected: 'Too many requests right now' },
       { code: 'AI_QUOTA_EXHAUSTED', expected: 'The AI service has reached its free limit' },
       { code: 'AI_AUTH_FAILED', expected: 'AI service could not authenticate' },
@@ -644,5 +648,241 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
       expect(chatAborted).toBe(true);
       expect(screen.getByTestId('msg-count')).toHaveTextContent('0');
     });
+  });
+
+  it('16. AI on shows NO offline box before the AI answer arrives', async () => {
+    let resolveChat: ((val: any) => void) | null = null;
+    setupFetchMock({
+      '/chat': () =>
+        new Promise((resolve) => {
+          resolveChat = resolve;
+        }),
+    });
+
+    render(<TestHarness initialEntries={['/app/overview']} />);
+    fireEvent.click(screen.getByTestId('toggle-panel-btn'));
+    expect(await screen.findByText('AI on')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
+    fireEvent.change(input, { target: { value: 'Explain graph structure' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
+
+    // Indicator is thinking, and NO offline message exists
+    expect(screen.getByTestId('chat-thinking-indicator')).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-offline-message')).not.toBeInTheDocument();
+
+    // Resolve AI answer
+    act(() => {
+      if (resolveChat) {
+        resolveChat(
+          new Response(JSON.stringify(aiChatSuccessFixture), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+    });
+
+    // AI message appears, thinking indicator removed, still NO offline box
+    expect(await screen.findByTestId('chat-ai-message')).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-thinking-indicator')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-offline-message')).not.toBeInTheDocument();
+  });
+
+  it('17. consent card PUT body and auto-send of the pending question', async () => {
+    let putCapturedBody: any = null;
+    let chatCallCount = 0;
+    let chatCapturedBody: any = null;
+
+    let currentSettings = { ...aiSettingsDefaultFixture.data }; // ai_enabled: false
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/api/ai/status')) {
+        return new Response(JSON.stringify(aiStatusFixture), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr.includes('/ai-settings')) {
+        if (init?.method === 'PUT') {
+          putCapturedBody = JSON.parse(String(init.body));
+          currentSettings = {
+            ...currentSettings,
+            ...putCapturedBody,
+          };
+          return new Response(JSON.stringify({ data: currentSettings, error: null }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ data: currentSettings, error: null }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (urlStr.includes('/chat')) {
+        chatCallCount++;
+        chatCapturedBody = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify(aiChatSuccessFixture), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (urlStr.includes('/api/projects')) {
+        return new Response(JSON.stringify({ data: [mockProjectScanned], error: null }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ data: null, error: 'Not found' }), { status: 404 });
+    });
+
+    render(<TestHarness initialEntries={['/app/overview']} />);
+    fireEvent.click(screen.getByTestId('toggle-panel-btn'));
+    expect(await screen.findByText('AI off for this project')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
+    fireEvent.change(input, { target: { value: 'Why are there circular dependencies?' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
+
+    // Offline answer appears with reason, and consent card is rendered
+    expect(await screen.findByTestId('chat-offline-message')).toBeInTheDocument();
+    const consentCard = await screen.findByTestId('chat-consent-card');
+    expect(consentCard).toBeInTheDocument();
+    expect(screen.getByTestId('consent-card-text')).toHaveTextContent(/Turning this on sends the question/i);
+
+    // Auto-send is pending. Check the "I understand" box and click turn on AI
+    const checkbox = screen.getByTestId('consent-card-checkbox');
+    const submitBtn = screen.getByTestId('consent-card-submit-btn');
+
+    expect(submitBtn).toBeDisabled();
+    fireEvent.click(checkbox);
+    expect(submitBtn).not.toBeDisabled();
+
+    fireEvent.click(submitBtn);
+
+    // Verify PUT body
+    await waitFor(() => {
+      expect(putCapturedBody).toEqual({
+        ai_enabled: true,
+        share_code: false,
+        consent_version: '2026-10-v2',
+      });
+    });
+
+    // Verify auto-send sent the pending question to /chat
+    await waitFor(() => {
+      expect(chatCallCount).toBe(1);
+      expect(chatCapturedBody?.message).toBe('Why are there circular dependencies?');
+      expect(screen.getByTestId('chat-ai-message')).toBeInTheDocument();
+    });
+  });
+
+  it('18. outdated consent shows the card and update message', async () => {
+    setupFetchMock({
+      '/ai-settings': {
+        data: {
+          project_id: 'proj-123',
+          ai_enabled: true,
+          share_code: false,
+          consent_version: '2026-10-v1', // Outdated!
+          current_consent_version: '2026-10-v2',
+          consent_text: 'Updated consent text v2.',
+        },
+        error: null,
+      },
+    });
+
+    render(<TestHarness initialEntries={['/app/overview']} />);
+    fireEvent.click(screen.getByTestId('toggle-panel-btn'));
+
+    // Status badge reflects outdated/off
+    expect(await screen.findByText('AI off for this project')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
+    fireEvent.change(input, { target: { value: 'Help with architecture' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
+
+    // Shows offline help with outdated consent reason
+    const offlineMsg = await screen.findByTestId('chat-offline-message');
+    expect(offlineMsg).toHaveTextContent(/The AI privacy note was updated. Please accept it again to use AI./i);
+
+    // Consent card is visible with updated title
+    const consentCard = await screen.findByTestId('chat-consent-card');
+    expect(consentCard).toHaveTextContent('Updated AI Consent Required');
+    expect(screen.getByTestId('consent-card-text')).toHaveTextContent('Updated consent text v2.');
+  });
+
+  it('19. fenced code block renders as monospace text, Copy button copies code, and XSS payload creates no DOM element', async () => {
+    const maliciousCode = '<img src=x onerror=alert(1)>';
+    const textWithFencedBlock = `Here is sample code:\n\`\`\`javascript\n${maliciousCode}\nconsole.log("hello");\n\`\`\`\nOutside fence: <img src=y onerror=alert(2)>`;
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextMock } });
+
+    setupFetchMock({
+      '/chat': {
+        data: {
+          text: textWithFencedBlock,
+          source: 'test',
+          provider: 'test',
+          model: 'test',
+        },
+        error: null,
+      },
+    });
+
+    render(<TestHarness initialEntries={['/app/overview']} />);
+    fireEvent.click(screen.getByTestId('toggle-panel-btn'));
+    expect(await screen.findByText('AI on')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
+    fireEvent.change(input, { target: { value: 'Show me code' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
+
+    const aiMsg = await screen.findByTestId('chat-ai-message');
+    expect(aiMsg).toBeInTheDocument();
+
+    // Verify <pre> and <code> block with monospace font
+    const codeBlock = aiMsg.querySelector('pre code');
+    expect(codeBlock).not.toBeNull();
+    expect(codeBlock).toHaveTextContent(maliciousCode);
+    expect(codeBlock?.className).toContain('font-mono');
+
+    // Verify Copy button for code block
+    const copyCodeBtn = screen.getByRole('button', { name: /Copy code/i });
+    expect(copyCodeBtn).toBeInTheDocument();
+    fireEvent.click(copyCodeBtn);
+    expect(writeTextMock).toHaveBeenCalledWith(`${maliciousCode}\nconsole.log("hello");`);
+    expect(copyCodeBtn).toHaveTextContent('Copied!');
+
+    // Critical security check: No <img> tag created anywhere in document
+    expect(document.querySelector('img')).toBeNull();
+    // Literal text present outside fence
+    expect(aiMsg).toHaveTextContent('Outside fence: <img src=y onerror=alert(2)>');
+  });
+
+  it('20. unclosed code fence renders as plain text without throwing or crashing', async () => {
+    const unclosedText = 'Unclosed snippet:\n```typescript\nconst active = true;\nlet count = 42;';
+
+    setupFetchMock({
+      '/chat': {
+        data: {
+          text: unclosedText,
+          source: 'test',
+          provider: 'test',
+          model: 'test',
+        },
+        error: null,
+      },
+    });
+
+    render(<TestHarness initialEntries={['/app/overview']} />);
+    fireEvent.click(screen.getByTestId('toggle-panel-btn'));
+    expect(await screen.findByText('AI on')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
+    fireEvent.change(input, { target: { value: 'Show unclosed' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
+
+    const aiMsg = await screen.findByTestId('chat-ai-message');
+    expect(aiMsg).toBeInTheDocument();
+    expect(aiMsg).toHaveTextContent('Unclosed snippet:');
+    expect(aiMsg).toHaveTextContent('const active = true;');
   });
 });

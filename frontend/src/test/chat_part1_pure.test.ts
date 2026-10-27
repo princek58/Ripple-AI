@@ -60,7 +60,7 @@ describe('K2 Part 1 – captured API fixture shapes', () => {
   it('PUT /api/projects/:id/ai-settings valid enable returns updated settings', () => {
     const { data } = aiSettingsPutEnable;
     expect(data.ai_enabled).toBe(true);
-    expect(data.consent_version).toBe('2026-10-v1');
+    expect(data.consent_version).toBe('2026-10-v2');
     expect(aiSettingsPutEnable.error).toBeNull();
   });
 

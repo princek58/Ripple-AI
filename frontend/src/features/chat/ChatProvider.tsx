@@ -14,7 +14,6 @@ import { contextIdsFromUrl } from './urlHelpers.js';
 import { chatErrorMessage } from './errorMessages.js';
 import { trimHistory } from './trimHistory.js';
 import { fetchAiStatus, fetchProjectAiSettings, putProjectAiSettings, postChatMessage } from './chatApi.js';
-import { getFriendlyErrorMessage } from '../../lib/api.js';
 import type {
   AiStatusData,
   ProjectAiSettings,
@@ -105,7 +104,9 @@ export interface ChatContextValue {
     ai_enabled: boolean;
     share_code?: boolean;
     consent_version?: string;
-  }) => Promise<void>;
+  }) => Promise<ProjectAiSettings | void>;
+  pendingQuestion?: string | null;
+  enableAiWithConsent?: () => Promise<void>;
 }
 
 export const ChatContext = createContext<ChatContextValue | null>(null);
@@ -135,6 +136,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [aiSettings, setAiSettings] = useState<ProjectAiSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState<boolean>(false);
+  const aiSettingsRef = useRef<ProjectAiSettings | null>(aiSettings);
+  useEffect(() => {
+    aiSettingsRef.current = aiSettings;
+  }, [aiSettings]);
+
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const pendingQuestionRef = useRef<string | null>(null);
+  useEffect(() => {
+    pendingQuestionRef.current = pendingQuestion;
+  }, [pendingQuestion]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const prevProjectIdRef = useRef<string | null>(selectedProjectId);
@@ -229,7 +240,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No project selected');
       }
       const updated = await putProjectAiSettings(selectedProjectId, body);
+      aiSettingsRef.current = updated;
       setAiSettings(updated);
+      return updated;
     },
     [selectedProjectId]
   );
@@ -263,100 +276,52 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await loadGlossarySyncOrAsync();
       }
 
-      // Check if question matches offline data questions (K3 Part 2)
+      // Check if question matches offline data questions
       const offlineDataType = chatModules?.offlineKeywords?.matchOfflineDataQuestion(
         clean,
         Boolean(ctx.finding_id)
       );
-
       const activeAnswers = chatModules?.offlineAnswers;
 
-      if (offlineDataType && activeAnswers) {
-        const isScanned = Boolean(selectedProject?.last_scan_at);
-
-        if (offlineDataType !== 'WHAT_IS_NOT_CHECKED' && !selectedProjectId) {
-          const offMsg: ChatMessage = {
-            id: uniqueMsgId('offline'),
-            role: 'assistant',
-            text:
-              lang === 'hi'
-                ? `Koi project select nahi hai. Offline help neeche hai.\n\n${activeAnswers.OFFLINE_DATA_FOOTER}`
-                : `No project selected. Offline help is shown below.\n\n${activeAnswers.OFFLINE_DATA_FOOTER}`,
-            type: 'offline',
-          };
-          setMessages((prev) => [...prev, userMsg, offMsg]);
-          return;
-        }
-
-        if (offlineDataType !== 'WHAT_IS_NOT_CHECKED' && !isScanned) {
-          const offMsg: ChatMessage = {
-            id: uniqueMsgId('offline'),
-            role: 'assistant',
-            text: activeAnswers.formatNeverScanned() || 'Not scanned yet.',
-            type: 'offline',
-          };
-          setMessages((prev) => [...prev, userMsg, offMsg]);
-          return;
-        }
-
-        const controller = new AbortController();
-        abortControllerRef.current = controller;
-        setBusy(true);
-        setMessages((prev) => [...prev, userMsg]);
-
-        try {
-          const ans = await activeAnswers.getOfflineDataAnswer(
-            offlineDataType,
-            {
-              projectId: selectedProjectId!,
-              isScanned,
-              lang,
-              screen: ctx.screen,
-              findingId: ctx.finding_id,
-              signal: controller.signal,
-            }
-          );
-          if (controller.signal.aborted) return;
-          const offMsg: ChatMessage = {
-            id: uniqueMsgId('offline'),
-            role: 'assistant',
-            text: ans,
-            type: 'offline',
-          };
-          setMessages((prev) => [...prev, offMsg]);
-        } catch (err: unknown) {
-          if (controller.signal.aborted) return;
-          const friendly = getFriendlyErrorMessage(err);
-          const offMsg: ChatMessage = {
-            id: uniqueMsgId('offline'),
-            role: 'assistant',
-            text: `${friendly}\n\n${activeAnswers.OFFLINE_DATA_FOOTER}`,
-            type: 'offline',
-          };
-          setMessages((prev) => [...prev, offMsg]);
-        } finally {
-          setBusy(false);
-          abortControllerRef.current = null;
-        }
-        return;
-      }
-
-      const hasMatch = chatModules?.glossary
-        ? chatModules.glossary.hasGlossaryMatch(clean) || Boolean(ctx.finding_id)
-        : Boolean(ctx.finding_id);
+      const currentSettings = aiSettingsRef.current || aiSettings;
       const isConfigured = aiStatus?.configured === true;
-      const isAiOn = aiSettings?.ai_enabled === true;
+      const isAiOn = currentSettings?.ai_enabled === true;
+      const currentConsentVer = currentSettings?.current_consent_version || '2026-10-v2';
+      const storedConsentVer = currentSettings?.consent_version || null;
+      const isConsentCurrent = Boolean(storedConsentVer) && storedConsentVer === currentConsentVer;
       const isScanned = Boolean(selectedProject?.last_scan_at);
       const currentProjectId = selectedProjectId;
       const hasProject = Boolean(currentProjectId);
 
-      // Offline answer computation
-      const computeOfflineText = () =>
-        chatModules?.glossary ? chatModules.glossary.offlineAnswer(clean, ctx, lang) : '';
+      const canUseAi = hasProject && isScanned && isConfigured && isAiOn && isConsentCurrent;
 
-      // If AI is not available (not selected, unscanned, not configured, or off)
-      if (!currentProjectId || !isScanned || !isConfigured || !isAiOn) {
-        const offText = computeOfflineText();
+      // When AI is off, not configured or consent is outdated: offline answers only with one-line reason and consent card below
+      if (!canUseAi) {
+        pendingQuestionRef.current = clean;
+        setPendingQuestion(clean);
+
+        let offText = '';
+        if (offlineDataType && activeAnswers && isScanned && currentProjectId) {
+          try {
+            offText = await activeAnswers.getOfflineDataAnswer(
+              offlineDataType,
+              {
+                projectId: currentProjectId,
+                isScanned,
+                lang,
+                screen: ctx.screen,
+                findingId: ctx.finding_id,
+              }
+            );
+          } catch {
+            offText = chatModules?.glossary ? chatModules.glossary.offlineAnswer(clean, ctx, lang) : '';
+          }
+        } else if (offlineDataType && activeAnswers && !isScanned && currentProjectId) {
+          offText = activeAnswers.formatNeverScanned() || 'Not scanned yet.';
+        } else {
+          offText = chatModules?.glossary ? chatModules.glossary.offlineAnswer(clean, ctx, lang) : '';
+        }
+
         let reason = '';
         if (!hasProject) {
           reason =
@@ -372,9 +337,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           reason = chatErrorMessage('AI_NOT_CONFIGURED', lang);
         } else if (!isAiOn) {
           reason = chatErrorMessage('AI_DISABLED', lang);
+        } else if (!isConsentCurrent) {
+          reason = chatErrorMessage('AI_DISABLED [CONSENT_OUTDATED]', lang);
         }
 
-        const fullOfflineText = reason ? `${offText}\n\n${reason}` : offText;
+        const fullOfflineText = reason ? (offText ? `${offText}\n\n${reason}` : reason) : offText;
 
         const offMsg: ChatMessage = {
           id: uniqueMsgId('offline'),
@@ -387,16 +354,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // AI IS configured, enabled, and project is selected & scanned
-      const offlineMsg: ChatMessage | null = hasMatch
-        ? {
-            id: uniqueMsgId('offline'),
-            role: 'assistant',
-            text: computeOfflineText(),
-            type: 'offline',
-          }
-        : null;
-
+      // AI-first flow: when AI is on and configured, send every user message to chat route
+      // and show only the "Ripple AI is thinking..." indicator (do NOT show an offline box first)
       const thinkingId = uniqueMsgId('think');
       const thinkingMsg: ChatMessage = {
         id: thinkingId,
@@ -406,14 +365,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isThinking: true,
       };
 
-      // Add messages immediately: user message + immediate offline answer (if match) + thinking indicator
-      setMessages((prev) => [
-        ...prev,
-        userMsg,
-        ...(offlineMsg ? [offlineMsg] : []),
-        thinkingMsg,
-      ]);
-
+      setMessages((prev) => [...prev, userMsg, thinkingMsg]);
       setBusy(true);
 
       const controller = new AbortController();
@@ -449,7 +401,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         const res = await postChatMessage(
-          currentProjectId,
+          currentProjectId!,
           {
             message: clean.slice(0, 1500),
             screen: ctx.screen,
@@ -466,6 +418,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearTimeout(timer12);
         clearTimeout(timer25);
 
+        // Success: replace thinkingMsg with AI answer
         setMessages((prev) =>
           prev.map((m) =>
             m.id === thinkingId
@@ -487,13 +440,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         let errorText = '';
         let canRetry = true;
+        const isUserCancelled =
+          controller.signal.aborted &&
+          !timedOut25 &&
+          controller.signal.reason !== 'AI_TIMEOUT';
 
         if (
           timedOut25 ||
           (controller.signal.aborted && controller.signal.reason === 'AI_TIMEOUT')
         ) {
           errorText = chatErrorMessage('AI_TIMEOUT', lang);
-        } else if (controller.signal.aborted) {
+        } else if (isUserCancelled) {
           errorText = 'Request cancelled';
           canRetry = false;
         } else {
@@ -501,19 +458,64 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           errorText = chatErrorMessage(raw, lang);
         }
 
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === thinkingId
-              ? {
-                  id: thinkingId,
-                  role: 'assistant',
-                  text: errorText,
-                  type: 'error',
-                  canRetry,
+        if (isUserCancelled) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === thinkingId
+                ? {
+                    id: thinkingId,
+                    role: 'assistant',
+                    text: errorText,
+                    type: 'error',
+                    canRetry: false,
+                  }
+                : m
+            )
+          );
+        } else {
+          // If request fails or reaches 25-second abort:
+          // Show the friendly message for the code AND the offline answer labelled "Offline help"
+          let offText = '';
+          try {
+            if (offlineDataType && activeAnswers && isScanned && currentProjectId) {
+              offText = await activeAnswers.getOfflineDataAnswer(
+                offlineDataType,
+                {
+                  projectId: currentProjectId,
+                  isScanned,
+                  lang,
+                  screen: ctx.screen,
+                  findingId: ctx.finding_id,
                 }
-              : m
-          )
-        );
+              );
+            } else if (chatModules?.glossary) {
+              offText = chatModules.glossary.offlineAnswer(clean, ctx, lang);
+            }
+          } catch {}
+
+          const errorMsg: ChatMessage = {
+            id: thinkingId,
+            role: 'assistant',
+            text: errorText,
+            type: 'error',
+            canRetry,
+          };
+
+          const offMsg: ChatMessage = {
+            id: uniqueMsgId('offline'),
+            role: 'assistant',
+            text: offText || 'Offline help is available for architecture and findings.',
+            type: 'offline',
+          };
+
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === thinkingId);
+            if (idx === -1) return [...prev, offMsg, errorMsg];
+            const next = [...prev];
+            next.splice(idx, 1, offMsg, errorMsg);
+            return next;
+          });
+        }
       } finally {
         setBusy(false);
         abortControllerRef.current = null;
@@ -531,6 +533,27 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       messages,
     ]
   );
+
+  const enableAiWithConsent = useCallback(async () => {
+    if (!selectedProjectId) return;
+    const currentVer =
+      aiSettingsRef.current?.current_consent_version ||
+      aiSettings?.current_consent_version ||
+      '2026-10-v2';
+
+    await updateSettings({
+      ai_enabled: true,
+      share_code: false,
+      consent_version: currentVer,
+    });
+
+    if (pendingQuestionRef.current) {
+      const q = pendingQuestionRef.current;
+      pendingQuestionRef.current = null;
+      setPendingQuestion(null);
+      await sendMessage(q);
+    }
+  }, [selectedProjectId, aiSettings, updateSettings, sendMessage]);
 
   const retryLastMessage = useCallback(() => {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
@@ -558,6 +581,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearMessages,
       refreshSettings,
       updateSettings,
+      pendingQuestion,
+      enableAiWithConsent,
     }),
     [
       isOpen,
@@ -576,6 +601,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearMessages,
       refreshSettings,
       updateSettings,
+      pendingQuestion,
+      enableAiWithConsent,
     ]
   );
 
