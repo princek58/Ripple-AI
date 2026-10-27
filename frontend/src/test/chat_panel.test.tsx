@@ -57,9 +57,8 @@ function TestHarness({
   );
 }
 
-// Controller to toggle open state and switch project in tests
 function ChatPanelController() {
-  const { isOpen, setIsOpen, messages } = useChat();
+  const { isOpen, setIsOpen, messages, sendMessage } = useChat();
   const { setSelectedProjectId } = useProjects();
   return (
     <div>
@@ -74,6 +73,12 @@ function ChatPanelController() {
         onClick={() => setSelectedProjectId('proj-unscanned')}
       >
         Switch Project
+      </button>
+      <button
+        data-testid="send-direct-btn"
+        onClick={() => sendMessage('Direct call')}
+      >
+        Send Direct
       </button>
       <span data-testid="msg-count">{messages.length}</span>
     </div>
@@ -354,12 +359,18 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
 
   it('8. double-click sends only one request', async () => {
     let chatCallCount = 0;
+    let resolveChat: (() => void) | null = null;
     setupFetchMock({
       '/chat': () => {
         chatCallCount += 1;
-        return new Response(JSON.stringify(aiChatSuccessFixture), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
+        return new Promise((resolve) => {
+          resolveChat = () =>
+            resolve(
+              new Response(JSON.stringify(aiChatSuccessFixture), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              })
+            );
         });
       },
     });
@@ -373,7 +384,10 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
 
     const sendBtn = screen.getByRole('button', { name: /Send message/i });
     fireEvent.click(sendBtn);
-    fireEvent.click(sendBtn); // rapid second click
+    // Rapid concurrent submit while request is in flight:
+    fireEvent.click(screen.getByTestId('send-direct-btn'));
+
+    if (resolveChat) (resolveChat as any)();
 
     await waitFor(() => {
       expect(screen.getByTestId('chat-ai-message')).toBeInTheDocument();
