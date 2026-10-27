@@ -163,7 +163,7 @@ export const OverviewPage: React.FC = () => {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-theme-text tracking-tight">
+            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-theme-text tracking-tight truncate max-w-xl" title={selectedProject.name}>
               {selectedProject.name}
             </h1>
             <div className="mt-1">
@@ -215,7 +215,7 @@ export const OverviewPage: React.FC = () => {
       {/* Header with Project Title and LastScanLabel */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-heading font-bold text-2xl sm:text-3xl text-theme-text tracking-tight">
+          <h1 className="font-heading font-bold text-2xl sm:text-3xl text-theme-text tracking-tight truncate max-w-xl" title={selectedProject.name}>
             {selectedProject.name}
           </h1>
           <div className="mt-1">

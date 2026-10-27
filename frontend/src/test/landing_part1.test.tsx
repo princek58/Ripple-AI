@@ -74,22 +74,27 @@ describe('Landing Page Part 1 (Step 9a)', () => {
   });
 
   describe('Navbar', () => {
-    it('Docs and Log in are visibly aria-disabled and not working links', () => {
+    it('Docs and Log in are working navigation links without Coming Soon locks or badges', () => {
       renderLanding();
 
-      const docsElements = screen.getAllByText(/docs/i);
-      const docsItem = docsElements[0].closest('[aria-disabled="true"]');
-      expect(docsItem).toBeInTheDocument();
-      expect(docsItem).toHaveAttribute('aria-disabled', 'true');
-      expect(docsItem?.tagName.toLowerCase()).not.toBe('a');
-      expect(docsItem).toHaveAttribute('title', 'Coming soon');
+      const docsElements = screen.getAllByText(/^docs$/i);
+      expect(docsElements.length).toBeGreaterThan(0);
+      const docsLink = docsElements[0].closest('a');
+      expect(docsLink).toBeInTheDocument();
+      expect(docsLink).not.toHaveAttribute('aria-disabled');
+      expect(docsLink).not.toHaveAttribute('title', 'Coming soon');
+      expect(docsLink).toHaveAttribute('href', '/app/overview');
 
-      const loginElements = screen.getAllByText(/log in/i);
-      const loginItem = loginElements[0].closest('[aria-disabled="true"]');
-      expect(loginItem).toBeInTheDocument();
-      expect(loginItem).toHaveAttribute('aria-disabled', 'true');
-      expect(loginItem?.tagName.toLowerCase()).not.toBe('a');
-      expect(loginItem).toHaveAttribute('title', 'Coming soon');
+      const loginElements = screen.getAllByText(/^log in$/i);
+      expect(loginElements.length).toBeGreaterThan(0);
+      const loginLink = loginElements[0].closest('a');
+      expect(loginLink).toBeInTheDocument();
+      expect(loginLink).not.toHaveAttribute('aria-disabled');
+      expect(loginLink).not.toHaveAttribute('title', 'Coming soon');
+      expect(loginLink).toHaveAttribute('href', '/app/projects');
+
+      // Verify no "Soon" badges exist
+      expect(screen.queryByText(/^soon$/i)).toBeNull();
     });
 
     it('Navbar shows the mobile menu when toggled and the scrolled class changes after a scroll event', () => {

@@ -160,7 +160,11 @@ export function computeL1Layout(graphData: GraphResponseData): L1LayoutResult {
   // Position Project Node at center
   let projectNode: LayoutNode | null = null;
   if (projectNodeRaw) {
-    const labelBox = estimateLabelBox(projectNodeRaw.label, centerX, centerY + 38, 12);
+    const rawLabel = projectNodeRaw.label;
+    // When project name exceeds 26 characters, clamp layout calculation to 26 characters
+    // so the bounding box doesn't horizontally touch or overlap adjacent module pills
+    const effectiveLabel = rawLabel.length > 26 ? rawLabel.slice(0, 26) : rawLabel;
+    const labelBox = estimateLabelBox(effectiveLabel, centerX, centerY + 38, 12);
     projectNode = {
       id: projectNodeRaw.id,
       type: 'project',

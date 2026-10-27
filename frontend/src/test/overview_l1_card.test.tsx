@@ -247,4 +247,87 @@ describe('Overview Level 1 Graph Card Rendering (UI-1 Part 2)', () => {
       ).toBeInTheDocument();
     }
   });
+
+  it('5. applies CSS text truncation with ellipsis on Overview card project label when exceeding 26 chars', () => {
+    const longProjectName = 'conduit-realworld-example-app-main'; // 34 characters
+    expect(longProjectName.length).toBeGreaterThan(26);
+
+    const dummyNodes: GraphNode[] = [
+      {
+        id: 'proj-long',
+        project_id: 'proj-long',
+        scan_id: 'scan-1',
+        type: 'project',
+        level: 1,
+        parent_id: null,
+        label: longProjectName,
+        path: '.',
+        line_start: null,
+        line_end: null,
+        language: null,
+        meta_json: null,
+        findingCount: 0,
+        maxSeverity: null,
+      },
+    ];
+
+    // Add 8 radial module pills
+    for (let i = 0; i < 8; i++) {
+      dummyNodes.push({
+        id: `mod-${i}`,
+        project_id: 'proj-long',
+        scan_id: 'scan-1',
+        type: 'module',
+        level: 1,
+        parent_id: 'proj-long',
+        label: `module-${i}`,
+        path: `src/mod${i}`,
+        line_start: null,
+        line_end: null,
+        language: null,
+        meta_json: null,
+        findingCount: 1,
+        maxSeverity: 'medium',
+      });
+    }
+
+    const graphData: GraphResponseData = {
+      nodes: dummyNodes,
+      edges: [],
+      clusters: [],
+      shown: 9,
+      total: 9,
+      level: 1,
+      focus: null,
+    };
+
+    // 1. Check pure layout clearance: labelBox width clamped to 26 characters
+    const layout = computeL1Layout(graphData);
+    expect(layout.projectNode).toBeDefined();
+    // 26 characters * 6.2 + 6 = 167px (unclamped 34 chars would be 217px)
+    expect(layout.projectNode!.labelBox.width).toBeLessThanOrEqual(168);
+
+    // Bounding box does not intersect ANY module label box
+    for (const mod of layout.moduleNodes) {
+      expect(boxesIntersect(layout.projectNode!.labelBox, mod.labelBox)).toBe(false);
+    }
+
+    // 2. Render ProjectGraphCard and verify CSS truncation classes & styles
+    render(
+      <MemoryRouter>
+        <ProjectGraphCard graphData={graphData} />
+      </MemoryRouter>
+    );
+
+    const projectLabel = screen.getByTestId('overview-project-label');
+    expect(projectLabel).toBeInTheDocument();
+    expect(projectLabel).toHaveClass('truncate');
+    expect(projectLabel).toHaveStyle({
+      textOverflow: 'ellipsis',
+      overflow: 'hidden',
+      whiteSpace: 'nowrap',
+    });
+    expect(projectLabel).toHaveAttribute('title', longProjectName);
+    expect(projectLabel).toHaveTextContent(longProjectName);
+  });
 });

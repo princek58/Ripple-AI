@@ -296,7 +296,7 @@ describe('Landing Page Part 2 (Step 9b)', () => {
   });
 
   describe('Footer', () => {
-    it('Footer has no <img>, no mailto and no social links, and Docs is aria-disabled', () => {
+    it('Footer has no <img>, no mailto and no social links, and Docs is a working link', () => {
       const { container } = render(
         <BrowserRouter>
           <Footer />
@@ -316,10 +316,11 @@ describe('Landing Page Part 2 (Step 9b)', () => {
         expect(href).not.toMatch(/twitter|x\.com|github|linkedin|facebook|discord|instagram/i);
       }
 
-      // Docs (coming soon) is aria-disabled
-      const docsElement = screen.getByText(/docs \(coming soon\)/i);
-      expect(docsElement).toHaveAttribute('aria-disabled', 'true');
-      expect(docsElement.tagName.toLowerCase()).not.toBe('a');
+      // Docs is a clean navigation link without disabled lock or coming soon text
+      const docsElement = screen.getByText(/^docs$/i);
+      expect(docsElement.tagName.toLowerCase()).toBe('a');
+      expect(docsElement).not.toHaveAttribute('aria-disabled');
+      expect(docsElement).toHaveAttribute('href', '/app/overview');
 
       // Contains privacy guarantee
       expect(

@@ -67,31 +67,21 @@ export const Navbar: React.FC<NavbarProps> = ({ className = '' }) => {
             Safety
           </a>
 
-          {/* Docs: Visibly disabled, not yet implemented */}
-          <span
-            role="link"
-            aria-disabled="true"
-            title="Coming soon"
-            className="text-sm font-medium text-theme-text-muted/40 cursor-not-allowed select-none inline-flex items-center gap-1.5 px-1.5 py-0.5"
+          {/* Docs: Finished navigation item */}
+          <Link
+            to="/app/overview"
+            className="text-sm font-medium text-theme-text-muted hover:text-theme-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime rounded-md px-1.5 py-0.5"
           >
             Docs
-            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded border border-theme-border/60 bg-theme-surface/50 text-theme-text-muted/60">
-              Soon
-            </span>
-          </span>
+          </Link>
 
-          {/* Log in: Visibly disabled, not yet implemented */}
-          <span
-            role="link"
-            aria-disabled="true"
-            title="Coming soon"
-            className="text-sm font-medium text-theme-text-muted/40 cursor-not-allowed select-none inline-flex items-center gap-1.5 px-1.5 py-0.5"
+          {/* Log in: Finished navigation item */}
+          <Link
+            to="/app/projects"
+            className="text-sm font-medium text-theme-text-muted hover:text-theme-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime rounded-md px-1.5 py-0.5"
           >
             Log in
-            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded border border-theme-border/60 bg-theme-surface/50 text-theme-text-muted/60">
-              Soon
-            </span>
-          </span>
+          </Link>
         </nav>
 
         {/* Action Buttons & Theme Toggle */}
@@ -159,31 +149,23 @@ export const Navbar: React.FC<NavbarProps> = ({ className = '' }) => {
             Safety
           </a>
 
-          {/* Docs disabled */}
-          <div
-            role="link"
-            aria-disabled="true"
-            title="Coming soon"
-            className="text-base font-medium text-theme-text-muted/40 cursor-not-allowed select-none flex items-center justify-between py-2 border-b border-theme-border/40"
+          {/* Docs */}
+          <Link
+            to="/app/overview"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="text-base font-medium text-theme-text py-2 border-b border-theme-border/40"
           >
-            <span>Docs</span>
-            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border border-theme-border/60 bg-theme-surface/50 text-theme-text-muted/60">
-              Soon
-            </span>
-          </div>
+            Docs
+          </Link>
 
-          {/* Log in disabled */}
-          <div
-            role="link"
-            aria-disabled="true"
-            title="Coming soon"
-            className="text-base font-medium text-theme-text-muted/40 cursor-not-allowed select-none flex items-center justify-between py-2 border-b border-theme-border/40"
+          {/* Log in */}
+          <Link
+            to="/app/projects"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="text-base font-medium text-theme-text py-2 border-b border-theme-border/40"
           >
-            <span>Log in</span>
-            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border border-theme-border/60 bg-theme-surface/50 text-theme-text-muted/60">
-              Soon
-            </span>
-          </div>
+            Log in
+          </Link>
 
           <div className="pt-2">
             <Link to="/app/projects" onClick={() => setIsMobileMenuOpen(false)}>

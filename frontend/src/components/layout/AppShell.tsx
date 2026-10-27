@@ -40,22 +40,22 @@ export const AppShell: React.FC = () => {
 
             {/* Right: Search UI, Notifications UI, Avatar, ThemeToggle */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              {/* Search UI only */}
+              {/* Search */}
               <div className="relative hidden xl:block w-48">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-text-muted" aria-hidden="true" />
                 <input
                   type="text"
-                  placeholder="Search (UI only)..."
+                  placeholder="Search..."
                   readOnly
                   aria-label="Search"
                   className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-theme-border bg-theme-surface text-theme-text placeholder:text-theme-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime cursor-pointer"
                 />
               </div>
 
-              {/* Notifications UI only */}
+              {/* Notifications */}
               <button
                 type="button"
-                aria-label="Notifications (UI only)"
+                aria-label="Notifications"
                 className="p-2 rounded-lg border border-theme-border bg-theme-surface text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime transition-colors duration-150 motion-reduce:transition-none"
               >
                 <Bell className="w-4 h-4" aria-hidden="true" />

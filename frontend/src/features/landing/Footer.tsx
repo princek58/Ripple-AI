@@ -46,15 +46,13 @@ export const Footer: React.FC<{ className?: string }> = ({ className = '' }) => 
               Safety
             </a>
 
-            {/* Docs (coming soon) disabled item */}
-            <span
-              role="link"
-              aria-disabled="true"
-              title="Coming soon"
-              className="text-theme-text-muted/40 cursor-not-allowed select-none inline-flex items-center gap-1.5"
+            {/* Docs navigation item */}
+            <Link
+              to="/app/overview"
+              className="text-theme-text-muted hover:text-theme-text transition-colors"
             >
-              Docs (coming soon)
-            </span>
+              Docs
+            </Link>
           </nav>
         </div>
 

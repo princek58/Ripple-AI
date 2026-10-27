@@ -189,18 +189,29 @@ export const ProjectGraphCard: React.FC<ProjectGraphCardProps> = ({
                 fill="var(--theme-surface)"
                 fillOpacity={0.85}
               />
-              <text
-                x={projectNode.pos.x}
-                y={projectNode.labelBox.y + 11}
-                textAnchor="middle"
-                paintOrder="stroke fill"
-                stroke="var(--theme-surface)"
-                strokeWidth={3}
-                strokeLinejoin="round"
-                className="font-heading font-bold text-xs fill-theme-text select-none"
+              <foreignObject
+                x={projectNode.labelBox.x}
+                y={projectNode.labelBox.y}
+                width={projectNode.labelBox.width}
+                height={projectNode.labelBox.height}
+                className="overflow-visible"
               >
-                {projectNode.label}
-              </text>
+                <div
+                  data-testid="overview-project-label"
+                  title={projectNode.label}
+                  className="project-label truncate font-heading font-bold text-xs text-theme-text text-center select-none"
+                  style={{
+                    width: `${projectNode.labelBox.width}px`,
+                    maxWidth: `${projectNode.labelBox.width}px`,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    lineHeight: `${projectNode.labelBox.height}px`,
+                  }}
+                >
+                  {projectNode.label}
+                </div>
+              </foreignObject>
             </g>
           )}
 
