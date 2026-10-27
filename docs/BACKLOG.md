@@ -55,3 +55,6 @@ This document tracks known limitations, technical debt, security advisories, and
 | **K-16** | AI Verification | real AI answers are only verified on the small demo-erp fixture | Minor | Open |
 | **L-01** | Landing Page | Docs link on the landing page is disabled until a real Docs page exists. | Minor | Open |
 | **L-02** | Git Maintenance | landing-wip branch holds unreviewed edits, not merged. | Minor | Open |
+| **D-01** | Security & Auth | no user accounts; one shared access code | Minor | Open |
+| **D-02** | Deployment & Storage | SQLite and uploads need a persistent disk | Minor | Open |
+| **D-03** | Public Deployment | public deployments should use PUBLIC_DEMO_MODE | Minor | Open |

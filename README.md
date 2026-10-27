@@ -158,6 +158,16 @@ npm --workspace=@ripple-ai/backend run build
 npm --workspace=@ripple-ai/frontend run build
 ```
 
+### Deploying
+
+Ripple AI can be deployed as a single unified service (serving both the API and the single-page application) with a persistent disk volume for SQLite and uploaded files.
+
+For full host-agnostic instructions, environment variables, and go-live checklist, see [DEPLOY.md](DEPLOY.md).
+
+#### Access Gate & Demo Mode
+- **Access Gate**: Setting `APP_ACCESS_CODE` and `APP_SESSION_SECRET` enables an authentication gate on all API routes and presents an "Enter access code" screen to users.
+- **Public Demo Mode**: Setting `PUBLIC_DEMO_MODE=1` forces snippet code sharing OFF across all projects, preventing code lines from being sent to external AI providers during public demonstrations.
+
 ### Visual QA
 
 Run full automated browser visual regression and quality verification:
@@ -235,8 +245,22 @@ RippleAI/
 - **Print layout verification**: Print layout is only checked by the stylesheet test, not by a printed page.
 - **Graph page bundle size**: The `elkjs` layout engine is bundled whole, so the Graph page chunk is about 1.6 MB (uncompressed).
 - **Routerless fixtures**: In architectures without a centralized router file (such as the included `demo-erp` sample), some standalone utility and helper files may be flagged as `isolated_file`.
-- **Local use only**: There is no authentication (local use only); the application is designed for single-user local workstation use.
+- **Single-user access code**: Authentication uses a shared passkey gate (`APP_ACCESS_CODE`); there are no multi-user accounts or roles.
 - **Browser-built patch download**: Patch download is built in the browser using Blob URLs.
+
+## Future scope
+
+In honest plain words, the following expansions and improvements are planned for future iterations:
+
+- **Fixing false alarms from rehearsal**: Refining checks to suppress false alarms on build config files, `.d.ts` declaration files, and standard environment variables.
+- **More static checks**: Adding automated checks for vulnerable dependencies and security patterns.
+- **Requirement-to-code**: Tracing requirements and user stories to code artifacts and implementation paths.
+- **CI/CD and deployment analysis**: Analyzing deployment configurations, GitHub Actions, Dockerfiles, and pipeline reliability.
+- **Running code in a safe sandbox**: Executing code in an isolated, safe sandbox so tests can be run and findings can be verified empirically.
+- **Saving chat and scan history**: Persisting scan history timelines and chat sessions across browser restarts and project switches.
+- **User accounts and login**: Introducing user accounts, authentication profiles, and team access permissions.
+- **Streaming chat answers**: Streaming AI responses incrementally to enhance perceived responsiveness.
+- **More AI providers**: Adding adapters for additional external AI providers and self-hosted models.
 
 ## Status
 
@@ -248,5 +272,6 @@ RippleAI/
 - **Step K4a (Chat Backend Natural Assistant)**: Complete.
 - **Step K4b (Chat Natural Assistant & AI-First UI)**: Complete.
 - **Step K5 (Chat Self-Aware Assistant & Always-On AI)**: Complete.
-- **Test suite**: 883 tests passing across 65 test files (257 backend tests, 626 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
+- **Step DEP1 (Deploy Ready & One Service)**: Complete.
+- **Test suite**: 911 tests passing across 69 test files (277 backend tests, 634 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
 

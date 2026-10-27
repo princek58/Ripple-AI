@@ -147,9 +147,11 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
 
     it('DEP1-1a. default share_code is ON when APP_ACCESS_CODE is set and PUBLIC_DEMO_MODE is not set', async () => {
       const originalAccessCode = process.env.APP_ACCESS_CODE;
+      const originalSessionSecret = process.env.APP_SESSION_SECRET;
       const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
       try {
         process.env.APP_ACCESS_CODE = 'test-secret-code';
+        process.env.APP_SESSION_SECRET = 'test-session-secret';
         delete process.env.PUBLIC_DEMO_MODE;
 
         const projCId = '00000000-0000-0000-0000-000000000010';
@@ -159,12 +161,19 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
           VALUES (?, 'Project C', CURRENT_TIMESTAMP, 50, 1)
         `).run(projCId);
 
-        const res = await request(app).get(`/api/projects/${projCId}/ai-settings`);
+        const loginRes = await request(app).post('/api/access').send({ code: 'test-secret-code' });
+        const cookie = loginRes.headers['set-cookie'];
+
+        const res = await request(app)
+          .get(`/api/projects/${projCId}/ai-settings`)
+          .set('Cookie', cookie);
         expect(res.status).toBe(200);
         expect(res.body.data.share_code).toBe(true);
       } finally {
         if (originalAccessCode === undefined) delete process.env.APP_ACCESS_CODE;
         else process.env.APP_ACCESS_CODE = originalAccessCode;
+        if (originalSessionSecret === undefined) delete process.env.APP_SESSION_SECRET;
+        else process.env.APP_SESSION_SECRET = originalSessionSecret;
         if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
         else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
       }
@@ -172,9 +181,11 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
 
     it('DEP1-1b. default share_code is OFF when PUBLIC_DEMO_MODE is set even if APP_ACCESS_CODE is set', async () => {
       const originalAccessCode = process.env.APP_ACCESS_CODE;
+      const originalSessionSecret = process.env.APP_SESSION_SECRET;
       const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
       try {
         process.env.APP_ACCESS_CODE = 'test-secret-code';
+        process.env.APP_SESSION_SECRET = 'test-session-secret';
         process.env.PUBLIC_DEMO_MODE = '1';
 
         const projDId = '00000000-0000-0000-0000-000000000011';
@@ -184,12 +195,19 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
           VALUES (?, 'Project D', CURRENT_TIMESTAMP, 50, 1)
         `).run(projDId);
 
-        const res = await request(app).get(`/api/projects/${projDId}/ai-settings`);
+        const loginRes = await request(app).post('/api/access').send({ code: 'test-secret-code' });
+        const cookie = loginRes.headers['set-cookie'];
+
+        const res = await request(app)
+          .get(`/api/projects/${projDId}/ai-settings`)
+          .set('Cookie', cookie);
         expect(res.status).toBe(200);
         expect(res.body.data.share_code).toBe(false);
       } finally {
         if (originalAccessCode === undefined) delete process.env.APP_ACCESS_CODE;
         else process.env.APP_ACCESS_CODE = originalAccessCode;
+        if (originalSessionSecret === undefined) delete process.env.APP_SESSION_SECRET;
+        else process.env.APP_SESSION_SECRET = originalSessionSecret;
         if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
         else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
       }

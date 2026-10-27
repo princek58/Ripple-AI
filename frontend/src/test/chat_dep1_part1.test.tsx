@@ -45,7 +45,7 @@ describe('DEP1 Part 1 - Owner-Open Defaults and Demo Mode UI', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            data: { items: [mockProjectScanned], total: 1 },
+            data: [mockProjectScanned],
             error: null,
           }),
         };

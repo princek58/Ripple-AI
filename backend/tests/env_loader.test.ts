@@ -83,6 +83,7 @@ describe('Environment Loader (Addendum v2 Step 1)', () => {
     expect(res.body).toEqual({
       data: {
         configured: true,
+        demo_mode: false,
         provider: 'gemini',
         model: 'gemini-1.5-flash',
       },
