@@ -18,7 +18,7 @@ export const LandingPage: React.FC = () => {
   const reducedMotion = usePrefersReducedMotion();
 
   return (
-    <div className="min-h-screen bg-theme-bg text-theme-text font-body transition-colors duration-150 motion-reduce:transition-none selection:bg-lime selection:text-forest overflow-x-hidden">
+    <div className="min-h-screen bg-theme-bg text-theme-text font-body transition-colors duration-150 motion-reduce:transition-none selection:bg-lime selection:text-forest overflow-x-clip">
       {/* 1. Navbar */}
       <Navbar />
 

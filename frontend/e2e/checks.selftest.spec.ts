@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupPageCheckListeners, runPageChecks } from './checkHelpers.js';
+import { setupPageCheckListeners, runPageChecks, checkStickyStaysPinned } from './checkHelpers.js';
 
 test.describe('Automated Checks Self-Test', () => {
   test('proves that automated checks detect injected defects (overlap, clipping, named overflow, invalid counters)', async ({
@@ -482,5 +482,91 @@ test.describe('Automated Checks Self-Test', () => {
     const cleanResult = await runPageChecks(page, true, true, listeners);
     expect(cleanResult.chatCircleCheck?.valid).toBe(true);
     expect(cleanResult.chatPanelCheck?.valid).toBe(true);
+  });
+
+  test('proves that automated checks detect sticky zoom defects (unpinned stage top drift, failure to reach L4) and pass on a pinned stage', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // 1. Defect: Unpinned stage (stage top scrolls off / changes position)
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Unpinned Stage Defect</title></head>
+        <body style="margin: 0;">
+          <div style="height: 1000px;">Above Content</div>
+          <section data-testid="sticky-graph-interactive" style="position: relative; height: 2600px;">
+            <div class="sticky" style="position: static;">
+              <span class="font-mono">L1 Project</span>
+              <div style="height: 400px;">Stage Content</div>
+            </div>
+          </section>
+        </body>
+      </html>
+    `);
+
+    const unpinnedResult = await checkStickyStaysPinned(page);
+    expect(unpinnedResult.found).toBe(true);
+    expect(unpinnedResult.pinnedConstant).toBe(false);
+    expect(unpinnedResult.valid).toBe(false);
+
+    // 2. Defect: Stage stays pinned but never progresses to L4
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>No L4 Defect</title></head>
+        <body style="margin: 0;">
+          <div style="height: 1000px;">Above Content</div>
+          <section data-testid="sticky-graph-interactive" style="position: relative; height: 2600px;">
+            <div class="sticky" style="position: sticky; top: 96px;">
+              <span class="font-mono">L1 Project</span>
+              <div style="height: 400px;">Stage Content</div>
+            </div>
+          </section>
+        </body>
+      </html>
+    `);
+
+    const noL4Result = await checkStickyStaysPinned(page);
+    expect(noL4Result.found).toBe(true);
+    expect(noL4Result.pinnedConstant).toBe(true);
+    expect(noL4Result.reachedL4).toBe(false);
+    expect(noL4Result.valid).toBe(false);
+
+    // 3. Clean: Pinned stage with scroll listener driving stage progression up to L4
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><meta charset="utf-8" /><title>Working Sticky Stage</title></head>
+        <body style="margin: 0;">
+          <div style="height: 1000px;">Above Content</div>
+          <section id="interactive-sec" data-testid="sticky-graph-interactive" style="position: relative; height: 2600px;">
+            <div class="sticky" style="position: sticky; top: 96px;">
+              <span id="stage-label" class="font-mono">L1 Project</span>
+              <div style="height: 400px;">Stage Content</div>
+            </div>
+          </section>
+          <script>
+            window.addEventListener('scroll', () => {
+              const sec = document.getElementById('interactive-sec');
+              const label = document.getElementById('stage-label');
+              const rect = sec.getBoundingClientRect();
+              const progress = -rect.top / (rect.height - window.innerHeight);
+              if (progress >= 0.75) label.textContent = 'L4 Evidence';
+              else if (progress >= 0.5) label.textContent = 'L3 Code';
+              else if (progress >= 0.25) label.textContent = 'L2 Module';
+              else label.textContent = 'L1 Project';
+            });
+          </script>
+        </body>
+      </html>
+    `);
+
+    const workingResult = await checkStickyStaysPinned(page);
+    expect(workingResult.found).toBe(true);
+    expect(workingResult.pinnedConstant).toBe(true);
+    expect(workingResult.reachedL4).toBe(true);
+    expect(workingResult.valid).toBe(true);
   });
 });

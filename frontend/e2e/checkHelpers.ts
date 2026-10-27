@@ -68,6 +68,16 @@ export interface ChatPanelCheckResult {
   valid: boolean;
 }
 
+export interface StickyPinnedCheckResult {
+  found: boolean;
+  pinnedConstant: boolean;
+  reachedL4: boolean;
+  stageTops: number[];
+  stagesObserved: string[];
+  valid: boolean;
+  error?: string;
+}
+
 export interface PageCheckResult {
   consoleErrors: string[];
   pageErrors: string[];
@@ -95,6 +105,7 @@ export interface PageCheckResult {
   impactCheck?: ImpactCheckResult;
   chatCircleCheck?: ChatCircleCheckResult;
   chatPanelCheck?: ChatPanelCheckResult;
+  stickyZoomCheck?: StickyPinnedCheckResult;
 }
 
 export function setupPageCheckListeners(page: Page) {
@@ -825,5 +836,105 @@ export async function runPageChecks(
     impactCheck: domResult.impactCheck,
     chatCircleCheck: domResult.chatCircleCheck,
     chatPanelCheck: domResult.chatPanelCheck,
+  };
+}
+
+export async function checkStickyStaysPinned(page: Page): Promise<StickyPinnedCheckResult> {
+  const section = page.locator('[data-testid="sticky-graph-interactive"]');
+  const count = await section.count();
+  if (count === 0) {
+    return {
+      found: false,
+      pinnedConstant: false,
+      reachedL4: false,
+      stageTops: [],
+      stagesObserved: [],
+      valid: false,
+      error: 'Interactive sticky section not found',
+    };
+  }
+
+  const stage = section.locator('.sticky');
+  if ((await stage.count()) === 0) {
+    return {
+      found: true,
+      pinnedConstant: false,
+      reachedL4: false,
+      stageTops: [],
+      stagesObserved: [],
+      valid: false,
+      error: '.sticky stage not found inside section',
+    };
+  }
+
+  const sectionBox = await section.boundingBox();
+  if (!sectionBox) {
+    return {
+      found: true,
+      pinnedConstant: false,
+      reachedL4: false,
+      stageTops: [],
+      stagesObserved: [],
+      valid: false,
+      error: 'Unable to get section bounding box',
+    };
+  }
+
+  const initialScrollY = await page.evaluate(() => window.scrollY);
+  const sectionTop = sectionBox.y + initialScrollY;
+  const sectionHeight = sectionBox.height;
+
+  // In StickyGraphZoom: scrollableHeight = sectionHeight - window.innerHeight.
+  // Progress goes from 0 (at rect.top = 0) to 1 (at rect.top = -scrollableHeight).
+  // Between 0% and 85% of scrollableRange, the stage stays pinned at top: 96px and progresses L1 -> L4.
+  const scrollableRange = sectionHeight - 800;
+  const steps = 5;
+  const stageTops: number[] = [];
+  const stagesObserved: string[] = [];
+
+  const pinStart = sectionTop + 100;
+  for (let step = 0; step <= steps; step++) {
+    const fraction = (step / steps) * 0.85;
+    const offset = Math.round(fraction * scrollableRange);
+    await page.evaluate((y) => window.scrollTo(0, y), pinStart + offset);
+    await page.waitForTimeout(60);
+
+    const metrics = await page.evaluate(() => {
+      const stageEl = document.querySelector('[data-testid="sticky-graph-interactive"] .sticky');
+      // The badge inside the card header shows the active stage label (L1 Project, L2 Module, etc.)
+      const cardHeader = stageEl?.querySelector('.border-b');
+      const labelEl = cardHeader?.querySelector('.font-mono') || stageEl?.querySelector('.font-mono');
+      const rect = stageEl?.getBoundingClientRect();
+      return {
+        top: rect ? Math.round(rect.top) : null,
+        label: labelEl?.textContent?.trim() || '',
+      };
+    });
+
+    if (metrics.top !== null) stageTops.push(metrics.top);
+    if (metrics.label) stagesObserved.push(metrics.label);
+  }
+
+  // Restore initial scroll position
+  await page.evaluate((y) => window.scrollTo(0, y), initialScrollY);
+  await page.waitForTimeout(60);
+
+  // Verification 1: Stage top stays constant over the section (all tops within 2px of first)
+  const firstTop = stageTops[0];
+  const pinnedConstant =
+    stageTops.length >= 3 && stageTops.every((t) => Math.abs(t - firstTop) <= 2);
+
+  // Verification 2: Stage label reaches L4
+  const reachedL4 = stagesObserved.some(
+    (l) => l.includes('L4') || l.includes('4 of 4') || l.includes('4 / 4')
+  );
+
+  return {
+    found: true,
+    pinnedConstant,
+    reachedL4,
+    stageTops,
+    stagesObserved,
+    valid: pinnedConstant && reachedL4,
   };
 }

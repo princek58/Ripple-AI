@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from '@playwright/test';
-import { setupPageCheckListeners, runPageChecks } from './checkHelpers.js';
+import { setupPageCheckListeners, runPageChecks, checkStickyStaysPinned } from './checkHelpers.js';
 import type { SeedData } from './seedHelper.js';
 
 const screenshotsDir = 'C:\\RippleAI\\frontend\\qa-screenshots';
@@ -470,6 +470,26 @@ test.describe('Automated Visual QA Suite', () => {
           }
           if (!checkResult.chatPanelCheck.inputReachable) {
             throw new Error(`[qa-check-fail] chat input is not reachable on ${fileKey}`);
+          }
+        }
+
+        // Automated check assertion for Sticky Zoom pinning on desktop landing (Step L1 Part 2)
+        if (r.slug === 'landing') {
+          if (v.device === 'desktop') {
+            const stickyResult = await checkStickyStaysPinned(page);
+            checkResult.stickyZoomCheck = stickyResult;
+            if (!stickyResult.valid) {
+              throw new Error(
+                `[qa-check-fail] sticky zoom check failed on ${fileKey}: pinnedConstant=${stickyResult.pinnedConstant}, reachedL4=${stickyResult.reachedL4}, tops=${stickyResult.stageTops.join(
+                  ','
+                )}, stages=${stickyResult.stagesObserved.join(',')}`
+              );
+            }
+          } else if (v.device === 'phone') {
+            // Existing phone overflow check
+            if (checkResult.horizontalOverflow) {
+              throw new Error(`[qa-check-fail] landing page has horizontal overflow on phone for ${fileKey}`);
+            }
           }
         }
 

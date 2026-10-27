@@ -346,9 +346,9 @@ describe('Landing Page Part 2 (Step 9b)', () => {
 
       const { container } = renderLanding();
 
-      // Verify the page root has overflow-x-hidden
+      // Verify the page root has overflow-x-clip to prevent horizontal overflow without breaking position: sticky
       const rootDiv = container.firstElementChild;
-      expect(rootDiv).toHaveClass('overflow-x-hidden');
+      expect(rootDiv).toHaveClass('overflow-x-clip');
 
       // Verify static stacked stage cards are used
       expect(screen.getByTestId('sticky-graph-static')).toBeInTheDocument();
