@@ -11,10 +11,12 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "build:all": "npm --prefix frontend run build && npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build",
     "test": "npm --prefix backend run test",
     "test:backend": "npm --prefix backend run test",
-    "start:backend": "npm --prefix backend run start"
+    "start:backend": "npm --prefix backend run start",
+    "start:prod": "node -e \"process.env.NODE_ENV='production'; import('./backend/dist/server.js');\""
   }
 }

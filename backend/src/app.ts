@@ -1,5 +1,7 @@
 import express from 'express';
 import config from './config.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import accessRouter from './routes/access.js';
 import healthRouter from './routes/health.js';
 import projectsRouter from './routes/projects.js';
@@ -12,10 +14,18 @@ import { notFoundHandler, errorHandler } from './utils/errors.js';
 
 const app = express();
 
+// Trust proxy if configured in environment
+if (config.trustProxy) {
+  app.set(
+    'trust proxy',
+    config.trustProxy === 'true' || config.trustProxy === '1' ? true : config.trustProxy
+  );
+}
+
 // Request size limit for JSON bodies
 app.use(express.json({ limit: config.jsonBodyLimit }));
 
-// CORS allowing only configured frontend origin
+// CORS: same-origin in production unless CORS_ORIGIN is explicitly set
 app.use((req, res, next) => {
   const allowedOrigin = config.corsOrigin;
   const origin = req.headers.origin;
@@ -47,6 +57,48 @@ app.use('/api', findingsRouter);
 app.use('/api', fixesRouter);
 app.use('/api', reportsRouter);
 app.use('/api', aiRouter);
+
+// Unknown /api routes always keep JSON 404
+app.all('/api/*', notFoundHandler);
+
+// Production frontend static file serving
+app.use((req, res, next) => {
+  if (config.nodeEnv !== 'production') return next();
+  const distPath = config.frontendDistPath;
+  if (!fs.existsSync(distPath)) return next();
+
+  express.static(distPath, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      const base = path.basename(filePath);
+      if (base === 'index.html') {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else if (filePath.includes('assets')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      }
+    },
+  })(req, res, next);
+});
+
+// SPA fallback for all non-/api GET requests in production
+app.get('*', (req, res, next) => {
+  if (config.nodeEnv !== 'production') return next();
+  const distPath = config.frontendDistPath;
+  if (!fs.existsSync(distPath)) return next();
+
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(indexPath);
+  }
+  next();
+});
 
 // 404 Handler for undefined routes
 app.use(notFoundHandler);

@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.env
+**/.env
+**/.env.*
+backend/data
+backend/storage
+*.zip
+**/*.zip
+.git
+tmp
+backend/dist
+frontend/dist

@@ -53,19 +53,64 @@ export function getUploadLimits(): UploadLimits {
   };
 }
 
+let customStoragePath: string | null = null;
+let customTempStoragePath: string | null = null;
+
 export const config = {
-  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 4000,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  dbPath:
-    process.env.DB_PATH ||
-    process.env.DATABASE_PATH ||
-    path.resolve(backendRootDir, 'data', 'ripple.db'),
-  storagePath: process.env.STORAGE_PATH || path.resolve(backendRootDir, 'storage'),
-  tempStoragePath:
-    process.env.TEMP_STORAGE_PATH || path.resolve(backendRootDir, 'storage', 'tmp'),
-  corsOrigin:
-    process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
-  jsonBodyLimit: process.env.JSON_BODY_LIMIT || '1mb',
+  get port(): number {
+    return process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+  },
+  get nodeEnv(): string {
+    return process.env.NODE_ENV || 'development';
+  },
+  get dbPath(): string {
+    return (
+      process.env.DB_PATH ||
+      process.env.DATABASE_PATH ||
+      path.resolve(backendRootDir, 'data', 'ripple.db')
+    );
+  },
+  set storagePath(val: string) {
+    customStoragePath = val;
+  },
+  get storagePath(): string {
+    return (
+      customStoragePath ||
+      process.env.STORAGE_PATH ||
+      path.resolve(backendRootDir, 'storage')
+    );
+  },
+  set tempStoragePath(val: string) {
+    customTempStoragePath = val;
+  },
+  get tempStoragePath(): string {
+    return (
+      customTempStoragePath ||
+      process.env.TEMP_STORAGE_PATH ||
+      path.resolve(backendRootDir, 'storage', 'tmp')
+    );
+  },
+  get corsOrigin(): string {
+    if (process.env.CORS_ORIGIN !== undefined) {
+      return process.env.CORS_ORIGIN;
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return '';
+    }
+    return process.env.FRONTEND_URL || 'http://localhost:3000';
+  },
+  get trustProxy(): string {
+    return process.env.TRUST_PROXY || '';
+  },
+  get frontendDistPath(): string {
+    return (
+      process.env.FRONTEND_DIST_PATH ||
+      path.resolve(backendRootDir, '..', 'frontend', 'dist')
+    );
+  },
+  get jsonBodyLimit(): string {
+    return process.env.JSON_BODY_LIMIT || '1mb';
+  },
 
   get githubCodeloadBase(): string {
     return process.env.GITHUB_CODELOAD_BASE || 'https://codeload.github.com';
