@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { getDatabase } from './connection.js';
 import { AI_CONSENT_VERSION } from '../services/ai/aiConfig.js';
 
@@ -216,4 +217,79 @@ export function updateProjectAISettings(
     updated_at: now,
   };
 }
+
+export interface ProjectChatMessageRecord {
+  id: string;
+  project_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  provider: string | null;
+  model: string | null;
+  created_at: string;
+}
+
+export function saveChatMessage(
+  projectId: string,
+  role: 'user' | 'assistant',
+  content: string,
+  provider?: string | null,
+  model?: string | null
+): ProjectChatMessageRecord {
+  const db = getDatabase();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO project_chat_messages (id, project_id, role, content, provider, model, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, projectId, role, content, provider || null, model || null, now);
+
+  // Prune older rows beyond latest 100 messages for this project
+  db.prepare(`
+    DELETE FROM project_chat_messages
+    WHERE project_id = ?
+      AND id NOT IN (
+        SELECT id FROM project_chat_messages
+        WHERE project_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT 100
+      )
+  `).run(projectId, projectId);
+
+  return {
+    id,
+    project_id: projectId,
+    role,
+    content,
+    provider: provider || null,
+    model: model || null,
+    created_at: now,
+  };
+}
+
+export function getProjectChatHistory(
+  projectId: string,
+  limit: number = 50
+): ProjectChatMessageRecord[] {
+  const db = getDatabase();
+  return db
+    .prepare(`
+      SELECT id, project_id, role, content, provider, model, created_at
+      FROM (
+        SELECT id, project_id, role, content, provider, model, created_at, rowid
+        FROM project_chat_messages
+        WHERE project_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      )
+      ORDER BY created_at ASC, rowid ASC
+    `)
+    .all(projectId, limit) as ProjectChatMessageRecord[];
+}
+
+export function clearProjectChatHistory(projectId: string): void {
+  const db = getDatabase();
+  db.prepare('DELETE FROM project_chat_messages WHERE project_id = ?').run(projectId);
+}
+
 

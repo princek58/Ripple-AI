@@ -292,8 +292,19 @@ function getArchitectureSummaryBlock(
       lines.push('Visible Modules:');
       for (const mod of moduleNodes.slice(0, 24)) {
         const stat = moduleStats.get(mod.id) || { total: 0, high: 0, medium: 0, low: 0 };
+        let fileStr = '';
+        try {
+          const repFiles = db
+            .prepare(
+              'SELECT path FROM nodes WHERE project_id = ? AND scan_id = ? AND parent_id = ? AND path IS NOT NULL ORDER BY path ASC LIMIT 4'
+            )
+            .all(projectId, scanId, mod.id) as { path: string }[];
+          if (repFiles.length > 0) {
+            fileStr = ` (files: ${repFiles.map((rf) => clamp300(rf.path)).join(', ')})`;
+          }
+        } catch {}
         lines.push(
-          `- Module "${clamp300(mod.label)}": ${stat.total} findings (High: ${stat.high}, Medium: ${stat.medium}, Low: ${stat.low})`
+          `- Module "${clamp300(mod.label)}": ${stat.total} findings (High: ${stat.high}, Medium: ${stat.medium}, Low: ${stat.low})${fileStr}`
         );
       }
     }
@@ -323,6 +334,92 @@ function getArchitectureSummaryBlock(
     } catch {}
 
     lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
+  } catch {}
+  return lines;
+}
+
+function getWorkflowBriefBlock(
+  db: Database.Database,
+  projectId: string,
+  scanId: string,
+  clamp300: (s: string | null | undefined) => string
+): string[] {
+  const lines: string[] = [];
+  try {
+    lines.push('Project Workflow & Architecture Brief:');
+
+    // 1. Node Breakdown by Type
+    const typeRows = db
+      .prepare(
+        'SELECT type, COUNT(*) as count FROM nodes WHERE project_id = ? AND scan_id = ? GROUP BY type'
+      )
+      .all(projectId, scanId) as { type: string; count: number }[];
+
+    let fileCount = 0;
+    let apiCount = 0;
+    let configCount = 0;
+    for (const r of typeRows) {
+      const t = (r.type || '').toLowerCase();
+      if (t === 'file' || t === 'frontend' || t === 'backend') {
+        fileCount += r.count;
+      } else if (t === 'api' || t === 'route') {
+        apiCount += r.count;
+      } else if (t === 'config' || t === 'table' || t === 'database') {
+        configCount += r.count;
+      }
+    }
+    lines.push(
+      `- Node Breakdown by Type: Files: ${fileCount}, APIs/Routes: ${apiCount}, Configs/Tables: ${configCount}`
+    );
+
+    // 2. Inter-Module Workflow Connections
+    try {
+      const graphRepo = new GraphRepository(db);
+      const level1 = graphRepo.getLevel1(projectId, 200);
+      if (level1) {
+        const labelMap = new Map<string, string>();
+        for (const n of level1.nodes) {
+          labelMap.set(n.id, n.label);
+        }
+        const edges = (level1.edges || []).slice(0, 20);
+        if (edges.length > 0) {
+          lines.push('- Inter-Module Workflow Connections:');
+          for (const edge of edges) {
+            const srcLabel = labelMap.get(edge.source_id) || edge.source_id;
+            const tgtLabel = labelMap.get(edge.target_id) || edge.target_id;
+            const count = (edge as any).count ?? (edge as any).evidence?.count ?? 1;
+            lines.push(
+              `  * ${clamp300(srcLabel)} -> ${clamp300(tgtLabel)} (${count} edge${count === 1 ? '' : 's'})`
+            );
+          }
+        }
+      }
+    } catch {}
+
+    // 3. Core Workflow Hubs (High-Impact Nodes)
+    try {
+      const hubs = db
+        .prepare(`
+          SELECT n.id, n.label, n.type, n.path,
+            (SELECT COUNT(*) FROM edges e WHERE e.target_id = n.id AND e.project_id = n.project_id) as in_degree,
+            (SELECT COUNT(*) FROM edges e WHERE e.source_id = n.id AND e.project_id = n.project_id) as out_degree
+          FROM nodes n
+          WHERE n.project_id = ? AND n.scan_id = ? AND n.type != 'module'
+          ORDER BY (in_degree + out_degree) DESC, in_degree DESC, n.id ASC
+          LIMIT 8
+        `)
+        .all(projectId, scanId) as any[];
+
+      if (hubs.length > 0) {
+        lines.push('- Core Workflow Hubs (High-Impact Nodes):');
+        for (const h of hubs) {
+          const display = h.path ? clamp300(h.path) : clamp300(h.label);
+          lines.push(
+            `  * [${h.type}] ${display}: ${h.in_degree} incoming, ${h.out_degree} outgoing edges`
+          );
+        }
+      }
+    } catch {}
   } catch {}
   return lines;
 }
@@ -391,9 +488,11 @@ function getTopFindingsBlock(
  * - No env values
  * - No secret matches
  * - Strings cut at 300 characters
- * - Whole context capped at 6000 characters
+ * - Whole context capped at 8000 characters (MAX_CONTEXT_CHARS)
  * - If project is not scanned: "This project has not been scanned yet."
  */
+export const MAX_CONTEXT_CHARS = 8000;
+
 export function buildScreenContext(
   db: Database.Database,
   projectId: string,
@@ -423,6 +522,9 @@ export function buildScreenContext(
 
   // 1. Architecture Header, Visible Modules, Connections, and Top Findings always at the top on every screen
   lines.push(...getArchitectureSummaryBlock(db, projectId, scanId, clamp300));
+
+  // 2. Comprehensive Project Workflow Brief on every screen for scanned projects
+  lines.push(...getWorkflowBriefBlock(db, projectId, scanId, clamp300));
 
   switch (params.screen) {
     case 'overview':
@@ -677,5 +779,5 @@ export function buildScreenContext(
     }
   }
 
-  return lines.join('\n').slice(0, 6000);
+  return lines.join('\n').slice(0, MAX_CONTEXT_CHARS);
 }

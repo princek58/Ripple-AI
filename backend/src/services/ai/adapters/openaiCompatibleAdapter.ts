@@ -1,4 +1,4 @@
-import type { AIAdapter, AIConfig, AIRequest, AIResponse } from '../types.js';
+import type { AIAdapter, AIConfig, AIRequest, AIResponse, AIProvider } from '../types.js';
 import { AIServiceError, mapHttpStatusToAiError, extractSafeErrorDetails } from '../errors.js';
 import { isOpenAIReasoningModel } from '../modelOptions.js';
 

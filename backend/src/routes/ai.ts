@@ -13,6 +13,9 @@ import {
   getCachedAIResponse,
   setCachedAIResponse,
   isPublicDemoMode,
+  getProjectChatHistory,
+  saveChatMessage,
+  clearProjectChatHistory,
 } from '../db/aiRepository.js';
 import { getDatabase } from '../db/connection.js';
 import { ProjectsRepository } from '../db/projectsRepository.js';
@@ -169,6 +172,59 @@ aiRouter.put('/projects/:id/ai-settings', (req, res) => {
 });
 
 /**
+ * GET /api/projects/:id/chat/history
+ * Returns { data: { items: [...] }, error: null } with up to the last 50 saved messages in chronological order.
+ * Verifies project existence (404 if project not found, unless :id is 'general' which returns { items: [] }).
+ */
+aiRouter.get('/projects/:id/chat/history', (req, res) => {
+  const { id } = req.params;
+  if (id === 'general') {
+    return sendSuccess(res, { items: [] });
+  }
+
+  const paramParsed = projectIdParamsSchema.safeParse(req.params);
+  if (!paramParsed.success) {
+    return sendError(res, 'Invalid project ID format, must be a UUID', 400);
+  }
+
+  const db = getDatabase();
+  const repo = new ProjectsRepository(db);
+  const project = repo.findById(id);
+  if (!project) {
+    return sendError(res, 'Project not found', 404);
+  }
+
+  const items = getProjectChatHistory(id, 50);
+  return sendSuccess(res, { items });
+});
+
+/**
+ * DELETE /api/projects/:id/chat/history
+ * Deletes saved chat messages for :id and returns { data: { cleared: true }, error: null }.
+ */
+aiRouter.delete('/projects/:id/chat/history', (req, res) => {
+  const { id } = req.params;
+  if (id === 'general') {
+    return sendSuccess(res, { cleared: true });
+  }
+
+  const paramParsed = projectIdParamsSchema.safeParse(req.params);
+  if (!paramParsed.success) {
+    return sendError(res, 'Invalid project ID format, must be a UUID', 400);
+  }
+
+  const db = getDatabase();
+  const repo = new ProjectsRepository(db);
+  const project = repo.findById(id);
+  if (!project) {
+    return sendError(res, 'Project not found', 404);
+  }
+
+  clearProjectChatHistory(id);
+  return sendSuccess(res, { cleared: true });
+});
+
+/**
  * POST /api/projects/:id/chat
  * Explains findings, code architecture, and answers developer questions across all screens.
  */
@@ -278,6 +334,8 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
 
   const cached = getCachedAIResponse(cacheKey);
   if (cached) {
+    saveChatMessage(id, 'user', message);
+    saveChatMessage(id, 'assistant', cached, aiConfig.provider, aiConfig.model);
     return sendSuccess(res, {
       text: cached,
       source: 'saved',
@@ -295,6 +353,18 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   );
   const systemPrompt = buildSystemPrompt();
   const userPrompt = buildUserPrompt(contextText, message, lang);
+
+  // If client history is omitted or empty, automatically load last 6 saved messages
+  let effectiveHistory = history;
+  if (!effectiveHistory || effectiveHistory.length === 0) {
+    const saved = getProjectChatHistory(id, 6);
+    if (saved.length > 0) {
+      effectiveHistory = saved.map((s) => ({
+        role: s.role,
+        text: s.content,
+      }));
+    }
+  }
 
   // 7. Invoke active adapter (with multi-key and multi-provider failover support)
   const candidates =
@@ -346,7 +416,7 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
       try {
         aiRes = await candidateAdapter.generate({
           systemPrompt,
-          history: history?.map((h) => ({ role: h.role, content: h.text })),
+          history: effectiveHistory?.map((h) => ({ role: h.role, content: h.text })),
           userPrompt,
           maxTokens: AI_MAX_OUTPUT_TOKENS,
         });
@@ -381,7 +451,6 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
         } else {
           // Different key or different provider (multi-key or groq/openai failover)
           const canFailover =
-            err.code === 'AI_RATE_LIMITED' ||
             err.code === 'AI_QUOTA_EXHAUSTED' ||
             err.code === 'AI_UNAVAILABLE' ||
             err.code === 'AI_MODEL_NOT_FOUND' ||
@@ -427,6 +496,10 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
     });
 
     setCachedAIResponse(activeCacheKey, answer, activeProvider, activeModel);
+
+    // Persist conversation turn into SQLite history
+    saveChatMessage(id, 'user', message);
+    saveChatMessage(id, 'assistant', answer, activeProvider, activeModel);
 
     const source = activeProvider === 'gemini' ? 'gemini' : 'ai';
     return sendSuccess(res, {

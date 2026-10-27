@@ -5,6 +5,7 @@ import app from '../src/app.js';
 import { getDatabase } from '../src/db/connection.js';
 import { updateProjectAISettings } from '../src/db/aiRepository.js';
 import { AI_CONSENT_VERSION, getAIConfig } from '../src/services/ai/aiConfig.js';
+import { resetRateLimiter } from '../src/services/ai/rateLimiter.js';
 
 describe('Step K6 Part 1: Multi-Key & Multi-Provider Auto-Failover (Gemini <-> Groq)', () => {
   const projId = '00000000-0000-0000-0000-000000000099';
@@ -22,6 +23,7 @@ describe('Step K6 Part 1: Multi-Key & Multi-Provider Auto-Failover (Gemini <-> G
   const originalEnv = { ...process.env };
 
   beforeEach(async () => {
+    resetRateLimiter();
     geminiCalls = [];
     groqCalls = [];
 
@@ -300,5 +302,168 @@ describe('Step K6 Part 1: Multi-Key & Multi-Provider Auto-Failover (Gemini <-> G
       expect(callStr).not.toContain(secretGeminiKey);
       expect(callStr).not.toContain(secretGroqKey);
     }
+  });
+
+  it('6. GET /api/projects/:id/chat/history returns saved user + assistant turns in order after POST chat', async () => {
+    process.env.GROQ_API_KEY = 'groq-key-history';
+    process.env.GROQ_MODEL = 'llama-3.3-70b-versatile';
+    process.env.GROQ_BASE_URL = mockGroqBaseUrl;
+    delete process.env.GEMINI_API_KEY;
+
+    groqHandler = (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'History turn 1 answer' } }] }));
+    };
+
+    // First POST chat
+    const postRes = await request(app)
+      .post(`/api/projects/${projId}/chat`)
+      .send({ message: 'Hello AI assistant', screen: 'overview' });
+    expect(postRes.status).toBe(200);
+
+    // Fetch GET history
+    const getRes = await request(app).get(`/api/projects/${projId}/chat/history`);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.error).toBeNull();
+    const items = getRes.body.data.items;
+    expect(items.length).toBeGreaterThanOrEqual(2);
+    const lastUser = items[items.length - 2];
+    const lastAssistant = items[items.length - 1];
+    expect(lastUser.role).toBe('user');
+    expect(lastUser.content).toBe('Hello AI assistant');
+    expect(lastAssistant.role).toBe('assistant');
+    expect(lastAssistant.content).toBe('History turn 1 answer');
+    expect(lastAssistant.provider).toBe('groq');
+    expect(lastAssistant.model).toBe('llama-3.3-70b-versatile');
+  });
+
+  it('7. Automatic multi-turn memory: second POST with history: [] passes previous saved turn to adapter', async () => {
+    process.env.GROQ_API_KEY = 'groq-key-memory';
+    process.env.GROQ_MODEL = 'llama-3.3-70b-versatile';
+    process.env.GROQ_BASE_URL = mockGroqBaseUrl;
+    delete process.env.GEMINI_API_KEY;
+
+    // Call 1
+    groqHandler = (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'I am Ripple AI' } }] }));
+    };
+    await request(app)
+      .post(`/api/projects/${projId}/chat`)
+      .send({ message: 'Who are you?', screen: 'overview' });
+
+    // Call 2 with empty history []
+    groqHandler = (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'I remember our previous turn' } }] }));
+    };
+
+    const call2Res = await request(app)
+      .post(`/api/projects/${projId}/chat`)
+      .send({ message: 'What was my previous question?', screen: 'overview', history: [] });
+
+    expect(call2Res.status).toBe(200);
+    expect(call2Res.body.data.text).toBe('I remember our previous turn');
+
+    // The second call sent to groq should contain the saved turn in messages
+    const lastGroqCall = groqCalls[groqCalls.length - 1];
+    expect(lastGroqCall.body).toBeDefined();
+    const msgs = lastGroqCall.body.messages;
+    const previousUserMsg = msgs.find((m: any) => m.content === 'Who are you?');
+    const previousAssistantMsg = msgs.find((m: any) => m.content === 'I am Ripple AI');
+    expect(previousUserMsg).toBeDefined();
+    expect(previousAssistantMsg).toBeDefined();
+  });
+
+  it('8. DELETE /api/projects/:id/chat/history clears the history for that project', async () => {
+    const delRes = await request(app).delete(`/api/projects/${projId}/chat/history`);
+    expect(delRes.status).toBe(200);
+    expect(delRes.body).toEqual({
+      data: { cleared: true },
+      error: null,
+    });
+
+    const getRes = await request(app).get(`/api/projects/${projId}/chat/history`);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.data.items).toEqual([]);
+
+    // Check 'general' project returns [] without error
+    const genGet = await request(app).get('/api/projects/general/chat/history');
+    expect(genGet.status).toBe(200);
+    expect(genGet.body.data.items).toEqual([]);
+
+    const genDel = await request(app).delete('/api/projects/general/chat/history');
+    expect(genDel.status).toBe(200);
+    expect(genDel.body.data.cleared).toBe(true);
+
+    // Non-existent UUID project returns 404
+    const notFound = await request(app).get('/api/projects/00000000-0000-0000-0000-000000000404/chat/history');
+    expect(notFound.status).toBe(404);
+  });
+
+  it('9. buildScreenContext includes Project Workflow & Architecture Brief:, node breakdown, representative files, and Core Workflow Hubs, without leaking canary project name or absolute paths', async () => {
+    const canaryProjName = 'SUPER_SECRET_CANARY_PROJ_NAME_XYZ123';
+    const db = getDatabase();
+
+    const canaryId = '00000000-0000-0000-0000-000000000777';
+    db.prepare(`
+      INSERT OR REPLACE INTO projects (id, name, created_at, size_bytes, file_count)
+      VALUES (?, ?, CURRENT_TIMESTAMP, 500, 10)
+    `).run(canaryId, canaryProjName);
+
+    const scanId = 'scan-k6-brief-test';
+    db.prepare(`
+      INSERT OR REPLACE INTO scans (id, project_id, status, started_at, finished_at, files_total)
+      VALUES (?, ?, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 10)
+    `).run(scanId, canaryId);
+
+    // Seed modules and representative child nodes
+    db.prepare(`
+      INSERT OR REPLACE INTO nodes (id, project_id, scan_id, label, type, level, path)
+      VALUES ('mod-auth', ?, ?, 'AuthModule', 'module', 1, 'src/auth')
+    `).run(canaryId, scanId);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO nodes (id, project_id, scan_id, label, type, level, path, parent_id)
+      VALUES ('file-login', ?, ?, 'LoginHandler', 'backend', 2, 'src/auth/login.ts', 'mod-auth')
+    `).run(canaryId, scanId);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO nodes (id, project_id, scan_id, label, type, level, path, parent_id)
+      VALUES ('api-login', ?, ?, 'POST /auth/login', 'api', 2, 'src/auth/routes.ts', 'mod-auth')
+    `).run(canaryId, scanId);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO nodes (id, project_id, scan_id, label, type, level, path)
+      VALUES ('mod-billing', ?, ?, 'BillingModule', 'module', 1, 'src/billing')
+    `).run(canaryId, scanId);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO nodes (id, project_id, scan_id, label, type, level, path, parent_id)
+      VALUES ('file-invoice', ?, ?, 'InvoiceService', 'backend', 2, 'src/billing/invoice.ts', 'mod-billing')
+    `).run(canaryId, scanId);
+
+    // Connect nodes
+    db.prepare(`
+      INSERT OR REPLACE INTO edges (id, project_id, scan_id, source_id, target_id, relation, status, confidence)
+      VALUES ('edge-1', ?, ?, 'file-login', 'file-invoice', 'calls', 'resolved', 'confirmed')
+    `).run(canaryId, scanId);
+
+    const { buildScreenContext } = await import('../src/services/ai/contextBuilder.js');
+    const ctx = buildScreenContext(db, canaryId, { screen: 'overview' }, false);
+
+    expect(ctx).toContain('Project Architecture Summary:');
+    expect(ctx).toContain('Visible Modules:');
+    expect(ctx).toContain('Project Workflow & Architecture Brief:');
+    expect(ctx).toContain('Node Breakdown by Type:');
+    expect(ctx).toContain('src/auth/login.ts');
+    expect(ctx).toContain('Core Workflow Hubs');
+
+    // Security check: no canary project name, no absolute path
+    expect(ctx).not.toContain(canaryProjName);
+    expect(ctx).not.toContain('C:');
+    expect(ctx).not.toContain('c:\\');
+    expect(ctx).not.toContain('/home/');
+    expect(ctx).not.toContain('/Users/');
   });
 });

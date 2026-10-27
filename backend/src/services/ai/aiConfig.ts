@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { AIConfig, AIProvider } from './types.js';
+import type { AIConfig, AIProvider, AICandidate } from './types.js';
 
 export const AI_CONSENT_VERSION = '2026-10-v2';
 export const AI_CONSENT_TEXT =
