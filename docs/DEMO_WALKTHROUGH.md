@@ -80,22 +80,20 @@ This guide is designed for a non-technical presenter or product specialist demon
 - **What to Say**:
   > *"Ripple AI proposes safe, deterministic diffs that are never applied automatically, and every generated audit report includes a mandatory 'What was not checked' section for absolute honesty."*
 
-### Step 7: Ripple AI Chat (Circle Button, Offline Data Answers & Per-Project AI)
+### Step 7: Ripple AI Chat (Circle Button, Natural AI Answers & Offline Fallback)
 - **Exact Action**:
+  - Open Graph.
   - Open the circle button at the bottom-right of the screen.
-  - Ask: `"kitni findings hain"` (or in English: `"how many findings"`).
-  - Observe the instant breakdown of findings across severities and rules computed directly from the project's analysis data.
-  - Ask: `"pehle kya theek karun"` (or in English: `"what should I fix first"`).
-  - Observe the top 3 prioritized findings with titles, file paths, and line numbers, followed by the sentence: *"This order comes from severity and confidence, it is not a guarantee."*
-  - Notice the footer label: *"Offline help from Ripple's own data. Not AI-written."*
-  - Ask `'circular dependency kya hai'` to demonstrate the instant offline glossary explanation.
-  - Open the in-panel Chat settings (gear icon) and review the consent text before enabling external AI.
+  - Ask: `"ye screen par kya hai"`.
+  - Observe the natural language response describing the current screen context (modules, nodes, findings) with the disclaimer: *"AI-written, may be wrong. Ripple has not verified it."*
+  - Ask a general coding question: `"async await aur promise mein kya fark hai? chhota example do"`.
+  - Observe the natural explanation with fenced monospace code blocks and dedicated `"Copy"` buttons.
 - **What to Say**:
-  > *"Say: this answer comes from Ripple's own data, not from AI."*
-  > *"The Ripple AI chat is accessible on every screen. Offline architectural help and deterministic data answers work immediately without any external services or API keys. External AI is strictly opt-in per project, requiring explicit user consent."*
+  > *"Answers come from Google Gemini and may be wrong; offline help works without internet."*
+  > *"The Ripple AI chat is accessible on every screen. It provides natural AI explanations with code examples and offline architectural help that works immediately without internet. External AI is strictly opt-in per project, requiring explicit user consent."*
 - **Important**:
-  - Do not claim: the chat is always AI-powered or always correct.
-  - Say: this answer comes from Ripple's own data, not from AI.
+  - Do not claim: the chat is always correct or verified by Ripple.
+  - Say: answers come from Google Gemini and may be wrong; offline help works without internet.
 
 ---
 

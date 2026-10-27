@@ -174,6 +174,12 @@ const routes: RouteDef[] = [
     pathBuilder: () => '/app/overview',
     projectType: 'scanned',
   },
+  // Ripple AI Chat AI answer with fenced code block and consent card (Step K4b Part 3)
+  {
+    slug: 'app-chat-ai-code',
+    pathBuilder: () => '/app/overview',
+    projectType: 'scanned',
+  },
 ];
 
 interface VariantDef {
@@ -236,6 +242,76 @@ test.describe('Automated Visual QA Suite', () => {
         );
 
         const listeners = setupPageCheckListeners(page);
+
+        if (r.slug === 'app-chat-ai-code') {
+          let currentAiEnabled = true;
+          let currentConsentVersion = '2026-10-v2';
+
+          await page.route('**/api/ai/status', async (route) => {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                data: {
+                  configured: true,
+                  provider: 'gemini',
+                  model: 'gemini-3.1-flash-lite',
+                },
+              }),
+            });
+          });
+
+          await page.route('**/api/projects/*/ai-settings', async (route) => {
+            if (route.request().method() === 'PUT') {
+              const body = route.request().postDataJSON() || {};
+              currentAiEnabled = body.ai_enabled ?? false;
+              currentConsentVersion = body.consent_version || currentConsentVersion;
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  data: {
+                    ai_enabled: currentAiEnabled,
+                    share_code: body.share_code ?? false,
+                    consent_version: currentConsentVersion,
+                    current_consent_version: '2026-10-v2',
+                    consent_text:
+                      'Turning this on sends the question and a short summary of the selected finding or file to the AI service configured in this app. The chat may also send the names and counts of modules and the titles of the top findings of the screen you are on.',
+                  },
+                }),
+              });
+            } else {
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  data: {
+                    ai_enabled: currentAiEnabled,
+                    share_code: false,
+                    consent_version: currentAiEnabled ? currentConsentVersion : null,
+                    current_consent_version: '2026-10-v2',
+                    consent_text:
+                      'Turning this on sends the question and a short summary of the selected finding or file to the AI service configured in this app. The chat may also send the names and counts of modules and the titles of the top findings of the screen you are on.',
+                  },
+                }),
+              });
+            }
+          });
+
+          await page.route('**/api/projects/*/chat', async (route) => {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                data: {
+                  source: 'gemini',
+                  model: 'gemini-3.1-flash-lite',
+                  text: 'Async/await se async operations synchronous syntax mein likhe ja sakte hain:\n\n```javascript\nasync function fetchReport(id) {\n  const res = await api.get(`/reports/${id}`);\n  return res.data;\n}\n```\n\nIs pattern se promises handle karna saral ho jata hai.',
+                },
+              }),
+            });
+          });
+        }
 
         const fullUrl = `${baseURL || 'http://localhost:3100'}${targetPath}`;
         await page.goto(fullUrl, { waitUntil: 'domcontentloaded' });
@@ -435,6 +511,42 @@ test.describe('Automated Visual QA Suite', () => {
             }
           } catch (e) {
             console.warn(`[qa] Failed interacting with chat panel on ${r.slug}:`, e);
+          }
+        }
+
+        // Ripple AI Chat AI answer with code block and consent card (Step K4b Part 3)
+        if (r.slug === 'app-chat-ai-code') {
+          const circleBtn = page.locator('[data-testid="chat-circle-button"]');
+          try {
+            await circleBtn.waitFor({ state: 'visible', timeout: 8000 });
+            await circleBtn.click();
+            const panel = page.locator('[data-testid="chat-panel"]');
+            await panel.waitFor({ state: 'visible', timeout: 8000 });
+
+            const input = page.locator('[data-testid="chat-input"]');
+            await input.waitFor({ state: 'visible', timeout: 5000 });
+            await input.fill('async await example');
+            const sendBtn = page.locator('[data-testid="chat-send-btn"]');
+            await sendBtn.click();
+
+            await page.locator('[data-testid="chat-ai-message"]').waitFor({ state: 'visible', timeout: 8000 });
+            await page.locator('[data-testid="chat-code-block"]').waitFor({ state: 'visible', timeout: 8000 });
+
+            // Toggle AI off in settings so consent card is visible below messages
+            const settingsBtn = page.locator('button[aria-label="Chat settings"]');
+            await settingsBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await settingsBtn.click();
+            const aiToggle = page.locator('#ai-enable-switch');
+            await aiToggle.waitFor({ state: 'visible', timeout: 5000 });
+            await aiToggle.click();
+            await page.waitForTimeout(300);
+
+            const backBtn = page.locator('button[aria-label="Back to chat"]');
+            await backBtn.click();
+            await page.locator('[data-testid="chat-consent-card"]').waitFor({ state: 'visible', timeout: 6000 });
+            await page.waitForTimeout(400);
+          } catch (e) {
+            console.warn(`[qa] Failed interacting with chat panel on app-chat-ai-code:`, e);
           }
         }
 

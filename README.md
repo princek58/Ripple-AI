@@ -114,9 +114,9 @@ npm run dev:frontend
 
 Alternatively, run both from root using `start-dev.bat` on Windows.
 
-### Ripple AI chat (backend)
+### Ripple AI chat
 
-Ripple AI includes an optional, read-only AI chat assistant acting like a smart, friendly senior developer sitting next to the user. It answers developer questions across all screens, explaining technical concepts simply, responding in the user's language and tone (natural Hinglish, Hindi in Roman letters, English), and providing practical steps or small code examples while keeping answers concise (under about 6 sentences for simple questions). Chat answers are AI-generated suggestions that may be inaccurate or unconfirmed hypotheses; static analysis evidence remains the authoritative source of truth, and code is read-only by default (Ripple never executes uploaded code or applies fixes automatically). Project AI features are OFF by default and require explicit per-project consent (`AI_CONSENT_VERSION = "2026-10-v2"`). In addition to the primary model, an optional fallback model can be configured via `AI_FALLBACK_MODEL` (retried once on upstream 5xx unavailability or 404 model not found within the same timeout budget; name only, never a default). Google AI Studio keys start with "AQ." and the model id in `backend/.env` must be one that is available for your account. Configure `GEMINI_API_KEY` and `GEMINI_MODEL` (e.g. `gemini-3.1-flash-lite`) in `backend/.env`.
+Ripple AI includes an AI-first chat assistant with instant offline fallback. It acts like a smart, friendly senior developer sitting next to the user, answering developer questions across all screens, explaining technical concepts simply, responding in the user's language and tone (natural Hinglish, Hindi in Roman letters, English), and providing practical steps or small code examples formatted as monospace code blocks with dedicated Copy buttons. When AI is on and configured, questions route AI-first to the configured model with a 25-second timeout and offline help fallback; when AI is off, unconfigured, or consent is outdated, offline help is shown immediately. A one-click consent card inside the panel allows enabling AI with explicit user confirmation for the updated consent version (`AI_CONSENT_VERSION = "2026-10-v2"`). Answers are AI-written suggestions that may be wrong or unconfirmed; Ripple has not verified them, static analysis evidence remains the authoritative source of truth, and code is strictly read-only by default (Ripple never executes uploaded code or applies fixes automatically). In addition to the primary model, an optional fallback model can be configured via `AI_FALLBACK_MODEL` (retried once on upstream 5xx unavailability or 404 model not found within the same timeout budget; name only, never a default). Configure `GEMINI_API_KEY` and `GEMINI_MODEL` (e.g. `gemini-3.1-flash-lite`) in `backend/.env`.
 
 ### Running Tests
 
@@ -246,5 +246,6 @@ RippleAI/
 - **Step K2 (Chatbox UI)**: Complete.
 - **Step K3 (Chatbox Demo-Ready)**: Complete.
 - **Step K4a (Chat Backend Natural Assistant)**: Complete.
-- **Test suite**: 877 tests passing across 65 test files (256 backend tests, 621 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
+- **Step K4b (Chat Natural Assistant & AI-First UI)**: Complete.
+- **Test suite**: 882 tests passing across 65 test files (256 backend tests, 626 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
 
