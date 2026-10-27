@@ -49,7 +49,7 @@ RippleAI/
 - fixes(id, finding_id, diff_text, files_json, status, approved_at) status: proposed | approved | rejected
 - test_runs(id, project_id, scan_id, name, status, created_at) status: pass | fail | skipped | not_run (Phase 1: everything not_run)
 - reports(id, project_id, created_at, markdown)
-- project_ai_settings(project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE, ai_enabled INTEGER NOT NULL DEFAULT 0, share_code INTEGER NOT NULL DEFAULT 0, consent_version TEXT, updated_at TEXT)
+- project_ai_settings(project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE, ai_enabled INTEGER NOT NULL DEFAULT 0, share_code INTEGER NOT NULL DEFAULT 0, consent_version TEXT, updated_at TEXT) (current consent version: "2026-10-v2")
 - ai_cache(cache_key TEXT PRIMARY KEY, response_text TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL)
 - Note: old global ai_settings table is unused and retained for backward migration compatibility (Backlog K-05).
 
@@ -71,10 +71,11 @@ RippleAI/
 - PUT /api/projects/:id/ai-settings -> { data: ProjectAISettings, error: null } (body: { ai_enabled?: boolean, share_code?: boolean, consent_version?: string | null }; ai_enabled: true requires consent_version === AI_CONSENT_VERSION else 400 AI_CONSENT_REQUIRED; share_code: true requires ai_enabled: true else 400 AI_CONSENT_REQUIRED; turning ai_enabled off sets share_code to false)
 - POST /api/projects/:id/chat -> { data: { text: string, source: "gemini" | "ai" | "saved", provider: string, model: string }, error: null }
   - Body (zod strict): message (string 1-1500), screen (enum: overview, projects, graph, investigations, fixes, tests, reports, landing, general), finding_id (UUID optional), node_id (UUID optional), fix_id (UUID optional), report_id (UUID optional), history (array <= 6 items { role: "user" | "assistant", text: string <= 1000 }), lang (optional "en" | "hi").
-  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 2000, context cap 6000 chars, individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true. Strict snippet rule: if any snippet line matches scanner secret patterns (private key headers, cloud keys) or an assignment of an 8+ character string literal to a name containing password, secret, token, api_key or apikey, the whole snippet is dropped (returns null); no [REDACTED] replacement.
+  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 4000 (default, clamped via AI_MAX_OUTPUT_CHARS), maxOutputTokens 1500 (single constant AI_MAX_OUTPUT_TOKENS), context cap 6000 chars, individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true. Strict snippet rule: if any snippet line matches scanner secret patterns (private key headers, cloud keys) or an assignment of an 8+ character string literal to a name containing password, secret, token, api_key or apikey, the whole snippet is dropped (returns null); no [REDACTED] replacement.
   - Final error codes and HTTP statuses:
     - 400: Validation error / bad UUID / foreign entity mismatch / missing consent on enable (`AI_CONSENT_REQUIRED`)
     - 403: `AI_DISABLED [CONSENT_REQUIRED]` (when project AI switch is off)
+    - 403: `AI_DISABLED [CONSENT_OUTDATED]` (when stored consent version differs from current AI_CONSENT_VERSION "2026-10-v2")
     - 404: Unknown project or foreign entity ID not belonging to project
     - 429: `AI_RATE_LIMITED [LOCAL_LIMIT_EXCEEDED]` (local in-memory limiter with `Retry-After` header)
     - 429: `AI_QUOTA_EXHAUSTED [<UPSTREAM_REASON>]` (upstream provider 429 quota exhaustion)
@@ -98,14 +99,15 @@ The backend supports provider-neutral AI configuration via `backend/.env` (parse
 - `AI_PROVIDER`: "gemini" or "openai_compatible" (default: "gemini")
 - `AI_API_KEY`: API key for the active provider
 - `AI_MODEL`: Model identifier (e.g. "gemini-1.5-flash" or "gpt-4o")
+- `AI_FALLBACK_MODEL`: Optional secondary model identifier (never default; retried once on 5xx `AI_UNAVAILABLE` or 404 `AI_MODEL_NOT_FOUND` within remaining timeout budget)
 - `AI_API_BASE`: Optional custom base endpoint URL
 - `GEMINI_API_KEY`: Fallback Gemini API key
 - `GEMINI_MODEL`: Fallback Gemini model name (default: "gemini-1.5-flash")
 - `GEMINI_API_BASE`: Fallback Gemini base URL
 - `AI_RATE_PER_MINUTE`: Maximum chat requests per minute (default: 10)
 - `AI_TIMEOUT_MS`: Request timeout in milliseconds (default: 30000)
-- `AI_MAX_OUTPUT_CHARS`: Maximum character length of response text (default: 2000)
-- `AI_CONSENT_VERSION`: `"2026-10-v1"`
+- `AI_MAX_OUTPUT_CHARS`: Maximum character length of response text (default: 4000)
+- `AI_CONSENT_VERSION`: `"2026-10-v2"`
 
 
 ## 7. Parser and graph builder

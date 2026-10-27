@@ -74,7 +74,9 @@ describe('Step 7 Fixes, Tests, Reports and Cleanups', () => {
     resetActiveUploads();
 
     if (fs.existsSync(TEST_DIR)) {
-      fs.rmSync(TEST_DIR, { recursive: true, force: true });
+      try {
+        fs.rmSync(TEST_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+      } catch {}
     }
 
     if (fs.existsSync(config.storagePath)) {

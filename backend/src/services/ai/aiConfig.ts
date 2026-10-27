@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 import type { AIConfig, AIProvider } from './types.js';
 
-export const AI_CONSENT_VERSION = '2026-10-v1';
+export const AI_CONSENT_VERSION = '2026-10-v2';
 export const AI_CONSENT_TEXT =
-  'Turning this on sends the question and a short summary of the selected finding or file (rule, severity, file path, line numbers) to the AI service configured in this app (its name is shown next to the switch). With the code switch on, up to 7 lines around the cited line are also sent. Free tiers of some AI services may use this text to improve their products and human reviewers may read it. Never turn this on for code you do not own or may not share.';
+  'Turning this on sends the question and a short summary of the selected finding or file (rule, severity, file path, line numbers) to the AI service configured in this app (its name is shown next to the switch). With the code switch on, up to 7 lines around the cited line are also sent. The chat may also send the names and counts of modules and the titles of the top findings of the screen you are on. Free tiers of some AI services may use this text to improve their products and human reviewers may read it. Never turn this on for code you do not own or may not share.';
+
+export const AI_MAX_OUTPUT_TOKENS = 1500;
 
 /**
  * Returns current resolved AI configuration based on environment variables.
@@ -58,7 +60,10 @@ export function getAIConfig(): AIConfig {
 
   const maxOutputChars = process.env.AI_MAX_OUTPUT_CHARS
     ? parseInt(process.env.AI_MAX_OUTPUT_CHARS, 10)
-    : 2000;
+    : 4000;
+
+  const rawFallbackModel = (process.env.AI_FALLBACK_MODEL || '').trim();
+  const fallbackModel = rawFallbackModel || null;
 
   const configured = Boolean(apiKey && model);
 
@@ -67,6 +72,7 @@ export function getAIConfig(): AIConfig {
     provider,
     apiKey,
     model,
+    fallbackModel,
     apiBase,
     ratePerMinute,
     timeoutMs,

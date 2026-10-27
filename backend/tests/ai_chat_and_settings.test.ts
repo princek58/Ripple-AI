@@ -384,7 +384,10 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
       expect(sys).toContain(UNTRUSTED_CONTEXT_START);
       expect(sys).toContain('Ripple has not confirmed this');
       expect(sys).toContain('read-only by default');
-      expect(sys).toContain('at most 8 short sentences');
+      expect(sys).toContain('under about 6 sentences');
+      expect(sys).toContain('senior developer');
+      expect(sys).toContain('Politely decline harmful or illegal requests');
+      expect(sys).toContain('general programming, web and software questions');
     });
 
     it('13. buildUserPrompt encloses finding and code in UNTRUSTED blocks', () => {
@@ -761,8 +764,8 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
       spy.mockRestore();
     });
 
-    it('24. answer cut at 2000', async () => {
-      const longText = 'A'.repeat(2500);
+    it('24. answer cut at 4000', async () => {
+      const longText = 'A'.repeat(4500);
       const mockAdapter = {
         provider: 'gemini' as const,
         generate: vi.fn().mockResolvedValue({ text: longText, provider: 'gemini', model: 'gemini-1.5-flash' }),
@@ -774,7 +777,7 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
         .send({ message: 'Long answer question', screen: 'general' });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.text.length).toBe(2000);
+      expect(res.body.data.text.length).toBe(4000);
 
       spy.mockRestore();
     });

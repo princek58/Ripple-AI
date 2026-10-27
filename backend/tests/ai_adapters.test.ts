@@ -487,10 +487,10 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
       expect(key1).not.toBe(key2);
     });
 
-    it('has exact provider-neutral consent text and version 2026-10-v1', () => {
-      expect(AI_CONSENT_VERSION).toBe('2026-10-v1');
+    it('has exact provider-neutral consent text and version 2026-10-v2', () => {
+      expect(AI_CONSENT_VERSION).toBe('2026-10-v2');
       expect(AI_CONSENT_TEXT).toBe(
-        'Turning this on sends the question and a short summary of the selected finding or file (rule, severity, file path, line numbers) to the AI service configured in this app (its name is shown next to the switch). With the code switch on, up to 7 lines around the cited line are also sent. Free tiers of some AI services may use this text to improve their products and human reviewers may read it. Never turn this on for code you do not own or may not share.'
+        'Turning this on sends the question and a short summary of the selected finding or file (rule, severity, file path, line numbers) to the AI service configured in this app (its name is shown next to the switch). With the code switch on, up to 7 lines around the cited line are also sent. The chat may also send the names and counts of modules and the titles of the top findings of the screen you are on. Free tiers of some AI services may use this text to improve their products and human reviewers may read it. Never turn this on for code you do not own or may not share.'
       );
     });
   });

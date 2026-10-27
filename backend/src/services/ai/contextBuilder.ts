@@ -170,6 +170,123 @@ export interface BuildContextParams {
   report_id?: string;
 }
 
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 5,
+  high: 4,
+  medium: 3,
+  low: 2,
+  unknown: 1,
+};
+
+function getVisibleModulesBlock(
+  db: Database.Database,
+  projectId: string,
+  clamp300: (s: string | null | undefined) => string
+): string[] {
+  const resultLines: string[] = [];
+  try {
+    const graphRepo = new GraphRepository(db);
+    const level1 = graphRepo.getLevel1(projectId, 200);
+    if (!level1) return resultLines;
+
+    const moduleNodes = level1.nodes.filter((n) => n.type === 'module');
+    moduleNodes.sort((a, b) => {
+      const sevA = a.maxSeverity ? (SEVERITY_ORDER[a.maxSeverity] ?? 0) : 0;
+      const sevB = b.maxSeverity ? (SEVERITY_ORDER[b.maxSeverity] ?? 0) : 0;
+      if (sevB !== sevA) return sevB - sevA;
+      const cntA = a.findingCount ?? 0;
+      const cntB = b.findingCount ?? 0;
+      if (cntB !== cntA) return cntB - cntA;
+      return a.label.localeCompare(b.label);
+    });
+
+    const topModules = moduleNodes.slice(0, 24);
+    if (topModules.length > 0) {
+      resultLines.push('Visible Modules:');
+      for (const mod of topModules) {
+        const sevStr = mod.maxSeverity || 'none';
+        resultLines.push(
+          `- ${clamp300(mod.label)}: ${mod.findingCount ?? 0} findings (max severity: ${sevStr})`
+        );
+      }
+    }
+
+    const labelMap = new Map<string, string>();
+    for (const n of level1.nodes) {
+      labelMap.set(n.id, n.label);
+    }
+
+    const edges = (level1.edges || []).slice(0, 20);
+    if (edges.length > 0) {
+      resultLines.push('Module Connections:');
+      for (const edge of edges) {
+        const srcLabel = labelMap.get(edge.source_id) || edge.source_id;
+        const tgtLabel = labelMap.get(edge.target_id) || edge.target_id;
+        const count = (edge as any).count ?? (edge as any).evidence?.count ?? 1;
+        resultLines.push(
+          `- ${clamp300(srcLabel)} -> ${clamp300(tgtLabel)}: ${count} connection${count === 1 ? '' : 's'}`
+        );
+      }
+    }
+  } catch {}
+  return resultLines;
+}
+
+function getTopFindingsBlock(
+  db: Database.Database,
+  projectId: string,
+  scanId: string,
+  clamp300: (s: string | null | undefined) => string
+): string[] {
+  const resultLines: string[] = [];
+  try {
+    const findings = db
+      .prepare(`
+        SELECT id, rule_id, severity, confidence, title, evidence_json, node_ids_json
+        FROM findings
+        WHERE project_id = ? AND scan_id = ?
+        ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END, id ASC
+        LIMIT 5
+      `)
+      .all(projectId, scanId) as any[];
+
+    if (findings.length > 0) {
+      resultLines.push('Top Findings:');
+      for (const f of findings) {
+        let loc = '';
+        try {
+          const ev = JSON.parse(f.evidence_json);
+          if (Array.isArray(ev) && ev.length > 0 && ev[0].file) {
+            const file = ev[0].file;
+            const line = typeof ev[0].line_start === 'number' ? `:${ev[0].line_start}` : '';
+            loc = `${file}${line}`;
+          }
+        } catch {}
+        if (!loc) {
+          try {
+            const nids = JSON.parse(f.node_ids_json);
+            if (Array.isArray(nids) && nids.length > 0) {
+              const nodeRow = db
+                .prepare('SELECT path, line_start FROM nodes WHERE id = ?')
+                .get(nids[0]) as any;
+              if (nodeRow?.path) {
+                const line =
+                  typeof nodeRow.line_start === 'number' ? `:${nodeRow.line_start}` : '';
+                loc = `${nodeRow.path}${line}`;
+              }
+            }
+          } catch {}
+        }
+        const locStr = loc ? ` at ${clamp300(loc)}` : '';
+        resultLines.push(
+          `- [${f.severity}] ${clamp300(f.title)} (${f.confidence}, rule: ${f.rule_id}${locStr})`
+        );
+      }
+    }
+  } catch {}
+  return resultLines;
+}
+
 /**
  * Builds context per screen from database only.
  * Enforces:
@@ -247,6 +364,9 @@ export function buildScreenContext(
       if (modRows.length > 0) {
         lines.push(`- Top affected modules: ${modRows.map(r => `${r.module} (${r.finding_count} findings)`).join(', ')}`);
       }
+
+      lines.push(...getVisibleModulesBlock(db, projectId, clamp300));
+      lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
       break;
     }
 
@@ -304,6 +424,9 @@ export function buildScreenContext(
         lines.push(`- Total nodes: ${nodeCount}`);
         lines.push(`- Total edges: ${edgeCount}`);
       }
+
+      lines.push(...getVisibleModulesBlock(db, projectId, clamp300));
+      lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
       break;
     }
 
@@ -347,13 +470,7 @@ export function buildScreenContext(
           }
         }
       } else {
-        const findings = db.prepare(`
-          SELECT rule_id, severity, title FROM findings WHERE project_id = ? AND scan_id = ? ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END LIMIT 5
-        `).all(projectId, scanId) as any[];
-        lines.push('Top Project Findings:');
-        for (const f of findings) {
-          lines.push(`- [${f.severity}] ${f.rule_id}: ${clamp300(f.title)}`);
-        }
+        lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
       }
       break;
     }
@@ -418,6 +535,29 @@ export function buildScreenContext(
         } else {
           lines.push('- No fixes proposed.');
         }
+
+        const fixItems = db.prepare(`
+          SELECT fx.id, fx.status, f.title, fx.files_json
+          FROM fixes fx
+          JOIN findings f ON fx.finding_id = f.id
+          WHERE f.project_id = ?
+          ORDER BY fx.id ASC
+          LIMIT 10
+        `).all(projectId) as any[];
+        if (fixItems.length > 0) {
+          lines.push('Fix Items:');
+          for (const fx of fixItems) {
+            let relPaths = '';
+            try {
+              const files = JSON.parse(fx.files_json);
+              if (Array.isArray(files)) {
+                relPaths = files.map((f: string) => clamp300(f)).join(', ');
+              }
+            } catch {}
+            const pathStr = relPaths ? ` (files: ${relPaths})` : '';
+            lines.push(`- ${clamp300(fx.title)}: status=${fx.status}${pathStr}`);
+          }
+        }
       }
       break;
     }
@@ -438,6 +578,16 @@ export function buildScreenContext(
       lines.push(`- Skipped: ${countMap.skipped}`);
       lines.push(`- Not run: ${countMap.not_run}`);
       lines.push('- Note: Phase 1: everything not_run (code execution is disabled)');
+
+      const testItems = db.prepare(`
+        SELECT id, name, status FROM test_runs WHERE project_id = ? AND scan_id = ? ORDER BY id ASC LIMIT 10
+      `).all(projectId, scanId) as any[];
+      if (testItems.length > 0) {
+        lines.push('Test Items:');
+        for (const t of testItems) {
+          lines.push(`- ${clamp300(t.name)}: status=${t.status}`);
+        }
+      }
       break;
     }
 
@@ -457,6 +607,16 @@ export function buildScreenContext(
       } else {
         const reportCount = (db.prepare('SELECT COUNT(*) as count FROM reports WHERE project_id = ?').get(projectId) as any)?.count ?? 0;
         lines.push(`Audit Reports: ${reportCount} report(s) available.`);
+
+        const reportItems = db.prepare(`
+          SELECT id, created_at FROM reports WHERE project_id = ? ORDER BY created_at DESC LIMIT 10
+        `).all(projectId) as any[];
+        if (reportItems.length > 0) {
+          lines.push('Report Items:');
+          for (const r of reportItems) {
+            lines.push(`- Report from ${r.created_at} (status: ready)`);
+          }
+        }
       }
       break;
     }

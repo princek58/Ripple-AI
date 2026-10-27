@@ -4,6 +4,7 @@ import {
   getAIConfig,
   AI_CONSENT_TEXT,
   AI_CONSENT_VERSION,
+  AI_MAX_OUTPUT_TOKENS,
   createProjectAICacheKey,
 } from '../services/ai/aiConfig.js';
 import {
@@ -192,6 +193,9 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   if (!settings || !settings.ai_enabled) {
     return sendError(res, 'AI_DISABLED [CONSENT_REQUIRED]', 403);
   }
+  if (settings.consent_version !== AI_CONSENT_VERSION) {
+    return sendError(res, 'AI_DISABLED [CONSENT_OUTDATED]', 403);
+  }
 
   // 2. Validate optional IDs (must belong to this project else 404)
   if (finding_id) {
@@ -289,29 +293,90 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = buildUserPrompt(contextText, message, lang);
 
-  // 7. Invoke active adapter
+  // 7. Invoke active adapter (with fallback support)
   const adapter = createAIAdapter(aiConfig);
+  const startTime = Date.now();
+
   try {
-    const aiRes = await adapter.generate({
-      systemPrompt,
-      history: history?.map((h) => ({ role: h.role, content: h.text })),
-      userPrompt,
-      maxTokens: 1000,
-    });
+    let aiRes: any = null;
+    let activeModel = aiConfig.model;
+
+    try {
+      aiRes = await adapter.generate({
+        systemPrompt,
+        history: history?.map((h) => ({ role: h.role, content: h.text })),
+        userPrompt,
+        maxTokens: AI_MAX_OUTPUT_TOKENS,
+      });
+    } catch (err: any) {
+      if (err instanceof AIServiceError) {
+        const canFallback =
+          (err.code === 'AI_UNAVAILABLE' || err.code === 'AI_MODEL_NOT_FOUND') &&
+          Boolean(aiConfig.fallbackModel && aiConfig.fallbackModel !== aiConfig.model);
+
+        if (canFallback) {
+          // Rate limiter counts both calls
+          consumeRateLimit(aiConfig.ratePerMinute);
+
+          const elapsed = Date.now() - startTime;
+          const remainingTimeout = Math.max(1, aiConfig.timeoutMs - elapsed);
+
+          const fallbackConfig = {
+            ...aiConfig,
+            model: aiConfig.fallbackModel!,
+            timeoutMs: remainingTimeout,
+          };
+          const fallbackAdapter = createAIAdapter(fallbackConfig);
+          try {
+            aiRes = await fallbackAdapter.generate({
+              systemPrompt,
+              history: history?.map((h) => ({ role: h.role, content: h.text })),
+              userPrompt,
+              maxTokens: AI_MAX_OUTPUT_TOKENS,
+            });
+            activeModel = aiConfig.fallbackModel!;
+          } catch {
+            // Both failed: return the first safe error code
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
 
     let answer = aiRes.text;
     if (answer.length > aiConfig.maxOutputChars) {
       answer = answer.slice(0, aiConfig.maxOutputChars);
     }
 
-    setCachedAIResponse(cacheKey, answer, aiConfig.provider, aiConfig.model);
+    // Cache key uses the model that actually answered
+    const activeCacheKey = createProjectAICacheKey({
+      provider: aiConfig.provider,
+      model: activeModel,
+      projectId: id,
+      scanId,
+      screen,
+      findingId: finding_id,
+      nodeId: node_id,
+      fixId: fix_id,
+      reportId: report_id,
+      shareCode: settings.share_code,
+      lang,
+      message,
+      history,
+    });
+
+    setCachedAIResponse(activeCacheKey, answer, aiConfig.provider, activeModel);
 
     const source = aiConfig.provider === 'gemini' ? 'gemini' : 'ai';
     return sendSuccess(res, {
       text: answer,
       source,
       provider: aiConfig.provider,
-      model: aiConfig.model,
+      model: activeModel,
     });
   } catch (err: any) {
     if (err instanceof AIServiceError) {

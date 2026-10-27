@@ -116,7 +116,7 @@ Alternatively, run both from root using `start-dev.bat` on Windows.
 
 ### Ripple AI chat (backend)
 
-Ripple AI includes an optional, read-only AI chat assistant for explaining static findings and answering questions about project code. Google AI Studio keys now start with "AQ." and that the model id in backend/.env must be one that is available for your account. Configure `GEMINI_API_KEY` and `GEMINI_MODEL` (e.g. `gemini-3.1-flash-lite`) in `backend/.env`.
+Ripple AI includes an optional, read-only AI chat assistant acting like a smart, friendly senior developer sitting next to the user. It answers developer questions across all screens, explaining technical concepts simply, responding in the user's language and tone (natural Hinglish, Hindi in Roman letters, English), and providing practical steps or small code examples while keeping answers concise (under about 6 sentences for simple questions). Chat answers are AI-generated suggestions that may be inaccurate or unconfirmed hypotheses; static analysis evidence remains the authoritative source of truth, and code is read-only by default (Ripple never executes uploaded code or applies fixes automatically). Project AI features are OFF by default and require explicit per-project consent (`AI_CONSENT_VERSION = "2026-10-v2"`). In addition to the primary model, an optional fallback model can be configured via `AI_FALLBACK_MODEL` (retried once on upstream 5xx unavailability or 404 model not found within the same timeout budget; name only, never a default). Google AI Studio keys start with "AQ." and the model id in `backend/.env` must be one that is available for your account. Configure `GEMINI_API_KEY` and `GEMINI_MODEL` (e.g. `gemini-3.1-flash-lite`) in `backend/.env`.
 
 ### Running Tests
 
@@ -245,5 +245,6 @@ RippleAI/
 - **Step K1c (Chat Backend)**: Complete.
 - **Step K2 (Chatbox UI)**: Complete.
 - **Step K3 (Chatbox Demo-Ready)**: Complete.
-- **Test suite**: 856 tests passing across 62 test files (235 backend tests, 621 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
+- **Step K4a (Chat Backend Natural Assistant)**: Complete.
+- **Test suite**: 877 tests passing across 65 test files (256 backend tests, 621 frontend tests, 0 failures, 5 skipped) as of 2026-10-27.
 

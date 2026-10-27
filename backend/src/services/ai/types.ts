@@ -24,6 +24,7 @@ export interface AIConfig {
   provider: AIProvider;
   apiKey: string;
   model: string;
+  fallbackModel?: string | null;
   apiBase: string;
   ratePerMinute: number;
   timeoutMs: number;
