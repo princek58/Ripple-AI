@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useChatSafe, setCachedGlossary } from './ChatProvider.js';
+import { useChatSafe, registerChatModules } from './ChatProvider.js';
 import { useProjects } from '../../lib/projectContext.js';
 import { contextIdsFromUrl } from './urlHelpers.js';
 import { ChatSettings } from './ChatSettings.js';
 import * as glossary from './glossary.js';
+import * as offlineAnswers from './offlineDataAnswers.js';
+import * as offlineKeywords from './offlineKeywords.js';
 
-setCachedGlossary(glossary);
+registerChatModules({ glossary, offlineAnswers, offlineKeywords });
 
 function getScreenExamples(screen: string, lang: 'en' | 'hi'): string[] {
   if (lang === 'hi') {

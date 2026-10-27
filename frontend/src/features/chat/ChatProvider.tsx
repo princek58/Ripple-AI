@@ -13,38 +13,63 @@ import { useExplainLanguage } from '../../lib/useExplainLanguage.js';
 import { contextIdsFromUrl } from './urlHelpers.js';
 import { chatErrorMessage } from './errorMessages.js';
 import { trimHistory } from './trimHistory.js';
-import {
-  fetchAiStatus,
-  fetchProjectAiSettings,
-  putProjectAiSettings,
-  postChatMessage,
-} from './chatApi.js';
+import { fetchAiStatus, fetchProjectAiSettings, putProjectAiSettings, postChatMessage } from './chatApi.js';
+import { getFriendlyErrorMessage } from '../../lib/api.js';
 import type {
   AiStatusData,
   ProjectAiSettings,
   ChatLang,
 } from './types.js';
 
-let cachedGlossary: {
-  offlineAnswer: (question: string, context?: any, lang?: any) => string;
-  hasGlossaryMatch: (question: string) => boolean;
+let chatModules: {
+  glossary?: {
+    offlineAnswer: (question: string, context?: any, lang?: any) => string;
+    hasGlossaryMatch: (question: string) => boolean;
+  };
+  offlineAnswers?: typeof import('./offlineDataAnswers.js');
+  offlineKeywords?: typeof import('./offlineKeywords.js');
 } | null = null;
+
+export function registerChatModules(mods: {
+  glossary: {
+    offlineAnswer: (question: string, context?: any, lang?: any) => string;
+    hasGlossaryMatch: (question: string) => boolean;
+  };
+  offlineAnswers: typeof import('./offlineDataAnswers.js');
+  offlineKeywords: typeof import('./offlineKeywords.js');
+}) {
+  chatModules = mods;
+}
 
 export function setCachedGlossary(m: {
   offlineAnswer: (question: string, context?: any, lang?: any) => string;
   hasGlossaryMatch: (question: string) => boolean;
 }) {
-  cachedGlossary = m;
+  if (!chatModules) {
+    chatModules = { glossary: m };
+  } else {
+    chatModules.glossary = m;
+  }
 }
 
-export function loadGlossarySyncOrAsync(): Promise<void> | null {
-  if (cachedGlossary) return null;
-  return import('./glossary.js').then((m) => {
-    cachedGlossary = {
-      offlineAnswer: m.offlineAnswer,
-      hasGlossaryMatch: m.hasGlossaryMatch,
-    };
-  });
+export async function loadGlossarySyncOrAsync(): Promise<void> {
+  if (
+    chatModules?.glossary &&
+    chatModules?.offlineAnswers &&
+    chatModules?.offlineKeywords
+  ) {
+    return;
+  }
+  const [glossary, offlineAnswers, offlineKeywords] = await Promise.all([
+    import('./glossary.js'),
+    import('./offlineDataAnswers.js'),
+    import('./offlineKeywords.js'),
+  ]);
+  chatModules = {
+    glossary,
+    offlineAnswers,
+    offlineKeywords,
+  };
 }
 
 export interface ChatMessage {
@@ -185,6 +210,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [selectedProjectId]);
 
+  // Abort in-flight requests when panel closes
+  useEffect(() => {
+    if (!isOpen && abortControllerRef.current) {
+      abortControllerRef.current.abort('PANEL_CLOSED');
+      abortControllerRef.current = null;
+      setBusy(false);
+    }
+  }, [isOpen]);
+
   const updateSettings = useCallback(
     async (body: {
       ai_enabled: boolean;
@@ -225,12 +259,90 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const search = location.search;
       const ctx = contextIdsFromUrl(pathname, search);
 
-      if (!cachedGlossary) {
+      if (!chatModules?.glossary || !chatModules?.offlineAnswers || !chatModules?.offlineKeywords) {
         await loadGlossarySyncOrAsync();
       }
 
-      const hasMatch = cachedGlossary
-        ? cachedGlossary.hasGlossaryMatch(clean) || Boolean(ctx.finding_id)
+      // Check if question matches offline data questions (K3 Part 2)
+      const offlineDataType = chatModules?.offlineKeywords?.matchOfflineDataQuestion(
+        clean,
+        Boolean(ctx.finding_id)
+      );
+
+      const activeAnswers = chatModules?.offlineAnswers;
+
+      if (offlineDataType && activeAnswers) {
+        const isScanned = Boolean(selectedProject?.last_scan_at);
+
+        if (offlineDataType !== 'WHAT_IS_NOT_CHECKED' && !selectedProjectId) {
+          const offMsg: ChatMessage = {
+            id: uniqueMsgId('offline'),
+            role: 'assistant',
+            text:
+              lang === 'hi'
+                ? `Koi project select nahi hai. Offline help neeche hai.\n\n${activeAnswers.OFFLINE_DATA_FOOTER}`
+                : `No project selected. Offline help is shown below.\n\n${activeAnswers.OFFLINE_DATA_FOOTER}`,
+            type: 'offline',
+          };
+          setMessages((prev) => [...prev, userMsg, offMsg]);
+          return;
+        }
+
+        if (offlineDataType !== 'WHAT_IS_NOT_CHECKED' && !isScanned) {
+          const offMsg: ChatMessage = {
+            id: uniqueMsgId('offline'),
+            role: 'assistant',
+            text: activeAnswers.formatNeverScanned() || 'Not scanned yet.',
+            type: 'offline',
+          };
+          setMessages((prev) => [...prev, userMsg, offMsg]);
+          return;
+        }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        setBusy(true);
+        setMessages((prev) => [...prev, userMsg]);
+
+        try {
+          const ans = await activeAnswers.getOfflineDataAnswer(
+            offlineDataType,
+            {
+              projectId: selectedProjectId!,
+              isScanned,
+              lang,
+              screen: ctx.screen,
+              findingId: ctx.finding_id,
+              signal: controller.signal,
+            }
+          );
+          if (controller.signal.aborted) return;
+          const offMsg: ChatMessage = {
+            id: uniqueMsgId('offline'),
+            role: 'assistant',
+            text: ans,
+            type: 'offline',
+          };
+          setMessages((prev) => [...prev, offMsg]);
+        } catch (err: unknown) {
+          if (controller.signal.aborted) return;
+          const friendly = getFriendlyErrorMessage(err);
+          const offMsg: ChatMessage = {
+            id: uniqueMsgId('offline'),
+            role: 'assistant',
+            text: `${friendly}\n\n${activeAnswers.OFFLINE_DATA_FOOTER}`,
+            type: 'offline',
+          };
+          setMessages((prev) => [...prev, offMsg]);
+        } finally {
+          setBusy(false);
+          abortControllerRef.current = null;
+        }
+        return;
+      }
+
+      const hasMatch = chatModules?.glossary
+        ? chatModules.glossary.hasGlossaryMatch(clean) || Boolean(ctx.finding_id)
         : Boolean(ctx.finding_id);
       const isConfigured = aiStatus?.configured === true;
       const isAiOn = aiSettings?.ai_enabled === true;
@@ -240,7 +352,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Offline answer computation
       const computeOfflineText = () =>
-        cachedGlossary ? cachedGlossary.offlineAnswer(clean, ctx, lang) : '';
+        chatModules?.glossary ? chatModules.glossary.offlineAnswer(clean, ctx, lang) : '';
 
       // If AI is not available (not selected, unscanned, not configured, or off)
       if (!currentProjectId || !isScanned || !isConfigured || !isAiOn) {
