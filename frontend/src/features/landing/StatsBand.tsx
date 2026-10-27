@@ -83,11 +83,14 @@ export const StatsBand: React.FC<StatsBandProps> = ({
       }
 
       const duration = 800; // ms
-      const startTime = performance.now();
+      let startTime: number | null = null;
 
       const animate = (currentTime: number) => {
+        if (startTime === null) {
+          startTime = currentTime;
+        }
         const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
+        const progress = Math.min(Math.max(0, elapsed / duration), 1);
 
         setCounts({
           levels: Math.round(progress * 4),
