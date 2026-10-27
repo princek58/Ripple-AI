@@ -67,8 +67,11 @@ The Ripple AI chatbox provides on-screen assistance with instant offline archite
 - **What is never sent**: The whole file, environment values (`.env` contents), secret tokens or credential patterns, and project names are never sent to external AI providers.
 - **Free-tier privacy warning**: Free tiers of third-party AI services may use submitted text to train models and human reviewers may read it. Never enable AI for sensitive, proprietary, or unowned source code.
 - **The circle on every screen**: Fixed at the bottom right across all 7 app screens and the landing page, with safe margins avoiding primary controls and automatic raising when the Impact view is active.
-- **Session-only history**: Messages are kept in memory for the active browser session only; switching projects or reloading clears the conversation. Nothing is stored on disk or in the database.
-- **Requires your own API key in `backend/.env`**: Supported variable names (names only, never commit keys): `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_API_BASE`, or the fallbacks `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_BASE`.
+- **Draggable & minimizable panel**: The chat panel can be dragged freely across the viewport by its top header bar (with boundary clamping and double-click/button position reset) and minimized to inspect the dependency graph or code behind it.
+- **Persistent SQLite chat history**: Conversations are stored per project in SQLite (`project_chat_messages`), persisting across page reloads and re-opening with a dedicated "Clear chat" button to wipe history.
+- **Project Workflow & Architecture Brief**: Screen context is enriched up to 8,000 characters with a structured architecture brief (node breakdown by type, representative files per module, inter-module connections, and core workflow hubs).
+- **Multi-key & multi-provider auto-failover**: Configurable with Google Gemini and Groq (`llama-3.3-70b-versatile`) with comma-separated multiple keys (`key1,key2`). Automatically fails over across keys and providers on rate limits (HTTP 429), timeouts, or service downtime within the request budget.
+- **Requires your own API key in `backend/.env`**: Supported variable names (names only, never commit keys): `GEMINI_API_KEY`, `GEMINI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_FALLBACK_MODEL`.
 
 ## Quick start for non-developers
 
@@ -273,5 +276,6 @@ In honest plain words, the following expansions and improvements are planned for
 - **Step K4b (Chat Natural Assistant & AI-First UI)**: Complete.
 - **Step K5 (Chat Self-Aware Assistant & Always-On AI)**: Complete.
 - **Step DEP1 (Deploy Ready & One Service)**: Complete.
-- **Test suite**: 911 tests passing across 69 test files (277 backend tests, 634 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
+- **Step K6 (Multi-Key Failover, Project Brief, Saved Chat History, Draggable Panel)**: Complete.
+- **Test suite**: 925 tests passing across 71 test files (286 backend tests, 639 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
 

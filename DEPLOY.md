@@ -27,8 +27,11 @@ Configure the following environment variables in your hosting provider's dashboa
 | `APP_ACCESS_CODE` | Shared passphrase protecting the application gate | Any strong secret code string |
 | `APP_SESSION_SECRET` | Secret key used to sign session cookies | High-entropy random secret (e.g. 32+ characters) |
 | `PUBLIC_DEMO_MODE` | Optional flag for public demonstration instances | Set to `1` or `true` (forces code sharing OFF) |
-| `GEMINI_API_KEY` | Google Gemini API key for AI assistant features | Required for external AI explanations |
-| `GEMINI_MODEL` | Primary AI model name | E.g. `gemini-3.1-flash-lite` |
+| `GEMINI_API_KEY` | Google Gemini API key(s) (supports comma-separated `key1,key2`) | Required for external Gemini AI explanations |
+| `GEMINI_MODEL` | Primary Gemini model name | E.g. `gemini-3.1-flash-lite` |
+| `GROQ_API_KEY` | Groq API key(s) (supports comma-separated `key1,key2`) | Enables ultra-fast Groq / LLaMA failover |
+| `GROQ_MODEL` | Groq model identifier | Defaults to `llama-3.3-70b-versatile` |
+| `GROQ_BASE_URL` | Optional base URL for Groq/OpenAI-compatible endpoints | Defaults to `https://api.groq.com/openai/v1` |
 | `AI_FALLBACK_MODEL` | Optional fallback model if the primary model is busy | E.g. `gemini-1.5-flash` |
 | `AI_TIMEOUT_MS` | Upstream AI timeout budget in milliseconds | Defaults to `45000` (45s) |
 | `DB_PATH` | Absolute path to the SQLite database file on persistent disk | E.g. `/data/ripple.db` |
@@ -36,6 +39,9 @@ Configure the following environment variables in your hosting provider's dashboa
 | `TEMP_STORAGE_PATH` | Absolute path for extraction temp files | E.g. `/data/storage/tmp` |
 | `TRUST_PROXY` | Proxy trust setting when behind a reverse proxy/load balancer | E.g. `1` or `true` |
 | `CORS_ORIGIN` | Allowed cross-origin domain | Leave unset for same-origin in production |
+
+> **Multi-Key & Multi-Provider Auto-Failover**: Both `GEMINI_API_KEY` and `GROQ_API_KEY` (or `AI_API_KEY`) support comma-separated lists of keys (e.g. `key1,key2`). When configured, Ripple AI automatically fails over across keys and providers (Gemini <-> Groq) within the request timeout budget if any candidate is rate-limited (HTTP 429), unavailable (HTTP 5xx), or rejected.
+
 
 ---
 

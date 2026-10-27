@@ -48,7 +48,6 @@ This document tracks known limitations, technical debt, security advisories, and
 | **K-08** | AI Chat | Chat history is not saved; client session is ephemeral and clears on refresh or project switch. | Minor | Open |
 | **K-09** | Demo Quality | Demo saved answers for offline walkthrough are planned in K3. | Minor | Open |
 | **K-10** | AI Reliability | AI answers depend on a free preview model that may be unavailable or rate limited. | Minor | Open |
-| **K-11** | AI Chat | Chat history is not saved on the server; client maintains ephemeral in-memory session only and clears on project switch or page reload. | Minor | Open |
 | **K-12** | Offline Chat | Offline keyword matching is simple substring matching and can miss paraphrased questions or complex multi-clause sentences. | Minor | Open |
 | **K-13** | AI Reliability | answers depend on a free preview model that may be unavailable or change; a fallback model can be set | Minor | Open |
 | **K-14** | AI Chat | no streaming of answers yet | Minor | Open |

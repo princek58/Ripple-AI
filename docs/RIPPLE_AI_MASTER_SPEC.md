@@ -69,9 +69,13 @@ RippleAI/
 - GET /api/ai/status -> { data: { configured: boolean, provider: "gemini" | "openai_compatible", model: string | null }, error: null } (never returns keys)
 - GET /api/projects/:id/ai-settings -> { data: { ai_enabled: boolean, share_code: boolean, consent_version: string | null, current_consent_version: string, consent_text: string }, error: null }
 - PUT /api/projects/:id/ai-settings -> { data: ProjectAISettings, error: null } (body: { ai_enabled?: boolean, share_code?: boolean, consent_version?: string | null }; ai_enabled: true requires consent_version === AI_CONSENT_VERSION else 400 AI_CONSENT_REQUIRED; share_code: true requires ai_enabled: true else 400 AI_CONSENT_REQUIRED; turning ai_enabled off sets share_code to false)
+- GET /api/projects/:id/chat/history -> { data: { items: [{ id, project_id, role, content, provider, model, created_at }] }, error: null } (up to last 50 saved messages in chronological order; 404 if project does not exist, empty items for "general")
+- DELETE /api/projects/:id/chat/history -> { data: { cleared: true }, error: null } (clears saved SQLite chat history for the project)
 - POST /api/projects/:id/chat -> { data: { text: string, source: "gemini" | "ai" | "saved", provider: string, model: string }, error: null }
   - Body (zod strict): message (string 1-1500), screen (enum: overview, projects, graph, investigations, fixes, tests, reports, landing, general), finding_id (UUID optional), node_id (UUID optional), fix_id (UUID optional), report_id (UUID optional), history (array <= 6 items { role: "user" | "assistant", text: string <= 1000 }), lang (optional "en" | "hi").
-  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 4000 (default, clamped via AI_MAX_OUTPUT_CHARS), maxOutputTokens 1500 (single constant AI_MAX_OUTPUT_TOKENS), context cap 6000 chars, individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true. Strict snippet rule: if any snippet line matches scanner secret patterns (private key headers, cloud keys) or an assignment of an 8+ character string literal to a name containing password, secret, token, api_key or apikey, the whole snippet is dropped (returns null); no [REDACTED] replacement.
+  - Persistent SQLite History & Multi-Turn: If history is empty or omitted, automatically loads the last 6 saved messages from `project_chat_messages`. Saves user prompt and assistant response into SQLite upon completion, pruning past the latest 100 messages.
+  - Multi-Key & Multi-Provider Auto-Failover: Iterates ordered candidates built from configured environment variables. Fails over across comma-separated keys and providers (e.g. Gemini -> Groq) on 429, 5xx, 404, 504, or key auth errors within timeout budget.
+  - Limits: local rate limiter 10 req/min (429 with Retry-After header), answer max output chars 4000 (default, clamped via AI_MAX_OUTPUT_CHARS), maxOutputTokens 1500 (single constant AI_MAX_OUTPUT_TOKENS), context cap 8000 chars (enriched with Project Workflow & Architecture Brief), individual fields clamped to 300 chars, code snippet window 7 lines (line ± 3) only when share_code is true. Strict snippet rule: if any snippet line matches scanner secret patterns (private key headers, cloud keys) or an assignment of an 8+ character string literal to a name containing password, secret, token, api_key or apikey, the whole snippet is dropped (returns null); no [REDACTED] replacement.
   - Final error codes and HTTP statuses:
     - 400: Validation error / bad UUID / foreign entity mismatch / missing consent on enable (`AI_CONSENT_REQUIRED`)
     - 403: `AI_DISABLED [CONSENT_REQUIRED]` (when project AI switch is off)
@@ -96,18 +100,26 @@ Public GitHub repository ZIP downloads use the base URL from GITHUB_CODELOAD_BAS
 
 ### AI Environment Variables & Consent Version
 The backend supports provider-neutral AI configuration via `backend/.env` (parsed on server startup in non-test environments; secrets are never logged, returned, or printed):
-- `AI_PROVIDER`: "gemini" or "openai_compatible" (default: "gemini")
-- `AI_API_KEY`: API key for the active provider
+- `AI_PROVIDER`: "gemini" or "openai_compatible" / "groq" (default: "gemini")
+- `AI_API_KEY`: API key for the active provider (supports comma-separated `key1,key2`)
 - `AI_MODEL`: Model identifier (e.g. "gemini-1.5-flash" or "gpt-4o")
-- `AI_FALLBACK_MODEL`: Optional secondary model identifier (never default; retried once on 5xx `AI_UNAVAILABLE` or 404 `AI_MODEL_NOT_FOUND` within remaining timeout budget)
+- `AI_FALLBACK_MODEL`: Optional secondary model identifier (retried on 5xx `AI_UNAVAILABLE` or 404 `AI_MODEL_NOT_FOUND` within remaining timeout budget)
 - `AI_API_BASE`: Optional custom base endpoint URL
-- `GEMINI_API_KEY`: Fallback Gemini API key
-- `GEMINI_MODEL`: Fallback Gemini model name (default: "gemini-1.5-flash")
+- `GEMINI_API_KEY`: Google Gemini API key(s) (supports comma-separated `key1,key2`)
+- `GEMINI_MODEL`: Primary Gemini model name (default: "gemini-1.5-flash")
 - `GEMINI_API_BASE`: Fallback Gemini base URL
+- `GROQ_API_KEY`: Groq API key(s) (supports comma-separated `key1,key2`) for automatic failover
+- `GROQ_MODEL`: Model name for Groq (default: "llama-3.3-70b-versatile")
+- `GROQ_BASE_URL`: Base URL for Groq API (default: "https://api.groq.com/openai/v1")
 - `AI_RATE_PER_MINUTE`: Maximum chat requests per minute (default: 10)
 - `AI_TIMEOUT_MS`: Request timeout in milliseconds (default: 30000)
 - `AI_MAX_OUTPUT_CHARS`: Maximum character length of response text (default: 4000)
 - `AI_CONSENT_VERSION`: `"2026-10-v2"`
+
+### Project Workflow Brief & UI Features (Step K6)
+- **Project Workflow & Architecture Brief**: Context cap raised to 8000 characters. Automatically enriches screen context for scanned projects with node type breakdown (files, APIs/routes, configs/tables), representative relative file paths per module, inter-module workflow connections, and core workflow hubs (highest fan-in nodes).
+- **Draggable & Minimizable Chat Panel**: Header bar is draggable across the viewport with boundary clamping (`left >= 8`, `top >= 8`, `left <= winWidth - width - 8`, `top <= winHeight - 64`), reset position button on drag or double-click, and minimize toggle button that collapses the panel to a floating header bar.
+
 
 
 ## 7. Parser and graph builder
