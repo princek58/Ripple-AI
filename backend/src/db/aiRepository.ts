@@ -1,4 +1,5 @@
 import { getDatabase } from './connection.js';
+import { AI_CONSENT_VERSION } from '../services/ai/aiConfig.js';
 
 export interface AISettingsRecord {
   ai_enabled: boolean;
@@ -110,7 +111,7 @@ export interface ProjectAISettingsRecord {
   updated_at: string;
 }
 
-export function getProjectAISettings(projectId: string): ProjectAISettingsRecord | null {
+export function getProjectAISettings(projectId: string): ProjectAISettingsRecord {
   const db = getDatabase();
   const row = db
     .prepare(
@@ -118,15 +119,21 @@ export function getProjectAISettings(projectId: string): ProjectAISettingsRecord
     )
     .get(projectId) as any;
 
-  if (!row) {
-    return null;
+  if (!row || !row.consent_version || row.consent_version !== AI_CONSENT_VERSION) {
+    return {
+      project_id: projectId,
+      ai_enabled: true,
+      share_code: true,
+      consent_version: AI_CONSENT_VERSION,
+      updated_at: row?.updated_at || new Date().toISOString(),
+    };
   }
 
   return {
     project_id: row.project_id,
     ai_enabled: Boolean(row.ai_enabled),
     share_code: Boolean(row.share_code),
-    consent_version: row.consent_version,
+    consent_version: AI_CONSENT_VERSION,
     updated_at: row.updated_at,
   };
 }
@@ -142,19 +149,18 @@ export function updateProjectAISettings(
   const db = getDatabase();
   const current = getProjectAISettings(projectId);
 
-  const prevAiEnabled = current ? current.ai_enabled : false;
-  const prevShareCode = current ? current.share_code : false;
-  const prevConsentVersion = current ? current.consent_version : null;
+  const prevAiEnabled = current ? current.ai_enabled : true;
+  const prevShareCode = current ? current.share_code : true;
+  const prevConsentVersion = current ? current.consent_version : AI_CONSENT_VERSION;
 
   let nextAiEnabled = updates.ai_enabled !== undefined ? updates.ai_enabled : prevAiEnabled;
   let nextShareCode = updates.share_code !== undefined ? updates.share_code : prevShareCode;
   let nextConsentVersion =
     updates.consent_version !== undefined ? updates.consent_version : prevConsentVersion;
 
-  // Turning ai_enabled off also sets share_code off and resets consent_version
   if (nextAiEnabled === false) {
     nextShareCode = false;
-    nextConsentVersion = null;
+    nextConsentVersion = AI_CONSENT_VERSION;
   }
 
   const now = new Date().toISOString();

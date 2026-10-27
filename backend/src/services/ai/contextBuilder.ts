@@ -178,58 +178,153 @@ const SEVERITY_ORDER: Record<string, number> = {
   unknown: 1,
 };
 
-function getVisibleModulesBlock(
+function getArchitectureSummaryBlock(
   db: Database.Database,
   projectId: string,
+  scanId: string,
   clamp300: (s: string | null | undefined) => string
 ): string[] {
-  const resultLines: string[] = [];
+  const lines: string[] = [];
   try {
-    const graphRepo = new GraphRepository(db);
-    const level1 = graphRepo.getLevel1(projectId, 200);
-    if (!level1) return resultLines;
+    const nodeCountRow = db
+      .prepare('SELECT COUNT(*) as count FROM nodes WHERE project_id = ? AND scan_id = ?')
+      .get(projectId, scanId) as any;
+    const totalNodes = nodeCountRow?.count ?? 0;
 
-    const moduleNodes = level1.nodes.filter((n) => n.type === 'module');
-    moduleNodes.sort((a, b) => {
-      const sevA = a.maxSeverity ? (SEVERITY_ORDER[a.maxSeverity] ?? 0) : 0;
-      const sevB = b.maxSeverity ? (SEVERITY_ORDER[b.maxSeverity] ?? 0) : 0;
-      if (sevB !== sevA) return sevB - sevA;
-      const cntA = a.findingCount ?? 0;
-      const cntB = b.findingCount ?? 0;
-      if (cntB !== cntA) return cntB - cntA;
-      return a.label.localeCompare(b.label);
-    });
+    const moduleNodes = db
+      .prepare("SELECT id, label FROM nodes WHERE project_id = ? AND scan_id = ? AND type = 'module'")
+      .all(projectId, scanId) as any[];
+    const moduleCount = moduleNodes.length;
 
-    const topModules = moduleNodes.slice(0, 24);
-    if (topModules.length > 0) {
-      resultLines.push('Visible Modules:');
-      for (const mod of topModules) {
-        const sevStr = mod.maxSeverity || 'none';
-        resultLines.push(
-          `- ${clamp300(mod.label)}: ${mod.findingCount ?? 0} findings (max severity: ${sevStr})`
+    const findings = db
+      .prepare('SELECT id, severity, node_ids_json, evidence_json FROM findings WHERE project_id = ? AND scan_id = ?')
+      .all(projectId, scanId) as any[];
+
+    let totalFindings = findings.length;
+    let highFindings = 0;
+    let medFindings = 0;
+    let lowFindings = 0;
+
+    for (const f of findings) {
+      const sev = (f.severity || '').toLowerCase();
+      if (sev === 'critical' || sev === 'high') {
+        highFindings += 1;
+      } else if (sev === 'medium') {
+        medFindings += 1;
+      } else if (sev === 'low') {
+        lowFindings += 1;
+      }
+    }
+
+    lines.push(
+      `Project Architecture Summary: Total Graph Nodes (files, APIs, configs): ${totalNodes} | Top-Level Modules: ${moduleCount} | Total Findings: ${totalFindings} (High: ${highFindings}, Medium: ${medFindings}, Low: ${lowFindings})`
+    );
+
+    // Compute per-module counts
+    const childRows = db
+      .prepare('SELECT id, parent_id FROM nodes WHERE project_id = ? AND scan_id = ? AND parent_id IS NOT NULL')
+      .all(projectId, scanId) as { id: string; parent_id: string }[];
+    const parentMap = new Map<string, string>();
+    for (const cr of childRows) {
+      parentMap.set(cr.id, cr.parent_id);
+    }
+
+    const pathRows = db
+      .prepare('SELECT path, parent_id FROM nodes WHERE project_id = ? AND scan_id = ? AND parent_id IS NOT NULL AND path IS NOT NULL')
+      .all(projectId, scanId) as { path: string; parent_id: string }[];
+    const pathMap = new Map<string, string>();
+    for (const pr of pathRows) {
+      pathMap.set(pr.path, pr.parent_id);
+    }
+
+    const moduleStats = new Map<string, { total: number; high: number; medium: number; low: number }>();
+    for (const mod of moduleNodes) {
+      moduleStats.set(mod.id, { total: 0, high: 0, medium: 0, low: 0 });
+    }
+
+    for (const f of findings) {
+      const targetModuleIds = new Set<string>();
+      let nodeIds: string[] = [];
+      try {
+        nodeIds = JSON.parse(f.node_ids_json);
+      } catch {}
+      for (const nid of nodeIds) {
+        if (moduleStats.has(nid)) {
+          targetModuleIds.add(nid);
+        } else if (parentMap.has(nid)) {
+          targetModuleIds.add(parentMap.get(nid)!);
+        }
+      }
+      if (targetModuleIds.size === 0 && f.evidence_json) {
+        try {
+          const ev = JSON.parse(f.evidence_json);
+          if (Array.isArray(ev) && ev[0]?.file && pathMap.has(ev[0].file)) {
+            targetModuleIds.add(pathMap.get(ev[0].file)!);
+          }
+        } catch {}
+      }
+
+      const sev = (f.severity || '').toLowerCase();
+      for (const mid of targetModuleIds) {
+        const stats = moduleStats.get(mid);
+        if (stats) {
+          stats.total += 1;
+          if (sev === 'critical' || sev === 'high') {
+            stats.high += 1;
+          } else if (sev === 'medium') {
+            stats.medium += 1;
+          } else if (sev === 'low') {
+            stats.low += 1;
+          }
+        }
+      }
+    }
+
+    if (moduleNodes.length > 0) {
+      moduleNodes.sort((a, b) => {
+        const statA = moduleStats.get(a.id) || { total: 0, high: 0, medium: 0, low: 0 };
+        const statB = moduleStats.get(b.id) || { total: 0, high: 0, medium: 0, low: 0 };
+        if (statB.total !== statA.total) return statB.total - statA.total;
+        if (statB.high !== statA.high) return statB.high - statA.high;
+        return a.label.localeCompare(b.label);
+      });
+
+      lines.push('Visible Modules:');
+      for (const mod of moduleNodes.slice(0, 24)) {
+        const stat = moduleStats.get(mod.id) || { total: 0, high: 0, medium: 0, low: 0 };
+        lines.push(
+          `- Module "${clamp300(mod.label)}": ${stat.total} findings (High: ${stat.high}, Medium: ${stat.medium}, Low: ${stat.low})`
         );
       }
     }
 
-    const labelMap = new Map<string, string>();
-    for (const n of level1.nodes) {
-      labelMap.set(n.id, n.label);
-    }
-
-    const edges = (level1.edges || []).slice(0, 20);
-    if (edges.length > 0) {
-      resultLines.push('Module Connections:');
-      for (const edge of edges) {
-        const srcLabel = labelMap.get(edge.source_id) || edge.source_id;
-        const tgtLabel = labelMap.get(edge.target_id) || edge.target_id;
-        const count = (edge as any).count ?? (edge as any).evidence?.count ?? 1;
-        resultLines.push(
-          `- ${clamp300(srcLabel)} -> ${clamp300(tgtLabel)}: ${count} connection${count === 1 ? '' : 's'}`
-        );
+    // Module Connections
+    try {
+      const graphRepo = new GraphRepository(db);
+      const level1 = graphRepo.getLevel1(projectId, 200);
+      if (level1) {
+        const labelMap = new Map<string, string>();
+        for (const n of level1.nodes) {
+          labelMap.set(n.id, n.label);
+        }
+        const edges = (level1.edges || []).slice(0, 20);
+        if (edges.length > 0) {
+          lines.push('Module Connections:');
+          for (const edge of edges) {
+            const srcLabel = labelMap.get(edge.source_id) || edge.source_id;
+            const tgtLabel = labelMap.get(edge.target_id) || edge.target_id;
+            const count = (edge as any).count ?? (edge as any).evidence?.count ?? 1;
+            lines.push(
+              `- ${clamp300(srcLabel)} -> ${clamp300(tgtLabel)}: ${count} connection${count === 1 ? '' : 's'}`
+            );
+          }
+        }
       }
-    }
+    } catch {}
+
+    lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
   } catch {}
-  return resultLines;
+  return lines;
 }
 
 function getTopFindingsBlock(
@@ -326,47 +421,12 @@ export function buildScreenContext(
     return trimmed.length > 300 ? `${trimmed.slice(0, 297)}...` : trimmed;
   };
 
+  // 1. Architecture Header, Visible Modules, Connections, and Top Findings always at the top on every screen
+  lines.push(...getArchitectureSummaryBlock(db, projectId, scanId, clamp300));
+
   switch (params.screen) {
     case 'overview':
     case 'projects': {
-      const countsRow = db.prepare(`
-        SELECT
-          (SELECT COUNT(*) FROM nodes WHERE project_id = ? AND scan_id = ?) as node_count,
-          (SELECT COUNT(*) FROM edges WHERE project_id = ? AND scan_id = ?) as edge_count,
-          (SELECT COUNT(*) FROM edges WHERE project_id = ? AND scan_id = ? AND status = 'unresolved') as unresolved_edge_count,
-          (SELECT COUNT(*) FROM project_files WHERE project_id = ?) as file_count,
-          (SELECT COUNT(*) FROM findings WHERE project_id = ? AND scan_id = ?) as finding_count,
-          (SELECT COUNT(*) FROM findings WHERE project_id = ? AND scan_id = ? AND severity IN ('critical', 'high')) as crit_high_count
-      `).get(projectId, scanId, projectId, scanId, projectId, scanId, projectId, projectId, scanId, projectId, scanId) as any;
-
-      lines.push('Project Architecture Summary:');
-      lines.push(`- Files: ${countsRow?.file_count ?? 0}`);
-      lines.push(`- Nodes: ${countsRow?.node_count ?? 0}`);
-      lines.push(`- Edges: ${countsRow?.edge_count ?? 0} (${countsRow?.unresolved_edge_count ?? 0} unresolved)`);
-      lines.push(`- Total findings: ${countsRow?.finding_count ?? 0} (${countsRow?.crit_high_count ?? 0} critical or high)`);
-
-      const sevRows = db.prepare(`
-        SELECT severity, COUNT(*) as count FROM findings WHERE project_id = ? AND scan_id = ? GROUP BY severity
-      `).all(projectId, scanId) as any[];
-      if (sevRows.length > 0) {
-        lines.push(`- Findings by severity: ${sevRows.map(r => `${r.severity}: ${r.count}`).join(', ')}`);
-      }
-
-      const modRows = db.prepare(`
-        SELECT m.label as module, COUNT(f.id) as finding_count
-        FROM nodes m
-        JOIN findings f ON f.project_id = m.project_id AND f.scan_id = m.scan_id
-        WHERE m.project_id = ? AND m.scan_id = ? AND m.type = 'module'
-        GROUP BY m.id
-        ORDER BY finding_count DESC
-        LIMIT 5
-      `).all(projectId, scanId) as any[];
-      if (modRows.length > 0) {
-        lines.push(`- Top affected modules: ${modRows.map(r => `${r.module} (${r.finding_count} findings)`).join(', ')}`);
-      }
-
-      lines.push(...getVisibleModulesBlock(db, projectId, clamp300));
-      lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
       break;
     }
 
@@ -424,9 +484,6 @@ export function buildScreenContext(
         lines.push(`- Total nodes: ${nodeCount}`);
         lines.push(`- Total edges: ${edgeCount}`);
       }
-
-      lines.push(...getVisibleModulesBlock(db, projectId, clamp300));
-      lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
       break;
     }
 
@@ -469,8 +526,6 @@ export function buildScreenContext(
             }
           }
         }
-      } else {
-        lines.push(...getTopFindingsBlock(db, projectId, scanId, clamp300));
       }
       break;
     }

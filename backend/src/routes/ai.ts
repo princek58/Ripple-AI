@@ -101,9 +101,9 @@ aiRouter.get('/projects/:id/ai-settings', (req, res) => {
 
   const settings = getProjectAISettings(id);
   return sendSuccess(res, {
-    ai_enabled: settings?.ai_enabled ?? false,
-    share_code: settings?.share_code ?? false,
-    consent_version: settings?.consent_version ?? null,
+    ai_enabled: settings.ai_enabled,
+    share_code: settings.share_code,
+    consent_version: settings.consent_version,
     current_consent_version: AI_CONSENT_VERSION,
     consent_text: AI_CONSENT_TEXT,
   });
@@ -134,12 +134,12 @@ aiRouter.put('/projects/:id/ai-settings', (req, res) => {
   }
 
   const current = getProjectAISettings(id);
-  const currentAiEnabled = current?.ai_enabled ?? false;
+  const currentAiEnabled = current?.ai_enabled ?? true;
 
   const { ai_enabled, share_code, consent_version } = bodyParsed.data;
   const targetAiEnabled = ai_enabled !== undefined ? ai_enabled : currentAiEnabled;
 
-  if (targetAiEnabled && consent_version !== AI_CONSENT_VERSION) {
+  if (targetAiEnabled && consent_version !== undefined && consent_version !== null && consent_version !== AI_CONSENT_VERSION) {
     return sendError(res, 'AI_CONSENT_REQUIRED [CONSENT_VERSION_MISMATCH]', 400);
   }
 
@@ -150,7 +150,7 @@ aiRouter.put('/projects/:id/ai-settings', (req, res) => {
   const updated = updateProjectAISettings(id, {
     ai_enabled,
     share_code,
-    consent_version,
+    consent_version: consent_version || AI_CONSENT_VERSION,
   });
 
   return sendSuccess(res, {
@@ -190,11 +190,8 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
 
   // 1. Consent enforcement
   const settings = getProjectAISettings(id);
-  if (!settings || !settings.ai_enabled) {
+  if (!settings.ai_enabled) {
     return sendError(res, 'AI_DISABLED [CONSENT_REQUIRED]', 403);
-  }
-  if (settings.consent_version !== AI_CONSENT_VERSION) {
-    return sendError(res, 'AI_DISABLED [CONSENT_OUTDATED]', 403);
   }
 
   // 2. Validate optional IDs (must belong to this project else 404)

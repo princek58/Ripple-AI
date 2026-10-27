@@ -56,7 +56,7 @@ export function getAIConfig(): AIConfig {
 
   const timeoutMs = process.env.AI_TIMEOUT_MS
     ? parseInt(process.env.AI_TIMEOUT_MS, 10)
-    : 30000;
+    : 45000;
 
   const maxOutputChars = process.env.AI_MAX_OUTPUT_CHARS
     ? parseInt(process.env.AI_MAX_OUTPUT_CHARS, 10)
