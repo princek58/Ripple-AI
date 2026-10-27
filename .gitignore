@@ -9,3 +9,5 @@ build
 frontend/qa-screenshots/
 frontend/test-results/
 frontend/playwright-report/
+*.mp4
+*.mov
