@@ -346,7 +346,7 @@ describe('ChatCircle and ChatSettings (K2 Part 3 & ADDENDUM K2-icon)', () => {
 
     // Open chat panel and go to settings
     fireEvent.click(screen.getByRole('button', { name: 'Open Ripple AI chat' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Chat settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Chat settings' }));
 
     expect(await screen.findByTestId('chat-settings-section')).toBeInTheDocument();
 
@@ -397,7 +397,7 @@ describe('ChatCircle and ChatSettings (K2 Part 3 & ADDENDUM K2-icon)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Ripple AI chat' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Chat settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Chat settings' }));
 
     await screen.findByTestId('chat-settings-section');
 
@@ -440,7 +440,7 @@ describe('ChatCircle and ChatSettings (K2 Part 3 & ADDENDUM K2-icon)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Ripple AI chat' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Chat settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Chat settings' }));
 
     await screen.findByTestId('chat-settings-section');
     fireEvent.click(screen.getByLabelText('Turn on AI for this project'));
@@ -468,7 +468,7 @@ describe('ChatCircle and ChatSettings (K2 Part 3 & ADDENDUM K2-icon)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Ripple AI chat' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Chat settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Chat settings' }));
 
     expect(
       await screen.findByText('Scan the project first to configure AI settings.')
@@ -492,7 +492,7 @@ describe('ChatCircle and ChatSettings (K2 Part 3 & ADDENDUM K2-icon)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Ripple AI chat' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Chat settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Chat settings' }));
 
     expect(
       await screen.findByText('Select a project to configure AI settings.')

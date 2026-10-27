@@ -527,8 +527,8 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     fireEvent.click(screen.getByTestId('toggle-panel-btn'));
 
     const panel = screen.getByRole('dialog', { name: /Ripple AI chat/i });
-    const closeBtn = screen.getByRole('button', { name: /Close Ripple AI chat/i });
-    const sendBtn = screen.getByRole('button', { name: /Send message/i });
+    const closeBtn = await screen.findByRole('button', { name: /Close Ripple AI chat/i });
+    const sendBtn = await screen.findByRole('button', { name: /Send message/i });
 
     // Focus last element and hit Tab -> should loop
     sendBtn.focus();
@@ -619,7 +619,9 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     fireEvent.change(input, { target: { value: 'Test message before switch' } });
     fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
 
-    expect(screen.getByTestId('msg-count')).not.toHaveTextContent('0');
+    await waitFor(() => {
+      expect(screen.getByTestId('msg-count')).not.toHaveTextContent('0');
+    });
 
     // Now switch project
     fireEvent.click(screen.getByTestId('switch-proj-btn'));

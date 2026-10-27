@@ -12,7 +12,6 @@ import { useProjects } from '../../lib/projectContext.js';
 import { useExplainLanguage } from '../../lib/useExplainLanguage.js';
 import { contextIdsFromUrl } from './urlHelpers.js';
 import { chatErrorMessage } from './errorMessages.js';
-import { offlineAnswer, hasGlossaryMatch } from './glossary.js';
 import { trimHistory } from './trimHistory.js';
 import {
   fetchAiStatus,
@@ -25,6 +24,28 @@ import type {
   ProjectAiSettings,
   ChatLang,
 } from './types.js';
+
+let cachedGlossary: {
+  offlineAnswer: (question: string, context?: any, lang?: any) => string;
+  hasGlossaryMatch: (question: string) => boolean;
+} | null = null;
+
+export function setCachedGlossary(m: {
+  offlineAnswer: (question: string, context?: any, lang?: any) => string;
+  hasGlossaryMatch: (question: string) => boolean;
+}) {
+  cachedGlossary = m;
+}
+
+export function loadGlossarySyncOrAsync(): Promise<void> | null {
+  if (cachedGlossary) return null;
+  return import('./glossary.js').then((m) => {
+    cachedGlossary = {
+      offlineAnswer: m.offlineAnswer,
+      hasGlossaryMatch: m.hasGlossaryMatch,
+    };
+  });
+}
 
 export interface ChatMessage {
   id: string;
@@ -204,7 +225,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const search = location.search;
       const ctx = contextIdsFromUrl(pathname, search);
 
-      const hasMatch = hasGlossaryMatch(clean) || Boolean(ctx.finding_id);
+      if (!cachedGlossary) {
+        await loadGlossarySyncOrAsync();
+      }
+
+      const hasMatch = cachedGlossary
+        ? cachedGlossary.hasGlossaryMatch(clean) || Boolean(ctx.finding_id)
+        : Boolean(ctx.finding_id);
       const isConfigured = aiStatus?.configured === true;
       const isAiOn = aiSettings?.ai_enabled === true;
       const isScanned = Boolean(selectedProject?.last_scan_at);
@@ -212,7 +239,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const hasProject = Boolean(currentProjectId);
 
       // Offline answer computation
-      const computeOfflineText = () => offlineAnswer(clean, ctx, lang);
+      const computeOfflineText = () =>
+        cachedGlossary ? cachedGlossary.offlineAnswer(clean, ctx, lang) : '';
 
       // If AI is not available (not selected, unscanned, not configured, or off)
       if (!currentProjectId || !isScanned || !isConfigured || !isAiOn) {
