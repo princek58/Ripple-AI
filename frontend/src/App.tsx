@@ -10,6 +10,7 @@ import { ProjectsPage } from './features/projects/ProjectsPage.js';
 import { DesignSystemPage } from './pages/DesignSystemPage.js';
 import { NotFoundPage } from './pages/NotFoundPage.js';
 import { Skeleton } from './components/ui/Skeleton.js';
+import { AccessGate } from './features/access/AccessGate.js';
 
 const GraphPage = React.lazy(() => import('./features/graph/GraphPage.js'));
 const InvestigationsPage = React.lazy(
@@ -123,9 +124,11 @@ export function AppRoutes() {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <AccessGate>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AccessGate>
     </ThemeProvider>
   );
 }

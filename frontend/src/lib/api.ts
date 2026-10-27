@@ -158,7 +158,7 @@ export async function apiFetch<T>(
     }
 
     // Handle non-JSON response (e.g. text/markdown)
-    const contentType = res.headers.get('content-type') || '';
+    const contentType = res.headers?.get?.('content-type') || '';
     if (contentType.includes('text/markdown') || contentType.includes('text/plain')) {
       const text = await res.text();
       if (!res.ok) {
@@ -180,6 +180,11 @@ export async function apiFetch<T>(
         const match = json.error.match(/\[([A-Z0-9_]+)\]/);
         if (match) {
           code = match[1];
+        }
+      }
+      if (res.status === 401 && (code === 'AUTH_REQUIRED' || json.error?.includes('AUTH_REQUIRED'))) {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('ripple:auth_required'));
         }
       }
       throw new ApiClientError(

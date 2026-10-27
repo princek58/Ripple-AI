@@ -1,11 +1,13 @@
 import express from 'express';
 import config from './config.js';
+import accessRouter from './routes/access.js';
 import healthRouter from './routes/health.js';
 import projectsRouter from './routes/projects.js';
 import findingsRouter from './routes/findings.js';
 import fixesRouter from './routes/fixes.js';
 import reportsRouter from './routes/reports.js';
 import aiRouter from './routes/ai.js';
+import { authMiddleware } from './middleware/auth.js';
 import { notFoundHandler, errorHandler } from './utils/errors.js';
 
 const app = express();
@@ -20,6 +22,7 @@ app.use((req, res, next) => {
 
   if (origin && (allowedOrigin === '*' || origin === allowedOrigin)) {
     res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
   } else if (!origin && allowedOrigin) {
     res.header('Access-Control-Allow-Origin', allowedOrigin);
   }
@@ -33,7 +36,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Authentication Gate Middleware (enforced if APP_ACCESS_CODE is set)
+app.use(authMiddleware);
+
 // API Routes
+app.use('/api', accessRouter);
 app.use('/api', healthRouter);
 app.use('/api', projectsRouter);
 app.use('/api', findingsRouter);
