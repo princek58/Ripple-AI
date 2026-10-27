@@ -179,11 +179,14 @@ export const ChatPanelContent: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const isDemoMode = Boolean(aiStatus?.demo_mode);
+  const isSharingCode = Boolean(aiSettings?.ai_enabled && aiSettings?.share_code && !isDemoMode);
+
   return (
     <div className="flex flex-col h-full w-full select-text">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-theme-border bg-theme-surface/90 backdrop-blur-sm flex-shrink-0">
-        <div className="flex flex-col">
+      <div className="flex flex-col border-b border-theme-border bg-theme-surface/90 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-2">
             <h1 className="font-heading font-semibold text-sm text-theme-text">Ripple AI</h1>
             <span
@@ -193,42 +196,51 @@ export const ChatPanelContent: React.FC = () => {
               {statusText}
             </span>
           </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* Language Toggle */}
+            <button
+              type="button"
+              onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+              className="px-2 py-1 text-xs font-medium rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors"
+              title="Toggle language"
+              aria-label={`Language: ${lang === 'en' ? 'English' : 'Hinglish'}`}
+            >
+              {lang === 'en' ? 'HI' : 'EN'}
+            </button>
+
+            {/* Settings Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowSettings((prev) => !prev)}
+              className={`p-1.5 rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors ${
+                showSettings ? 'bg-theme-surface-active text-theme-text' : ''
+              }`}
+              title="Chat settings"
+              aria-label="Chat settings"
+            >
+              ⚙
+            </button>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={handleClose}
+              className="p-1.5 text-sm rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
+              aria-label="Close Ripple AI chat"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {/* Language Toggle */}
-          <button
-            type="button"
-            onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
-            className="px-2 py-1 text-xs font-medium rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors"
-            title="Toggle language"
-            aria-label={`Language: ${lang === 'en' ? 'English' : 'Hinglish'}`}
-          >
-            {lang === 'en' ? 'HI' : 'EN'}
-          </button>
-
-          {/* Settings Toggle */}
-          <button
-            type="button"
-            onClick={() => setShowSettings((prev) => !prev)}
-            className={`p-1.5 rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors ${
-              showSettings ? 'bg-theme-surface-active text-theme-text' : ''
-            }`}
-            title="Chat settings"
-            aria-label="Chat settings"
-          >
-            ⚙
-          </button>
-
-          {/* Close Button */}
-          <button
-            type="button"
-            onClick={handleClose}
-            className="p-1.5 text-sm rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
-            aria-label="Close Ripple AI chat"
-          >
-            ✕
-          </button>
+        <div
+          data-testid="chat-header-note"
+          className="px-4 pb-2 text-[10.5px] leading-snug text-theme-text-muted border-t border-theme-border/40 pt-1"
+        >
+          {isSharingCode
+            ? 'Code lines are being sent to Google Gemini for better answers (secrets are never sent).'
+            : 'Only rule names, file names and line numbers are sent to Google Gemini.'}
         </div>
       </div>
 

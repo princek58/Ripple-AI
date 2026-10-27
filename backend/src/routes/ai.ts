@@ -12,6 +12,7 @@ import {
   updateProjectAISettings,
   getCachedAIResponse,
   setCachedAIResponse,
+  isPublicDemoMode,
 } from '../db/aiRepository.js';
 import { getDatabase } from '../db/connection.js';
 import { ProjectsRepository } from '../db/projectsRepository.js';
@@ -78,6 +79,7 @@ aiRouter.get('/ai/status', (_req, res) => {
     configured: config.configured,
     provider: config.provider,
     model: config.model || null,
+    demo_mode: isPublicDemoMode(),
   });
 });
 
@@ -138,6 +140,10 @@ aiRouter.put('/projects/:id/ai-settings', (req, res) => {
 
   const { ai_enabled, share_code, consent_version } = bodyParsed.data;
   const targetAiEnabled = ai_enabled !== undefined ? ai_enabled : currentAiEnabled;
+
+  if (isPublicDemoMode() && share_code === true) {
+    return sendError(res, 'AI_REQUEST_REJECTED [DEMO_MODE]', 400);
+  }
 
   if (targetAiEnabled && consent_version !== undefined && consent_version !== null && consent_version !== AI_CONSENT_VERSION) {
     return sendError(res, 'AI_CONSENT_REQUIRED [CONSENT_VERSION_MISMATCH]', 400);

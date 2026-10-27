@@ -31,6 +31,7 @@ export interface AiStatusData {
   configured: boolean;
   provider: string | null;
   model: string | null;
+  demo_mode?: boolean;
 }
 
 /** Project AI settings shape returned by GET /api/projects/:id/ai-settings */

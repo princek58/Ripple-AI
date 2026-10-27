@@ -103,6 +103,19 @@ export function setCachedAIResponse(
   `).run(cacheKey, responseText, provider, model, new Date().toISOString());
 }
 
+export function isPublicDemoMode(): boolean {
+  const mode = process.env.PUBLIC_DEMO_MODE?.trim().toLowerCase();
+  return mode === '1' || mode === 'true';
+}
+
+export function getDefaultShareCode(): boolean {
+  if (isPublicDemoMode()) {
+    return false;
+  }
+  const accessCode = process.env.APP_ACCESS_CODE?.trim();
+  return Boolean(accessCode && accessCode.length > 0);
+}
+
 export interface ProjectAISettingsRecord {
   project_id: string;
   ai_enabled: boolean;
@@ -129,20 +142,24 @@ export function getProjectAISettings(projectId: string): ProjectAISettingsRecord
     };
   }
 
+  const defaultShare = getDefaultShareCode();
+
   if (!row || !row.consent_version || row.consent_version !== AI_CONSENT_VERSION) {
     return {
       project_id: projectId,
       ai_enabled: true,
-      share_code: true,
+      share_code: defaultShare,
       consent_version: AI_CONSENT_VERSION,
       updated_at: row?.updated_at || new Date().toISOString(),
     };
   }
 
+  const effectiveShareCode = isPublicDemoMode() ? false : Boolean(row.share_code);
+
   return {
     project_id: row.project_id,
     ai_enabled: Boolean(row.ai_enabled),
-    share_code: Boolean(row.share_code),
+    share_code: effectiveShareCode,
     consent_version: AI_CONSENT_VERSION,
     updated_at: row.updated_at,
   };

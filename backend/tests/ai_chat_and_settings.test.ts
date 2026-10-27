@@ -114,12 +114,12 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
   });
 
   describe('Per-Project AI Settings & Consent Endpoints (Step K1b Part 1)', () => {
-    it('1. default on per project', async () => {
+    it('1. default on per project (share_code OFF when APP_ACCESS_CODE not set)', async () => {
       const res = await request(app).get(`/api/projects/${projId}/ai-settings`);
       expect(res.status).toBe(200);
       expect(res.body.error).toBeNull();
       expect(res.body.data.ai_enabled).toBe(true);
-      expect(res.body.data.share_code).toBe(true);
+      expect(res.body.data.share_code).toBe(false);
       expect(res.body.data.consent_version).toBe(AI_CONSENT_VERSION);
       expect(res.body.data.current_consent_version).toBe(AI_CONSENT_VERSION);
       expect(res.body.data.consent_text).toBe(AI_CONSENT_TEXT);
@@ -142,7 +142,113 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
       const resB = await request(app).get(`/api/projects/${projBId}/ai-settings`);
       expect(resB.status).toBe(200);
       expect(resB.body.data.ai_enabled).toBe(true);
-      expect(resB.body.data.share_code).toBe(true);
+      expect(resB.body.data.share_code).toBe(false);
+    });
+
+    it('DEP1-1a. default share_code is ON when APP_ACCESS_CODE is set and PUBLIC_DEMO_MODE is not set', async () => {
+      const originalAccessCode = process.env.APP_ACCESS_CODE;
+      const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
+      try {
+        process.env.APP_ACCESS_CODE = 'test-secret-code';
+        delete process.env.PUBLIC_DEMO_MODE;
+
+        const projCId = '00000000-0000-0000-0000-000000000010';
+        const db = getDatabase();
+        db.prepare(`
+          INSERT INTO projects (id, name, created_at, size_bytes, file_count)
+          VALUES (?, 'Project C', CURRENT_TIMESTAMP, 50, 1)
+        `).run(projCId);
+
+        const res = await request(app).get(`/api/projects/${projCId}/ai-settings`);
+        expect(res.status).toBe(200);
+        expect(res.body.data.share_code).toBe(true);
+      } finally {
+        if (originalAccessCode === undefined) delete process.env.APP_ACCESS_CODE;
+        else process.env.APP_ACCESS_CODE = originalAccessCode;
+        if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
+        else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
+      }
+    });
+
+    it('DEP1-1b. default share_code is OFF when PUBLIC_DEMO_MODE is set even if APP_ACCESS_CODE is set', async () => {
+      const originalAccessCode = process.env.APP_ACCESS_CODE;
+      const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
+      try {
+        process.env.APP_ACCESS_CODE = 'test-secret-code';
+        process.env.PUBLIC_DEMO_MODE = '1';
+
+        const projDId = '00000000-0000-0000-0000-000000000011';
+        const db = getDatabase();
+        db.prepare(`
+          INSERT INTO projects (id, name, created_at, size_bytes, file_count)
+          VALUES (?, 'Project D', CURRENT_TIMESTAMP, 50, 1)
+        `).run(projDId);
+
+        const res = await request(app).get(`/api/projects/${projDId}/ai-settings`);
+        expect(res.status).toBe(200);
+        expect(res.body.data.share_code).toBe(false);
+      } finally {
+        if (originalAccessCode === undefined) delete process.env.APP_ACCESS_CODE;
+        else process.env.APP_ACCESS_CODE = originalAccessCode;
+        if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
+        else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
+      }
+    });
+
+    it('DEP1-1c. PUBLIC_DEMO_MODE forces share_code OFF for existing project with share_code true', async () => {
+      const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
+      try {
+        delete process.env.PUBLIC_DEMO_MODE;
+        updateProjectAISettings(projId, {
+          ai_enabled: true,
+          share_code: true,
+          consent_version: AI_CONSENT_VERSION,
+        });
+
+        const resBefore = await request(app).get(`/api/projects/${projId}/ai-settings`);
+        expect(resBefore.body.data.share_code).toBe(true);
+
+        process.env.PUBLIC_DEMO_MODE = 'true';
+        const resAfter = await request(app).get(`/api/projects/${projId}/ai-settings`);
+        expect(resAfter.body.data.share_code).toBe(false);
+      } finally {
+        if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
+        else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
+      }
+    });
+
+    it('DEP1-1d. PUT share_code true returns 400 AI_REQUEST_REJECTED [DEMO_MODE] when PUBLIC_DEMO_MODE is set', async () => {
+      const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
+      try {
+        process.env.PUBLIC_DEMO_MODE = '1';
+        const res = await request(app)
+          .put(`/api/projects/${projId}/ai-settings`)
+          .send({ ai_enabled: true, share_code: true, consent_version: AI_CONSENT_VERSION });
+        expect(res.status).toBe(400);
+        expect(res.body.data).toBeNull();
+        expect(res.body.error).toBe('AI_REQUEST_REJECTED [DEMO_MODE]');
+      } finally {
+        if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
+        else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
+      }
+    });
+
+    it('DEP1-1e. GET /api/ai/status returns demo_mode boolean', async () => {
+      const originalDemoMode = process.env.PUBLIC_DEMO_MODE;
+      try {
+        delete process.env.PUBLIC_DEMO_MODE;
+        const resOff = await request(app).get('/api/ai/status');
+        expect(resOff.status).toBe(200);
+        expect(resOff.body.data.demo_mode).toBe(false);
+
+        process.env.PUBLIC_DEMO_MODE = '1';
+        const resOn = await request(app).get('/api/ai/status');
+        expect(resOn.status).toBe(200);
+        expect(resOn.body.data.demo_mode).toBe(true);
+      } finally {
+        if (originalDemoMode === undefined) delete process.env.PUBLIC_DEMO_MODE;
+        else process.env.PUBLIC_DEMO_MODE = originalDemoMode;
+      }
     });
 
     it('3. share_code without ai_enabled returns 400 AI_CONSENT_REQUIRED', async () => {

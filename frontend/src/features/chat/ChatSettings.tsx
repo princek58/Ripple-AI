@@ -18,9 +18,10 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
   const hasProject = Boolean(selectedProjectId);
   const isScanned = Boolean(selectedProject?.last_scan_at);
   const canEdit = hasProject && isScanned;
+  const isDemoMode = Boolean(aiStatus?.demo_mode);
 
   const aiEnabled = aiSettings ? Boolean(aiSettings.ai_enabled) : true;
-  const shareCode = aiSettings ? Boolean(aiSettings.share_code) : true;
+  const shareCode = aiSettings ? Boolean(aiSettings.share_code) : false;
 
   const handleToggleAi = async () => {
     setErrorMessage(null);
@@ -50,7 +51,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
     try {
       await updateSettings({
         ai_enabled: true,
-        share_code: shareCode,
+        share_code: isDemoMode ? false : shareCode,
         consent_version: aiSettings?.current_consent_version || '2026-10-v2',
       });
       setShowConsentFlow(false);
@@ -62,7 +63,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
   };
 
   const handleToggleShareCode = async () => {
-    if (!aiEnabled) return;
+    if (!aiEnabled || isDemoMode) return;
     setIsSaving(true);
     setErrorMessage(null);
     try {
@@ -200,7 +201,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
             <label
               htmlFor="ai-share-code-switch"
               className={`text-xs font-medium ${
-                canEdit && aiEnabled ? 'text-theme-text cursor-pointer' : 'text-theme-text-muted cursor-not-allowed'
+                canEdit && aiEnabled && !isDemoMode ? 'text-theme-text cursor-pointer' : 'text-theme-text-muted cursor-not-allowed'
               }`}
             >
               Allow sending up to 7 code lines
@@ -208,15 +209,21 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
             <p className="text-[11px] text-theme-text-muted">
               Sends up to 7 lines of code context for more accurate fix advice.
             </p>
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
-              Only for code you own or may share
-            </p>
+            {isDemoMode ? (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5" data-testid="demo-mode-code-disabled-reason">
+                Code sharing is disabled in demo mode.
+              </p>
+            ) : (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                Only for code you own or may share
+              </p>
+            )}
           </div>
           <input
             id="ai-share-code-switch"
             type="checkbox"
-            checked={shareCode}
-            disabled={!canEdit || !aiEnabled || isSaving}
+            checked={isDemoMode ? false : shareCode}
+            disabled={!canEdit || !aiEnabled || isSaving || isDemoMode}
             onChange={handleToggleShareCode}
             className="w-4 h-4 rounded border-theme-border text-theme-primary focus:ring-theme-primary cursor-pointer disabled:cursor-not-allowed"
           />
