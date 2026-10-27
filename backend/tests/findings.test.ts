@@ -8,6 +8,9 @@ import config, { resetUploadLimits } from '../src/config.js';
 import { createDatabase, setDatabase, closeDatabase } from '../src/db/connection.js';
 import { createYazlZip } from './test_helpers.js';
 import { resetActiveUploads } from '../src/routes/projects.js';
+import { checkIsolatedFile } from '../src/checks/isolated_file.js';
+import { checkEnvUndeclared } from '../src/checks/env_undeclared.js';
+import type { CheckContext } from '../src/checks/types.js';
 
 const TEST_DIR = path.resolve(__dirname, 'tmp_findings_test');
 const FIXTURE_DIR = path.resolve(__dirname, 'fixtures', 'demo-erp');
@@ -448,5 +451,146 @@ describe('Step 6 Findings Model, Checks, and Summary Tests', () => {
     expect(str).not.toContain('class Notice');
     expect(str).not.toContain('setNotices');
     expect(str).not.toContain('function getAllNotices');
+  });
+
+  it('14. R2 false alarm fix: build/tooling configuration files (*.config.*, vite.config.*, tailwind.*, postcss.*, webpack.*) are exempt from isolated_file', () => {
+    const context: CheckContext = {
+      projectId: 'proj-test',
+      scanId: 'scan-test',
+      nodes: [
+        { id: 'n1', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'vite.config.ts', type: 'frontend', level: 3, path: 'vite.config.ts' },
+        { id: 'n2', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'tailwind.config.js', type: 'frontend', level: 3, path: 'tailwind.config.js' },
+        { id: 'n3', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'postcss.js', type: 'frontend', level: 3, path: 'postcss.js' },
+        { id: 'n4', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'webpack.common.js', type: 'backend', level: 3, path: 'webpack.common.js' },
+        { id: 'n5', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'jest.config.mjs', type: 'backend', level: 3, path: 'jest.config.mjs' },
+        { id: 'n6', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'orphanCode.ts', type: 'frontend', level: 3, path: 'src/orphanCode.ts' },
+      ],
+      edges: [],
+      files: [],
+    };
+
+    const findings = checkIsolatedFile(context);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toContain('orphanCode.ts');
+    for (const configName of ['vite.config.ts', 'tailwind.config.js', 'postcss.js', 'webpack.common.js', 'jest.config.mjs']) {
+      expect(findings.some((f) => f.title.includes(configName))).toBe(false);
+    }
+  });
+
+  it('15. R2 false alarm fix: TypeScript ambient declaration files (*.d.ts) are exempt from isolated_file', () => {
+    const context: CheckContext = {
+      projectId: 'proj-test',
+      scanId: 'scan-test',
+      nodes: [
+        { id: 'n1', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'vite-env.d.ts', type: 'frontend', level: 3, path: 'src/vite-env.d.ts' },
+        { id: 'n2', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'global.d.ts', type: 'frontend', level: 3, path: 'src/types/global.d.ts' },
+        { id: 'n3', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'deadService.ts', type: 'backend', level: 3, path: 'src/deadService.ts' },
+      ],
+      edges: [],
+      files: [],
+    };
+
+    const findings = checkIsolatedFile(context);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toContain('deadService.ts');
+    expect(findings.some((f) => f.title.includes('vite-env.d.ts'))).toBe(false);
+    expect(findings.some((f) => f.title.includes('global.d.ts'))).toBe(false);
+  });
+
+  it('16. R2 false alarm fix: dynamic ORM loader sibling files (models directory with index.js using fs.readdirSync) are exempt from isolated_file', () => {
+    const context: CheckContext = {
+      projectId: 'proj-test',
+      scanId: 'scan-test',
+      nodes: [
+        { id: 'n1', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'User.js', type: 'database', level: 3, path: 'backend/models/User.js' },
+        { id: 'n2', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'Post.js', type: 'database', level: 3, path: 'backend/models/Post.js' },
+        { id: 'n3', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'orphanUtil.js', type: 'backend', level: 3, path: 'backend/utils/orphanUtil.js' },
+      ],
+      edges: [],
+      files: [
+        {
+          path: 'backend/models/index.js',
+          fullPath: '/virtual/backend/models/index.js',
+          size: 500,
+          language: 'JavaScript',
+          sensitive: false,
+          type: 'database',
+          module: 'database',
+          content: `
+            const fs = require('fs');
+            const path = require('path');
+            fs.readdirSync(__dirname).filter(file => file !== 'index.js').forEach(file => require('./' + file));
+          `,
+        },
+      ],
+    };
+
+    const findings = checkIsolatedFile(context);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toContain('orphanUtil.js');
+    expect(findings.some((f) => f.title.includes('User.js'))).toBe(false);
+    expect(findings.some((f) => f.title.includes('Post.js'))).toBe(false);
+  });
+
+  it('17. R2 false alarm fix: standard runtime variables (NODE_ENV, CI, npm_*) are exempt from env_undeclared', () => {
+    const contextWithMix: CheckContext = {
+      projectId: 'proj-test',
+      scanId: 'scan-test',
+      nodes: [
+        { id: 'n1', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:NODE_ENV', type: 'config', level: 2, path: 'NODE_ENV' },
+        { id: 'n2', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:CI', type: 'config', level: 2, path: 'CI' },
+        { id: 'n3', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:npm_package_version', type: 'config', level: 2, path: 'npm_package_version' },
+        { id: 'n4', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:npm_config_user_agent', type: 'config', level: 2, path: 'npm_config_user_agent' },
+        { id: 'n5', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:REAL_UNDECLARED_SECRET', type: 'config', level: 2, path: 'REAL_UNDECLARED_SECRET' },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          project_id: 'proj-test',
+          scan_id: 'scan-test',
+          source_id: 's1',
+          target_id: 'n5',
+          relation: 'reads',
+          status: 'resolved',
+          confidence: 'confirmed',
+          evidence_json: JSON.stringify({ file: 'src/config.ts', line_start: 5 }),
+        },
+      ],
+      files: [
+        {
+          path: '.env.example',
+          fullPath: '/virtual/.env.example',
+          size: 20,
+          language: 'plaintext',
+          sensitive: false,
+          type: 'config',
+          module: 'config',
+          content: 'PORT=3000\n',
+        },
+      ],
+    };
+
+    const findingsMix = checkEnvUndeclared(contextWithMix);
+    expect(findingsMix).toHaveLength(1);
+    expect(findingsMix[0].title).toContain('REAL_UNDECLARED_SECRET');
+    for (const stdVar of ['NODE_ENV', 'CI', 'npm_package_version', 'npm_config_user_agent']) {
+      expect(findingsMix.some((f) => f.title.includes(stdVar))).toBe(false);
+    }
+
+    // When ONLY standard variables are present in a project without .env.example, zero findings are produced
+    const contextOnlyStandard: CheckContext = {
+      projectId: 'proj-test',
+      scanId: 'scan-test',
+      nodes: [
+        { id: 'n1', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:NODE_ENV', type: 'config', level: 2, path: 'NODE_ENV' },
+        { id: 'n2', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:CI', type: 'config', level: 2, path: 'CI' },
+        { id: 'n3', project_id: 'proj-test', scan_id: 'scan-test', parent_id: null, label: 'env:npm_lifecycle_event', type: 'config', level: 2, path: 'npm_lifecycle_event' },
+      ],
+      edges: [],
+      files: [],
+    };
+
+    const findingsOnlyStandard = checkEnvUndeclared(contextOnlyStandard);
+    expect(findingsOnlyStandard).toHaveLength(0);
   });
 });

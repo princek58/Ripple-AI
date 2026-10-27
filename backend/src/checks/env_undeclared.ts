@@ -1,9 +1,22 @@
 import crypto from 'node:crypto';
 import type { CheckContext, CheckFinding } from './types.js';
 
+export const STANDARD_ENV_EXEMPTIONS = ['NODE_ENV', 'CI'];
+
+export function isExemptEnvVariable(name: string): boolean {
+  if (STANDARD_ENV_EXEMPTIONS.includes(name)) {
+    return true;
+  }
+  if (name.startsWith('npm_')) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Checks for environment variables used in source code that are missing from .env.example.
  * Never stores or references secret values. Names only.
+ * Exempts standard Node/npm runtime variables (NODE_ENV, CI, npm_*).
  */
 export function checkEnvUndeclared(context: CheckContext): CheckFinding[] {
   const { projectId, scanId, nodes, edges, files } = context;
@@ -29,9 +42,13 @@ export function checkEnvUndeclared(context: CheckContext): CheckFinding[] {
     }
   }
 
-  // 2. Find all config nodes representing environment variables (label: "env:NAME")
+  // 2. Find all config nodes representing environment variables (label: "env:NAME"),
+  // excluding standard Node/npm runtime variables (NODE_ENV, CI, npm_*)
   const envConfigNodes = nodes.filter(
-    (n) => n.type === 'config' && n.label.startsWith('env:')
+    (n) =>
+      n.type === 'config' &&
+      n.label.startsWith('env:') &&
+      !isExemptEnvVariable(n.path)
   );
 
   if (envConfigNodes.length === 0) {
