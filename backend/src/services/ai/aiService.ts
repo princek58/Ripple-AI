@@ -8,8 +8,12 @@ import { OpenAICompatibleAdapter } from './adapters/openaiCompatibleAdapter.js';
  */
 export function createAIAdapter(config?: AIConfig): AIAdapter {
   const resolved = config ?? getAIConfig();
-  if (resolved.provider === 'openai_compatible') {
-    return new OpenAICompatibleAdapter(resolved);
+  if (
+    resolved.provider === 'openai_compatible' ||
+    resolved.provider === 'groq' ||
+    resolved.provider === 'openai'
+  ) {
+    return new OpenAICompatibleAdapter(resolved, resolved.provider);
   }
   return new GeminiAdapter(resolved);
 }

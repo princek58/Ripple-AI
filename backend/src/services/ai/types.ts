@@ -1,4 +1,12 @@
-export type AIProvider = 'gemini' | 'openai_compatible';
+export type AIProvider = 'gemini' | 'openai_compatible' | 'groq' | 'openai';
+
+export interface AICandidate {
+  provider: AIProvider;
+  apiKey: string;
+  model: string;
+  apiBase: string;
+  timeoutMs?: number;
+}
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,9 +37,11 @@ export interface AIConfig {
   ratePerMinute: number;
   timeoutMs: number;
   maxOutputChars: number;
+  candidates?: AICandidate[];
 }
 
 export interface AIAdapter {
   readonly provider: AIProvider;
   generate(request: AIRequest): Promise<AIResponse>;
 }
+

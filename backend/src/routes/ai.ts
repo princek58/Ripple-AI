@@ -296,58 +296,112 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = buildUserPrompt(contextText, message, lang);
 
-  // 7. Invoke active adapter (with fallback support)
-  const adapter = createAIAdapter(aiConfig);
+  // 7. Invoke active adapter (with multi-key and multi-provider failover support)
+  const candidates =
+    aiConfig.candidates && aiConfig.candidates.length > 0
+      ? aiConfig.candidates
+      : [
+          {
+            provider: aiConfig.provider,
+            apiKey: aiConfig.apiKey,
+            model: aiConfig.model,
+            apiBase: aiConfig.apiBase,
+          },
+        ];
+
   const startTime = Date.now();
+  let aiRes: any = null;
+  let activeProvider = aiConfig.provider;
+  let activeModel = aiConfig.model;
+  let firstError: any = null;
+  let lastError: any = null;
 
   try {
-    let aiRes: any = null;
-    let activeModel = aiConfig.model;
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (i > 0) {
+        // Each failover attempt consumes 1 unit from rate limiter
+        consumeRateLimit(aiConfig.ratePerMinute);
+      }
 
-    try {
-      aiRes = await adapter.generate({
-        systemPrompt,
-        history: history?.map((h) => ({ role: h.role, content: h.text })),
-        userPrompt,
-        maxTokens: AI_MAX_OUTPUT_TOKENS,
-      });
-    } catch (err: any) {
-      if (err instanceof AIServiceError) {
-        const canFallback =
-          (err.code === 'AI_UNAVAILABLE' || err.code === 'AI_MODEL_NOT_FOUND') &&
-          Boolean(aiConfig.fallbackModel && aiConfig.fallbackModel !== aiConfig.model);
+      const elapsed = Date.now() - startTime;
+      const remainingTimeout = Math.max(1, aiConfig.timeoutMs - elapsed);
+      if (remainingTimeout <= 1) {
+        const timeoutErr = new AIServiceError('AI_TIMEOUT', 504);
+        if (!firstError) firstError = timeoutErr;
+        lastError = timeoutErr;
+        break;
+      }
 
-        if (canFallback) {
-          // Rate limiter counts both calls
-          consumeRateLimit(aiConfig.ratePerMinute);
+      const candidateConfig = {
+        ...aiConfig,
+        provider: candidate.provider,
+        apiKey: candidate.apiKey,
+        model: candidate.model,
+        apiBase: candidate.apiBase,
+        timeoutMs: remainingTimeout,
+      };
+      const candidateAdapter = createAIAdapter(candidateConfig);
 
-          const elapsed = Date.now() - startTime;
-          const remainingTimeout = Math.max(1, aiConfig.timeoutMs - elapsed);
+      try {
+        aiRes = await candidateAdapter.generate({
+          systemPrompt,
+          history: history?.map((h) => ({ role: h.role, content: h.text })),
+          userPrompt,
+          maxTokens: AI_MAX_OUTPUT_TOKENS,
+        });
+        activeProvider = candidate.provider;
+        activeModel = candidate.model;
+        break; // Successfully got an answer!
+      } catch (err: any) {
+        if (!firstError) firstError = err;
+        lastError = err;
 
-          const fallbackConfig = {
-            ...aiConfig,
-            model: aiConfig.fallbackModel!,
-            timeoutMs: remainingTimeout,
-          };
-          const fallbackAdapter = createAIAdapter(fallbackConfig);
-          try {
-            aiRes = await fallbackAdapter.generate({
-              systemPrompt,
-              history: history?.map((h) => ({ role: h.role, content: h.text })),
-              userPrompt,
-              maxTokens: AI_MAX_OUTPUT_TOKENS,
-            });
-            activeModel = aiConfig.fallbackModel!;
-          } catch {
-            // Both failed: return the first safe error code
-            throw err;
-          }
-        } else {
+        if (!(err instanceof AIServiceError)) {
           throw err;
         }
-      } else {
-        throw err;
+
+        const hasNext = i + 1 < candidates.length;
+        if (!hasNext) {
+          break;
+        }
+
+        const next = candidates[i + 1];
+        const isDifferentKeyOrProvider =
+          next.apiKey !== candidate.apiKey || next.provider !== candidate.provider;
+
+        if (!isDifferentKeyOrProvider) {
+          // Same key and provider (model fallback on the same key):
+          // only retry on 5xx or 404 (do not retry 429, 400, 403 on same key)
+          const canFallback =
+            err.code === 'AI_UNAVAILABLE' || err.code === 'AI_MODEL_NOT_FOUND';
+          if (!canFallback) {
+            break;
+          }
+        } else {
+          // Different key or different provider (multi-key or groq/openai failover)
+          const canFailover =
+            err.code === 'AI_RATE_LIMITED' ||
+            err.code === 'AI_QUOTA_EXHAUSTED' ||
+            err.code === 'AI_UNAVAILABLE' ||
+            err.code === 'AI_MODEL_NOT_FOUND' ||
+            err.code === 'AI_TIMEOUT' ||
+            err.code === 'AI_AUTH_FAILED' ||
+            err.upstream_status === 429 ||
+            (typeof err.upstream_status === 'number' && err.upstream_status >= 500) ||
+            err.upstream_status === 404 ||
+            err.upstream_status === 401 ||
+            err.upstream_status === 403;
+
+          if (!canFailover) {
+            break;
+          }
+        }
       }
+    }
+
+    if (!aiRes) {
+      throw firstError || lastError || new AIServiceError('AI_UNAVAILABLE', 502);
     }
 
     let answer = aiRes.text;
@@ -355,9 +409,9 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
       answer = answer.slice(0, aiConfig.maxOutputChars);
     }
 
-    // Cache key uses the model that actually answered
+    // Cache key uses the provider & model that actually answered
     const activeCacheKey = createProjectAICacheKey({
-      provider: aiConfig.provider,
+      provider: activeProvider,
       model: activeModel,
       projectId: id,
       scanId,
@@ -372,13 +426,13 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
       history,
     });
 
-    setCachedAIResponse(activeCacheKey, answer, aiConfig.provider, activeModel);
+    setCachedAIResponse(activeCacheKey, answer, activeProvider, activeModel);
 
-    const source = aiConfig.provider === 'gemini' ? 'gemini' : 'ai';
+    const source = activeProvider === 'gemini' ? 'gemini' : 'ai';
     return sendSuccess(res, {
       text: answer,
       source,
-      provider: aiConfig.provider,
+      provider: activeProvider,
       model: activeModel,
     });
   } catch (err: any) {

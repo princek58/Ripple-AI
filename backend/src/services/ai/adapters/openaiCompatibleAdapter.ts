@@ -3,11 +3,12 @@ import { AIServiceError, mapHttpStatusToAiError, extractSafeErrorDetails } from 
 import { isOpenAIReasoningModel } from '../modelOptions.js';
 
 export class OpenAICompatibleAdapter implements AIAdapter {
-  readonly provider = 'openai_compatible' as const;
+  readonly provider: AIProvider;
   private config: AIConfig;
 
-  constructor(config: AIConfig) {
+  constructor(config: AIConfig, provider?: AIProvider) {
     this.config = config;
+    this.provider = provider || (config.provider as AIProvider) || 'openai_compatible';
   }
 
   async generate(request: AIRequest): Promise<AIResponse> {

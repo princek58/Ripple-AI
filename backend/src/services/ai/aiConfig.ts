@@ -7,48 +7,76 @@ export const AI_CONSENT_TEXT =
 
 export const AI_MAX_OUTPUT_TOKENS = 1500;
 
+export function parseApiKeys(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
+}
+
 /**
  * Returns current resolved AI configuration based on environment variables.
  * Fallbacks:
  * - If AI_PROVIDER is unset or empty, defaults to 'gemini'.
  * - If provider is 'gemini', falls back to GEMINI_API_KEY, GEMINI_MODEL, GEMINI_API_BASE when AI_* are not set.
- * - AI_API_BASE defaults:
- *   - 'https://generativelanguage.googleapis.com' for gemini
- *   - 'https://api.openai.com/v1' for openai_compatible
- * - No default model name exists.
- * - Configured is true ONLY if both apiKey and model are non-empty.
+ * - Supports comma-separated keys in GEMINI_API_KEY, GROQ_API_KEY, or AI_API_KEY.
+ * - If GROQ_API_KEY is set, defaults GROQ_MODEL to 'llama-3.3-70b-versatile' and GROQ_BASE_URL to 'https://api.groq.com/openai/v1'.
+ * - If GEMINI_API_KEY is NOT set but GROQ_API_KEY is set, Groq is the primary provider.
+ * - If both are set, Gemini is primary with Groq as automatic failover candidates.
  */
 export function getAIConfig(): AIConfig {
   const rawProvider = (process.env.AI_PROVIDER || '').trim().toLowerCase();
-  const provider: AIProvider =
-    rawProvider === 'openai_compatible' ? 'openai_compatible' : 'gemini';
 
   const rawAiKey = (process.env.AI_API_KEY || '').trim();
   const rawAiModel = (process.env.AI_MODEL || '').trim();
   const rawAiBase = (process.env.AI_API_BASE || '').trim();
 
-  let apiKey = rawAiKey;
-  let model = rawAiModel;
-  let apiBase = rawAiBase;
+  // Gemini keys
+  const geminiKeyStr =
+    process.env.GEMINI_API_KEY ||
+    (rawProvider !== 'openai_compatible' ? rawAiKey : '');
+  const geminiKeys = parseApiKeys(geminiKeyStr);
+  const geminiModel = (
+    process.env.GEMINI_MODEL ||
+    (rawProvider !== 'openai_compatible' ? rawAiModel : '') ||
+    ''
+  ).trim();
+  const geminiBase = (
+    process.env.GEMINI_API_BASE ||
+    (rawProvider !== 'openai_compatible' ? rawAiBase : '') ||
+    'https://generativelanguage.googleapis.com'
+  ).trim();
 
-  if (provider === 'gemini') {
-    if (!apiKey) {
-      apiKey = (process.env.GEMINI_API_KEY || '').trim();
-    }
-    if (!model) {
-      model = (process.env.GEMINI_MODEL || '').trim();
-    }
-    if (!apiBase) {
-      apiBase = (process.env.GEMINI_API_BASE || '').trim();
-    }
-  }
+  // Groq keys
+  const groqKeyStr = process.env.GROQ_API_KEY || '';
+  const groqKeys = parseApiKeys(groqKeyStr);
+  const groqModel = (
+    process.env.GROQ_MODEL ||
+    (groqKeys.length > 0 ? 'llama-3.3-70b-versatile' : '')
+  ).trim();
+  const groqBase = (
+    process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1'
+  ).trim();
 
-  if (!apiBase) {
-    apiBase =
-      provider === 'openai_compatible'
-        ? 'https://api.openai.com/v1'
-        : 'https://generativelanguage.googleapis.com';
-  }
+  // OpenAI keys
+  const openaiKeyStr =
+    process.env.OPENAI_API_KEY ||
+    (rawProvider === 'openai_compatible' ? rawAiKey : '');
+  const openaiKeys = parseApiKeys(openaiKeyStr);
+  const openaiModel = (
+    process.env.OPENAI_MODEL ||
+    (rawProvider === 'openai_compatible' ? rawAiModel : '') ||
+    ''
+  ).trim();
+  const openaiBase = (
+    process.env.OPENAI_BASE_URL ||
+    (rawProvider === 'openai_compatible' ? rawAiBase : '') ||
+    'https://api.openai.com/v1'
+  ).trim();
+
+  const rawFallbackModel = (process.env.AI_FALLBACK_MODEL || '').trim();
+  const fallbackModel = rawFallbackModel || null;
 
   const ratePerMinute = process.env.AI_RATE_PER_MINUTE
     ? parseInt(process.env.AI_RATE_PER_MINUTE, 10)
@@ -62,10 +90,117 @@ export function getAIConfig(): AIConfig {
     ? parseInt(process.env.AI_MAX_OUTPUT_CHARS, 10)
     : 4000;
 
-  const rawFallbackModel = (process.env.AI_FALLBACK_MODEL || '').trim();
-  const fallbackModel = rawFallbackModel || null;
+  const candidates: AICandidate[] = [];
+  let provider: AIProvider = 'gemini';
+  let apiKey = '';
+  let model = '';
+  let apiBase = geminiBase;
 
-  const configured = Boolean(apiKey && model);
+  if (rawProvider === 'openai_compatible' && openaiKeys.length > 0 && openaiModel) {
+    provider = 'openai_compatible';
+    apiKey = openaiKeys[0];
+    model = openaiModel;
+    apiBase = openaiBase;
+
+    for (const key of openaiKeys) {
+      candidates.push({ provider: 'openai_compatible', apiKey: key, model: openaiModel, apiBase: openaiBase });
+    }
+
+    if (fallbackModel && fallbackModel !== openaiModel) {
+      for (const key of openaiKeys) {
+        candidates.push({ provider: 'openai_compatible', apiKey: key, model: fallbackModel, apiBase: openaiBase });
+      }
+    }
+
+    if (groqKeys.length > 0 && groqModel) {
+      for (const key of groqKeys) {
+        candidates.push({ provider: 'groq', apiKey: key, model: groqModel, apiBase: groqBase });
+      }
+    }
+
+    if (geminiKeys.length > 0 && geminiModel) {
+      for (const key of geminiKeys) {
+        candidates.push({ provider: 'gemini', apiKey: key, model: geminiModel, apiBase: geminiBase });
+      }
+    }
+  } else if (geminiKeys.length > 0 && geminiModel) {
+    provider = 'gemini';
+    apiKey = geminiKeys[0];
+    model = geminiModel;
+    apiBase = geminiBase;
+
+    for (const key of geminiKeys) {
+      candidates.push({ provider: 'gemini', apiKey: key, model: geminiModel, apiBase: geminiBase });
+    }
+
+    if (fallbackModel && fallbackModel !== geminiModel) {
+      for (const key of geminiKeys) {
+        candidates.push({ provider: 'gemini', apiKey: key, model: fallbackModel, apiBase: geminiBase });
+      }
+    }
+
+    if (groqKeys.length > 0 && groqModel) {
+      for (const key of groqKeys) {
+        candidates.push({ provider: 'groq', apiKey: key, model: groqModel, apiBase: groqBase });
+      }
+    }
+
+    if (openaiKeys.length > 0 && openaiModel) {
+      for (const key of openaiKeys) {
+        candidates.push({ provider: 'openai', apiKey: key, model: openaiModel, apiBase: openaiBase });
+      }
+    }
+  } else if (groqKeys.length > 0 && groqModel) {
+    provider = 'groq';
+    apiKey = groqKeys[0];
+    model = groqModel;
+    apiBase = groqBase;
+
+    for (const key of groqKeys) {
+      candidates.push({ provider: 'groq', apiKey: key, model: groqModel, apiBase: groqBase });
+    }
+
+    if (fallbackModel && fallbackModel !== groqModel) {
+      for (const key of groqKeys) {
+        candidates.push({ provider: 'groq', apiKey: key, model: fallbackModel, apiBase: groqBase });
+      }
+    }
+
+    if (geminiKeys.length > 0 && geminiModel) {
+      for (const key of geminiKeys) {
+        candidates.push({ provider: 'gemini', apiKey: key, model: geminiModel, apiBase: geminiBase });
+      }
+    }
+
+    if (openaiKeys.length > 0 && openaiModel) {
+      for (const key of openaiKeys) {
+        candidates.push({ provider: 'openai', apiKey: key, model: openaiModel, apiBase: openaiBase });
+      }
+    }
+  } else if (openaiKeys.length > 0 && openaiModel) {
+    provider = rawProvider === 'openai_compatible' ? 'openai_compatible' : 'openai';
+    apiKey = openaiKeys[0];
+    model = openaiModel;
+    apiBase = openaiBase;
+
+    for (const key of openaiKeys) {
+      candidates.push({ provider: 'openai_compatible', apiKey: key, model: openaiModel, apiBase: openaiBase });
+    }
+
+    if (fallbackModel && fallbackModel !== openaiModel) {
+      for (const key of openaiKeys) {
+        candidates.push({ provider: 'openai_compatible', apiKey: key, model: fallbackModel, apiBase: openaiBase });
+      }
+    }
+  } else {
+    // Unconfigured
+    provider = rawProvider === 'openai_compatible' ? 'openai_compatible' : 'gemini';
+    apiKey = '';
+    model = '';
+    apiBase = provider === 'openai_compatible' ? openaiBase : geminiBase;
+  }
+
+  const configured = candidates.length > 0;
 
   return {
     configured,
@@ -77,6 +212,7 @@ export function getAIConfig(): AIConfig {
     ratePerMinute,
     timeoutMs,
     maxOutputChars,
+    candidates,
   };
 }
 
