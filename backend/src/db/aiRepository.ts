@@ -119,6 +119,16 @@ export function getProjectAISettings(projectId: string): ProjectAISettingsRecord
     )
     .get(projectId) as any;
 
+  if (row && row.ai_enabled === 0) {
+    return {
+      project_id: row.project_id,
+      ai_enabled: false,
+      share_code: false,
+      consent_version: null,
+      updated_at: row.updated_at,
+    };
+  }
+
   if (!row || !row.consent_version || row.consent_version !== AI_CONSENT_VERSION) {
     return {
       project_id: projectId,
@@ -160,7 +170,7 @@ export function updateProjectAISettings(
 
   if (nextAiEnabled === false) {
     nextShareCode = false;
-    nextConsentVersion = AI_CONSENT_VERSION;
+    nextConsentVersion = null;
   }
 
   const now = new Date().toISOString();

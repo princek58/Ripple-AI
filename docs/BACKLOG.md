@@ -52,7 +52,6 @@ This document tracks known limitations, technical debt, security advisories, and
 | **K-12** | Offline Chat | Offline keyword matching is simple substring matching and can miss paraphrased questions or complex multi-clause sentences. | Minor | Open |
 | **K-13** | AI Reliability | answers depend on a free preview model that may be unavailable or change; a fallback model can be set | Minor | Open |
 | **K-14** | AI Chat | no streaming of answers yet | Minor | Open |
-| **K-15** | AI Context | In the first real graph answer the AI mixed up nodes and modules (said 30 nodes (modules) when there are 5 modules) and said fees has 2 High findings when it has 1 High and 1 Low; the screen context needs explicit per-module severity counts and clear nodes versus modules labels | Minor | Open |
 | **K-16** | AI Verification | real AI answers are only verified on the small demo-erp fixture | Minor | Open |
 | **L-01** | Landing Page | Docs link on the landing page is disabled until a real Docs page exists. | Minor | Open |
 | **L-02** | Git Maintenance | landing-wip branch holds unreviewed edits, not merged. | Minor | Open |

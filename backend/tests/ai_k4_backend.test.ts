@@ -141,6 +141,11 @@ describe('Step K4a: Rich Screen Context, Consent v2, and Fallback Model', () => 
       expect(prompt).toContain('Plain text only, no HTML, no links');
       expect(prompt).toContain('<<<BEGIN_UNTRUSTED_CONTEXT>>>');
       expect(prompt).toContain('<<<BEGIN_UNTRUSTED_USER_MESSAGE>>>');
+      expect(prompt).toContain('Graph');
+      expect(prompt).toContain('Investigations');
+      expect(prompt).toContain('Show impact');
+      expect(prompt).toContain('Level 1 shows top-level Modules');
+      expect(prompt).toContain('Level 2');
     });
   });
 
@@ -217,6 +222,18 @@ describe('Step K4a: Rich Screen Context, Consent v2, and Fallback Model', () => 
       expect(ctx.length).toBeLessThanOrEqual(6000);
     });
 
+    it('investigations screen with finding_id includes project architecture summary and per-module severity breakdown', () => {
+      const db = getDatabase();
+      const ctx = buildScreenContext(db, projId, { screen: 'investigations', finding_id: finding1Id }, true);
+
+      expect(ctx).toContain('Project Architecture Summary: Total Graph Nodes (files, APIs, configs):');
+      expect(ctx).toContain('Visible Modules:');
+      expect(ctx).toMatch(/- Module "AuthModule": \d+ findings \(High: \d+, Medium: \d+, Low: \d+\)/);
+      expect(ctx).toContain('Finding Details:');
+      expect(ctx).toContain('Hardcoded credential');
+      expect(ctx.length).toBeLessThanOrEqual(6000);
+    });
+
     it('fixes screen without fix_id includes counts and list of first 10 items', () => {
       const db = getDatabase();
       const ctx = buildScreenContext(db, projId, { screen: 'fixes' }, false);
@@ -283,7 +300,7 @@ describe('Step K4a: Rich Screen Context, Consent v2, and Fallback Model', () => 
   });
 
   describe('Item 4: Consent version v2 and outdated consent handling', () => {
-    it('GET /api/projects/:id/ai-settings returns current_consent_version as 2026-10-v2 and shows mismatch when stored is v1', async () => {
+    it('GET /api/projects/:id/ai-settings defaults older consent version to current_consent_version without blocking', async () => {
       updateProjectAISettings(projId, {
         ai_enabled: true,
         consent_version: '2026-10-v1',
@@ -291,14 +308,14 @@ describe('Step K4a: Rich Screen Context, Consent v2, and Fallback Model', () => 
 
       const res = await request(app).get(`/api/projects/${projId}/ai-settings`);
       expect(res.status).toBe(200);
-      expect(res.body.data.consent_version).toBe('2026-10-v1');
+      expect(res.body.data.consent_version).toBe('2026-10-v2');
       expect(res.body.data.current_consent_version).toBe('2026-10-v2');
       expect(res.body.data.consent_text).toContain(
         'The chat may also send the names and counts of modules and the titles of the top findings of the screen you are on.'
       );
     });
 
-    it('POST /api/projects/:id/chat returns 403 AI_DISABLED [CONSENT_OUTDATED] when stored consent version differs', async () => {
+    it('POST /api/projects/:id/chat does not block on older consent version and does not return 403 CONSENT_OUTDATED', async () => {
       updateProjectAISettings(projId, {
         ai_enabled: true,
         consent_version: '2026-10-v1',
@@ -308,9 +325,10 @@ describe('Step K4a: Rich Screen Context, Consent v2, and Fallback Model', () => 
         .post(`/api/projects/${projId}/chat`)
         .send({ message: 'What is on my screen?', screen: 'overview' });
 
-      expect(res.status).toBe(403);
-      expect(res.body.data).toBeNull();
-      expect(res.body.error).toBe('AI_DISABLED [CONSENT_OUTDATED]');
+      expect(res.status).not.toBe(403);
+      if (res.body.error) {
+        expect(res.body.error).not.toBe('AI_DISABLED [CONSENT_OUTDATED]');
+      }
     });
 
     it('PUT /api/projects/:id/ai-settings rejects old consent version and accepts 2026-10-v2', async () => {

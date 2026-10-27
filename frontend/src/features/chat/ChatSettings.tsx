@@ -24,12 +24,16 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({ onBack }) => {
 
   const handleToggleAi = async () => {
     setErrorMessage(null);
+    if (!aiEnabled) {
+      setShowConsentFlow(true);
+      return;
+    }
     setIsSaving(true);
     try {
       await updateSettings({
-        ai_enabled: !aiEnabled,
-        share_code: !aiEnabled ? shareCode : false,
-        consent_version: aiSettings?.current_consent_version || '2026-10-v2',
+        ai_enabled: false,
+        share_code: false,
+        consent_version: undefined,
       });
       setShowConsentFlow(false);
     } catch (err: any) {

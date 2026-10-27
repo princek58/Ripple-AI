@@ -264,7 +264,7 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     );
   });
 
-  it('5. aborts request at 25 seconds and shows friendly timeout message', async () => {
+  it('5. aborts request at 40 seconds and shows friendly timeout message', async () => {
     vi.useFakeTimers();
 
     setupFetchMock({
@@ -281,9 +281,9 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     fireEvent.change(input, { target: { value: 'Explain graph' } });
     fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
 
-    // Fast-forward past 25s
+    // Fast-forward past 40s
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(25100);
+      await vi.advanceTimersByTimeAsync(40100);
     });
 
     const errorMsg = screen.getByTestId('chat-error-message');
@@ -689,100 +689,62 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     expect(screen.queryByTestId('chat-offline-message')).not.toBeInTheDocument();
   });
 
-  it('17. consent card PUT body and auto-send of the pending question', async () => {
-    let putCapturedBody: any = null;
-    let chatCallCount = 0;
-    let chatCapturedBody: any = null;
-
-    let currentSettings = { ...aiSettingsDefaultFixture.data }; // ai_enabled: false
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
-      const urlStr = String(url);
-      if (urlStr.includes('/api/ai/status')) {
-        return new Response(JSON.stringify(aiStatusFixture), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }
-      if (urlStr.includes('/ai-settings')) {
-        if (init?.method === 'PUT') {
-          putCapturedBody = JSON.parse(String(init.body));
-          currentSettings = {
-            ...currentSettings,
-            ...putCapturedBody,
-          };
-          return new Response(JSON.stringify({ data: currentSettings, error: null }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-        return new Response(JSON.stringify({ data: currentSettings, error: null }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (urlStr.includes('/chat')) {
-        chatCallCount++;
-        chatCapturedBody = JSON.parse(String(init?.body));
-        return new Response(JSON.stringify(aiChatSuccessFixture), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (urlStr.includes('/api/projects')) {
-        return new Response(JSON.stringify({ data: [mockProjectScanned], error: null }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }
-      return new Response(JSON.stringify({ data: null, error: 'Not found' }), { status: 404 });
+  it('17. user question and AI answer both remain visible in DOM in order with You label', async () => {
+    setupFetchMock({
+      '/chat': {
+        data: {
+          text: 'This is the AI answer explaining circular dependencies.',
+          source: 'test',
+          provider: 'test',
+          model: 'test',
+        },
+        error: null,
+      },
     });
 
     render(<TestHarness initialEntries={['/app/overview']} />);
     fireEvent.click(screen.getByTestId('toggle-panel-btn'));
-    expect(await screen.findByText('AI off for this project')).toBeInTheDocument();
+    expect(await screen.findByText('AI on')).toBeInTheDocument();
 
     const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
     fireEvent.change(input, { target: { value: 'Why are there circular dependencies?' } });
     fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
 
-    // Offline answer appears with reason, and consent card is rendered
-    expect(await screen.findByTestId('chat-offline-message')).toBeInTheDocument();
-    const consentCard = await screen.findByTestId('chat-consent-card');
-    expect(consentCard).toBeInTheDocument();
-    expect(screen.getByTestId('consent-card-text')).toHaveTextContent(/Turning this on sends the question/i);
+    // Both user message and AI message are present in DOM
+    const userMsg = await screen.findByTestId('chat-user-message');
+    expect(userMsg).toBeInTheDocument();
+    expect(userMsg).toHaveTextContent('Why are there circular dependencies?');
+    expect(userMsg).toHaveTextContent('You');
 
-    // Auto-send is pending. Check the "I understand" box and click turn on AI
-    const checkbox = screen.getByTestId('consent-card-checkbox');
-    const submitBtn = screen.getByTestId('consent-card-submit-btn');
+    const aiMsg = await screen.findByTestId('chat-ai-message');
+    expect(aiMsg).toBeInTheDocument();
+    expect(aiMsg).toHaveTextContent('This is the AI answer explaining circular dependencies.');
 
-    expect(submitBtn).toBeDisabled();
-    fireEvent.click(checkbox);
-    expect(submitBtn).not.toBeDisabled();
-
-    fireEvent.click(submitBtn);
-
-    // Verify PUT body
-    await waitFor(() => {
-      expect(putCapturedBody).toEqual({
-        ai_enabled: true,
-        share_code: false,
-        consent_version: '2026-10-v2',
-      });
-    });
-
-    // Verify auto-send sent the pending question to /chat
-    await waitFor(() => {
-      expect(chatCallCount).toBe(1);
-      expect(chatCapturedBody?.message).toBe('Why are there circular dependencies?');
-      expect(screen.getByTestId('chat-ai-message')).toBeInTheDocument();
-    });
+    // Verify ordering: user message precedes AI message
+    const allMessages = screen.getAllByTestId(/chat-(user|ai)-message/);
+    expect(allMessages.length).toBe(2);
+    expect(allMessages[0]).toHaveAttribute('data-testid', 'chat-user-message');
+    expect(allMessages[1]).toHaveAttribute('data-testid', 'chat-ai-message');
   });
 
-  it('18. outdated consent shows the card and update message', async () => {
+  it('18. outdated consent version does not block AI chat and allows normal interaction', async () => {
     setupFetchMock({
       '/ai-settings': {
         data: {
           project_id: 'proj-123',
           ai_enabled: true,
-          share_code: false,
-          consent_version: '2026-10-v1', // Outdated!
+          share_code: true,
+          consent_version: '2026-10-v1', // Older consent version
           current_consent_version: '2026-10-v2',
-          consent_text: 'Updated consent text v2.',
+        },
+        error: null,
+      },
+      '/chat': {
+        data: {
+          text: 'Architecture advice for your project.',
+          source: 'test',
+          provider: 'test',
+          model: 'test',
         },
         error: null,
       },
@@ -791,21 +753,16 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     render(<TestHarness initialEntries={['/app/overview']} />);
     fireEvent.click(screen.getByTestId('toggle-panel-btn'));
 
-    // Status badge reflects outdated/off
-    expect(await screen.findByText('AI off for this project')).toBeInTheDocument();
+    // Status badge is AI on
+    expect(await screen.findByText('AI on')).toBeInTheDocument();
 
     const input = screen.getByPlaceholderText(/Ask Ripple AI.../i);
     fireEvent.change(input, { target: { value: 'Help with architecture' } });
     fireEvent.click(screen.getByRole('button', { name: /Send message/i }));
 
-    // Shows offline help with outdated consent reason
-    const offlineMsg = await screen.findByTestId('chat-offline-message');
-    expect(offlineMsg).toHaveTextContent(/The AI privacy note was updated. Please accept it again to use AI./i);
-
-    // Consent card is visible with updated title
-    const consentCard = await screen.findByTestId('chat-consent-card');
-    expect(consentCard).toHaveTextContent('Updated AI Consent Required');
-    expect(screen.getByTestId('consent-card-text')).toHaveTextContent('Updated consent text v2.');
+    // Directly receives AI answer without consent roadblocks or consent card
+    expect(await screen.findByTestId('chat-ai-message')).toHaveTextContent('Architecture advice for your project.');
+    expect(screen.queryByTestId('chat-consent-card')).not.toBeInTheDocument();
   });
 
   it('19. fenced code block renders as monospace text, Copy button copies code, and XSS payload creates no DOM element', async () => {

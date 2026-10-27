@@ -114,18 +114,18 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
   });
 
   describe('Per-Project AI Settings & Consent Endpoints (Step K1b Part 1)', () => {
-    it('1. default off per project', async () => {
+    it('1. default on per project', async () => {
       const res = await request(app).get(`/api/projects/${projId}/ai-settings`);
       expect(res.status).toBe(200);
       expect(res.body.error).toBeNull();
-      expect(res.body.data.ai_enabled).toBe(false);
-      expect(res.body.data.share_code).toBe(false);
-      expect(res.body.data.consent_version).toBeNull();
+      expect(res.body.data.ai_enabled).toBe(true);
+      expect(res.body.data.share_code).toBe(true);
+      expect(res.body.data.consent_version).toBe(AI_CONSENT_VERSION);
       expect(res.body.data.current_consent_version).toBe(AI_CONSENT_VERSION);
       expect(res.body.data.consent_text).toBe(AI_CONSENT_TEXT);
     });
 
-    it('2. project A enabled does not enable project B', async () => {
+    it('2. project A disabled does not disable project B', async () => {
       const projBId = '00000000-0000-0000-0000-000000000009';
       const db = getDatabase();
       db.prepare(`
@@ -133,16 +133,16 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
         VALUES (?, 'Project B', CURRENT_TIMESTAMP, 50, 1)
       `).run(projBId);
 
-      const enableResA = await request(app)
+      const disableResA = await request(app)
         .put(`/api/projects/${projId}/ai-settings`)
-        .send({ ai_enabled: true, consent_version: AI_CONSENT_VERSION });
-      expect(enableResA.status).toBe(200);
-      expect(enableResA.body.data.ai_enabled).toBe(true);
+        .send({ ai_enabled: false });
+      expect(disableResA.status).toBe(200);
+      expect(disableResA.body.data.ai_enabled).toBe(false);
 
       const resB = await request(app).get(`/api/projects/${projBId}/ai-settings`);
       expect(resB.status).toBe(200);
-      expect(resB.body.data.ai_enabled).toBe(false);
-      expect(resB.body.data.share_code).toBe(false);
+      expect(resB.body.data.ai_enabled).toBe(true);
+      expect(resB.body.data.share_code).toBe(true);
     });
 
     it('3. share_code without ai_enabled returns 400 AI_CONSENT_REQUIRED', async () => {
