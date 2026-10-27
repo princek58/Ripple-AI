@@ -110,6 +110,14 @@ export const ChatPanelContent: React.FC = () => {
     sendMessage,
     stopRequest,
     retryLastMessage,
+    clearChat,
+    isMinimized,
+    toggleMinimized,
+    panelCoords,
+    setPanelCoords,
+    resetPosition,
+    isDragging,
+    setIsDragging,
   } = chat;
 
   const { selectedProjectId } = useProjects();
@@ -146,10 +154,10 @@ export const ChatPanelContent: React.FC = () => {
 
   // Focus input on open
   useEffect(() => {
-    if (isOpen && !showSettings) {
+    if (isOpen && !showSettings && !isMinimized) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen, showSettings]);
+  }, [isOpen, showSettings, isMinimized]);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -179,25 +187,151 @@ export const ChatPanelContent: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleDragMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, input, a, select, label, textarea')) {
+      return;
+    }
+    if (e.button !== 0) return;
+
+    const panel = document.getElementById('ripple-chat-panel');
+    const rect = panel?.getBoundingClientRect() || { left: 0, top: 0, width: 380, height: 580 };
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    setIsDragging(true);
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const panelWidth = rect.width > 0 ? rect.width : (panel?.offsetWidth || 380);
+      const winWidth = window.innerWidth || 1024;
+      const winHeight = window.innerHeight || 768;
+
+      const rawLeft = moveEvent.clientX - offsetX;
+      const rawTop = moveEvent.clientY - offsetY;
+
+      const minLeft = 8;
+      const minTop = 8;
+      const maxLeft = Math.max(8, winWidth - panelWidth - 8);
+      const maxTop = Math.max(8, winHeight - 64);
+
+      const left = Math.max(minLeft, Math.min(rawLeft, maxLeft));
+      const top = Math.max(minTop, Math.min(rawTop, maxTop));
+
+      setPanelCoords({ x: left, y: top });
+    };
+
+    const onMouseUp = () => {
+      setIsDragging(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  const handleDragTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, input, a, select, label, textarea')) {
+      return;
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const panel = document.getElementById('ripple-chat-panel');
+    const rect = panel?.getBoundingClientRect() || { left: 0, top: 0, width: 380, height: 580 };
+    const offsetX = touch.clientX - rect.left;
+    const offsetY = touch.clientY - rect.top;
+
+    setIsDragging(true);
+
+    const onTouchMove = (moveEvent: TouchEvent) => {
+      const t = moveEvent.touches[0];
+      if (!t) return;
+      const panelWidth = rect.width > 0 ? rect.width : (panel?.offsetWidth || 380);
+      const winWidth = window.innerWidth || 1024;
+      const winHeight = window.innerHeight || 768;
+
+      const rawLeft = t.clientX - offsetX;
+      const rawTop = t.clientY - offsetY;
+
+      const minLeft = 8;
+      const minTop = 8;
+      const maxLeft = Math.max(8, winWidth - panelWidth - 8);
+      const maxTop = Math.max(8, winHeight - 64);
+
+      const left = Math.max(minLeft, Math.min(rawLeft, maxLeft));
+      const top = Math.max(minTop, Math.min(rawTop, maxTop));
+
+      setPanelCoords({ x: left, y: top });
+    };
+
+    const onTouchEnd = () => {
+      setIsDragging(false);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+
+    window.addEventListener('touchmove', onTouchMove);
+    window.addEventListener('touchend', onTouchEnd);
+  };
+
   const isDemoMode = Boolean(aiStatus?.demo_mode);
   const isSharingCode = Boolean(aiSettings?.ai_enabled && aiSettings?.share_code && !isDemoMode);
 
   return (
     <div className="flex flex-col h-full w-full select-text">
-      {/* Header */}
-      <div className="flex flex-col border-b border-theme-border bg-theme-surface/90 backdrop-blur-sm flex-shrink-0">
+      {/* Header with Drag Handle */}
+      <div
+        data-testid="chat-drag-handle"
+        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        onMouseDown={handleDragMouseDown}
+        onTouchStart={handleDragTouchStart}
+        onDoubleClick={(e) => {
+          if (!(e.target as HTMLElement)?.closest('button, input, a, select, label, textarea')) {
+            resetPosition();
+          }
+        }}
+        className="flex flex-col border-b border-theme-border bg-theme-surface/90 backdrop-blur-sm flex-shrink-0 select-none"
+      >
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <h1 className="font-heading font-semibold text-sm text-theme-text">Ripple AI</h1>
+            <h1 className="font-heading font-semibold text-sm text-theme-text pointer-events-none">Ripple AI</h1>
             <span
               data-testid="chat-status-badge"
-              className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-theme-surface-active text-theme-text border border-theme-border"
+              className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-theme-surface-active text-theme-text border border-theme-border pointer-events-none"
             >
               {statusText}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Reset Position Button */}
+            {panelCoords !== null && (
+              <button
+                type="button"
+                data-testid="chat-reset-position"
+                onClick={resetPosition}
+                className="p-1.5 text-xs rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
+                title="Reset panel position"
+                aria-label="Reset panel position"
+              >
+                ⟲
+              </button>
+            )}
+
+            {/* Clear Chat Button */}
+            <button
+              type="button"
+              data-testid="chat-clear-button"
+              onClick={() => clearChat()}
+              className="p-1.5 text-xs rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
+              title="Clear chat history"
+              aria-label="Clear chat history"
+            >
+              🗑
+            </button>
+
             {/* Language Toggle */}
             <button
               type="button"
@@ -222,6 +356,18 @@ export const ChatPanelContent: React.FC = () => {
               ⚙
             </button>
 
+            {/* Minimize / Expand Button */}
+            <button
+              type="button"
+              data-testid="chat-minimize-button"
+              onClick={toggleMinimized}
+              className="p-1.5 text-xs rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none font-bold"
+              title={isMinimized ? 'Expand chat' : 'Minimize chat'}
+              aria-label={isMinimized ? 'Expand chat' : 'Minimize chat'}
+            >
+              {isMinimized ? '+' : '—'}
+            </button>
+
             {/* Close Button */}
             <button
               type="button"
@@ -234,21 +380,25 @@ export const ChatPanelContent: React.FC = () => {
           </div>
         </div>
 
-        <div
-          data-testid="chat-header-note"
-          className="px-4 pb-2 text-[10.5px] leading-snug text-theme-text-muted border-t border-theme-border/40 pt-1"
-        >
-          {isSharingCode
-            ? 'Code lines are being sent to Google Gemini for better answers (secrets are never sent).'
-            : 'Only rule names, file names and line numbers are sent to Google Gemini.'}
-        </div>
+        {!isMinimized && (
+          <div
+            data-testid="chat-header-note"
+            className="px-4 pb-2 text-[10.5px] leading-snug text-theme-text-muted border-t border-theme-border/40 pt-1"
+          >
+            {isSharingCode
+              ? 'Code lines are being sent to Google Gemini for better answers (secrets are never sent).'
+              : 'Only rule names, file names and line numbers are sent to Google Gemini.'}
+          </div>
+        )}
       </div>
 
-      {/* Main Content: Settings or Messages */}
-      {showSettings ? (
-        <ChatSettings onBack={() => setShowSettings(false)} />
-      ) : (
-        <div className="flex flex-col flex-1 min-h-0">
+      {/* Main Content: Settings or Messages (hidden when minimized) */}
+      {!isMinimized && (
+        <>
+          {showSettings ? (
+            <ChatSettings onBack={() => setShowSettings(false)} />
+          ) : (
+            <div className="flex flex-col flex-1 min-h-0">
           {/* Message List */}
           <div
             role="log"
@@ -357,6 +507,14 @@ export const ChatPanelContent: React.FC = () => {
               }
 
               // Default: AI Message
+              const providerLabel = m.provider
+                ? m.provider.toLowerCase() === 'gemini'
+                  ? 'Gemini'
+                  : m.provider.toLowerCase() === 'groq'
+                  ? 'Groq'
+                  : m.provider
+                : null;
+
               return (
                 <div
                   key={m.id}
@@ -364,8 +522,16 @@ export const ChatPanelContent: React.FC = () => {
                   data-testid="chat-ai-message"
                 >
                   <div className="flex items-center justify-between text-[10px] text-theme-text-muted pb-1 border-b border-theme-border">
-                    <span className="truncate">
-                      AI-written, may be wrong. Ripple has not verified it.
+                    <span className="truncate flex items-center gap-1.5">
+                      {providerLabel && (
+                        <span
+                          data-testid="chat-provider-badge"
+                          className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-theme-surface-active text-theme-text border border-theme-border/60"
+                        >
+                          {providerLabel}
+                        </span>
+                      )}
+                      <span>AI-written, may be wrong. Ripple has not verified it.</span>
                     </span>
                     <button
                       type="button"
@@ -437,7 +603,9 @@ export const ChatPanelContent: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
+  )}
+</div>
   );
 };
 

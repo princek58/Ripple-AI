@@ -140,7 +140,7 @@ function ChatPanelSkeleton({ onClose }: { onClose: () => void }) {
 export const ChatPanel: React.FC = () => {
   const chat = useChatSafe();
   if (!chat) return null;
-  const { isOpen, setIsOpen } = chat;
+  const { isOpen, setIsOpen, isMinimized, panelCoords } = chat;
 
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -205,6 +205,23 @@ export const ChatPanel: React.FC = () => {
     return null;
   }
 
+  const panelStyle: React.CSSProperties = {
+    ...(panelCoords
+      ? {
+          left: `${panelCoords.x}px`,
+          top: `${panelCoords.y}px`,
+          right: 'auto',
+          bottom: 'auto',
+        }
+      : {}),
+    ...(isMinimized
+      ? {
+          height: 'auto',
+          maxHeight: 'none',
+        }
+      : {}),
+  };
+
   return (
     <div
       ref={panelRef}
@@ -214,7 +231,10 @@ export const ChatPanel: React.FC = () => {
       aria-label="Ripple AI chat"
       tabIndex={-1}
       onKeyDown={handlePanelKeyDown}
-      className="fixed inset-0 z-50 flex flex-col bg-theme-surface border border-theme-border shadow-2xl md:inset-auto md:bottom-20 md:right-6 md:w-[380px] md:max-h-[70vh] md:h-[580px] md:rounded-2xl md:z-40 overflow-hidden font-sans"
+      style={panelStyle}
+      className={`fixed inset-0 z-50 flex flex-col bg-theme-surface border border-theme-border shadow-2xl md:inset-auto md:w-[380px] md:rounded-2xl md:z-40 overflow-hidden font-sans ${
+        panelCoords ? '' : 'md:bottom-20 md:right-6'
+      } ${isMinimized ? 'md:h-auto md:max-h-none' : 'md:max-h-[70vh] md:h-[580px]'}`}
     >
       <ChatPanelErrorBoundary onRetry={() => setRetryKey((k) => k + 1)} onClose={handleClose}>
         <Suspense fallback={<ChatPanelSkeleton onClose={handleClose} />}>

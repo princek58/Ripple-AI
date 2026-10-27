@@ -119,3 +119,50 @@ export async function postChatMessage(
   }
   return json.data;
 }
+
+export interface ChatHistoryMessage {
+  id: string;
+  project_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  provider: string | null;
+  model: string | null;
+  created_at: string;
+}
+
+export async function fetchChatHistory(
+  projectId: string,
+  signal?: AbortSignal
+): Promise<ChatHistoryMessage[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/chat/history`, {
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+    if (!res || !res.ok) return [];
+    const json = await res.json().catch(() => null);
+    if (!json || json.error || !json.data || !Array.isArray(json.data.items)) return [];
+    return json.data.items;
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteChatHistory(
+  projectId: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/chat/history`, {
+      method: 'DELETE',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+    if (!res || !res.ok) return false;
+    const json = await res.json().catch(() => null);
+    return Boolean(json?.data?.cleared);
+  } catch {
+    return false;
+  }
+}
+

@@ -13,7 +13,14 @@ import { useExplainLanguage } from '../../lib/useExplainLanguage.js';
 import { contextIdsFromUrl } from './urlHelpers.js';
 import { chatErrorMessage } from './errorMessages.js';
 import { trimHistory } from './trimHistory.js';
-import { fetchAiStatus, fetchProjectAiSettings, putProjectAiSettings, postChatMessage } from './chatApi.js';
+import {
+  fetchAiStatus,
+  fetchProjectAiSettings,
+  putProjectAiSettings,
+  postChatMessage,
+  fetchChatHistory,
+  deleteChatHistory,
+} from './chatApi.js';
 import type {
   AiStatusData,
   ProjectAiSettings,
@@ -99,6 +106,15 @@ export interface ChatContextValue {
   stopRequest: () => void;
   retryLastMessage: () => void;
   clearMessages: () => void;
+  clearChat: () => Promise<void>;
+  isMinimized: boolean;
+  setIsMinimized: (minimized: boolean) => void;
+  toggleMinimized: () => void;
+  panelCoords: { x: number; y: number } | null;
+  setPanelCoords: React.Dispatch<React.SetStateAction<{ x: number; y: number } | null>>;
+  resetPosition: () => void;
+  isDragging: boolean;
+  setIsDragging: (dragging: boolean) => void;
   refreshSettings: () => Promise<void>;
   updateSettings: (body: {
     ai_enabled: boolean;
@@ -161,9 +177,65 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [setLangRaw]
   );
 
-  const clearMessages = useCallback(() => {
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const toggleMinimized = useCallback(() => setIsMinimized((prev) => !prev), []);
+  const [panelCoords, setPanelCoords] = useState<{ x: number; y: number } | null>(null);
+  const resetPosition = useCallback(() => setPanelCoords(null), []);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  const clearChat = useCallback(async () => {
     setMessages([]);
-  }, []);
+    if (selectedProjectId) {
+      try {
+        await deleteChatHistory(selectedProjectId);
+      } catch {}
+    }
+  }, [selectedProjectId]);
+
+  const clearMessages = useCallback(() => {
+    clearChat();
+  }, [clearChat]);
+
+  // Fetch persistent chat history for selected project
+  useEffect(() => {
+    if (!selectedProjectId) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    let isCancelled = false;
+
+    fetchChatHistory(selectedProjectId, abortController.signal)
+      .then((historyItems) => {
+        if (isCancelled || !Array.isArray(historyItems) || historyItems.length === 0) {
+          return;
+        }
+
+        const loaded: ChatMessage[] = historyItems.map((item) => ({
+          id: item.id || uniqueMsgId('history'),
+          role: item.role,
+          text: item.content,
+          type: item.role === 'user' ? 'user' : 'ai',
+          provider: item.provider || undefined,
+          model: item.model || undefined,
+        }));
+
+        setMessages((current) => {
+          if (current.length === 0) {
+            return loaded;
+          }
+          const existingIds = new Set(current.map((m) => m.id));
+          const toPrepend = loaded.filter((m) => !existingIds.has(m.id));
+          return [...toPrepend, ...current];
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+      abortController.abort();
+    };
+  }, [selectedProjectId]);
 
   // Fetch global AI status on mount
   useEffect(() => {
@@ -588,6 +660,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       stopRequest,
       retryLastMessage,
       clearMessages,
+      clearChat,
+      isMinimized,
+      setIsMinimized,
+      toggleMinimized,
+      panelCoords,
+      setPanelCoords,
+      resetPosition,
+      isDragging,
+      setIsDragging,
       refreshSettings,
       updateSettings,
       pendingQuestion,
@@ -608,6 +689,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       stopRequest,
       retryLastMessage,
       clearMessages,
+      clearChat,
+      isMinimized,
+      setIsMinimized,
+      toggleMinimized,
+      panelCoords,
+      setPanelCoords,
+      resetPosition,
+      isDragging,
+      setIsDragging,
       refreshSettings,
       updateSettings,
       pendingQuestion,

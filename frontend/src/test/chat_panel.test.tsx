@@ -102,6 +102,13 @@ describe('ChatPanel & ChatProvider (K2 Part 2)', () => {
     globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       const urlStr = String(url);
 
+      if (urlStr.includes('/chat/history') && (!customResponses || !customResponses['/chat/history'])) {
+        return new Response(JSON.stringify({ data: { items: [] }, error: null }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       if (customResponses) {
         for (const [pattern, resp] of Object.entries(customResponses)) {
           if (urlStr.includes(pattern)) {
