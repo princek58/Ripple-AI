@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ripple-ai
+    runtime: node
+    plan: free
+    buildCommand: npm run install:all && npm run build:all
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_DEMO_MODE
+        value: "true"
+      - key: APP_SESSION_SECRET
+        generateValue: true
+      - key: APP_ACCESS_CODE
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
