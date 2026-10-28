@@ -27,13 +27,16 @@ jobs:
       - name: Install monorepo dependencies
         run: npm ci
 
+      - name: Ensure backend data and storage directories exist
+        run: mkdir -p backend/data backend/storage
+
       - name: Backend Typecheck
         working-directory: backend
         run: npx tsc -p tsconfig.test.json --noEmit
 
       - name: Backend Tests
         working-directory: backend
-        run: npm test -- --pool=forks --poolOptions.forks.singleFork=true --poolOptions.forks.isolate=true
+        run: npm test
 
       - name: Backend Build
         working-directory: backend

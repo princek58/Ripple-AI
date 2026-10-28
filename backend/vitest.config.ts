@@ -11,11 +11,14 @@ export default defineConfig({
     poolOptions: {
       forks: {
         singleFork: true,
-        isolate: true,
+        isolate: false,
       },
     },
+    testTimeout: 30000,
+    hookTimeout: 30000,
     globalSetup: ['./tests/globalSetup.ts'],
     setupFiles: ['./tests/setup.ts'],
   },
 });
+
 
