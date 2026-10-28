@@ -40,7 +40,7 @@ export function getAIConfig(): AIConfig {
   const geminiModel = (
     process.env.GEMINI_MODEL ||
     (rawProvider !== 'openai_compatible' ? rawAiModel : '') ||
-    ''
+    (geminiKeys.length > 0 ? 'gemini-1.5-flash' : '')
   ).trim();
   const geminiBase = (
     process.env.GEMINI_API_BASE ||

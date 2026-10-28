@@ -581,6 +581,24 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
       expect(config.apiBase).toBe('https://generativelanguage.googleapis.com');
     });
 
+    it('defaults GEMINI_MODEL to gemini-1.5-flash when GEMINI_API_KEY is present and GEMINI_MODEL is unset', () => {
+      delete process.env.AI_PROVIDER;
+      delete process.env.AI_API_KEY;
+      delete process.env.AI_MODEL;
+      delete process.env.AI_API_BASE;
+      delete process.env.GROQ_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      process.env.GEMINI_API_KEY = 'gemini-key-default-test';
+      delete process.env.GEMINI_MODEL;
+
+      const config = getAIConfig();
+      expect(config.configured).toBe(true);
+      expect(config.provider).toBe('gemini');
+      expect(config.apiKey).toBe('gemini-key-default-test');
+      expect(config.model).toBe('gemini-1.5-flash');
+    });
+
     it('prefers AI_* over GEMINI_* when both are provided', () => {
       process.env.AI_PROVIDER = 'openai_compatible';
       process.env.AI_API_KEY = 'ai-key-1';

@@ -506,6 +506,9 @@ aiRouter.post(['/projects/:id/chat', '/projects/:id/chat/stream'], async (req, r
           break; // Stream finished successfully
         } catch (err: any) {
           if (streamStarted) {
+            console.error(
+              `[AI] Stream interrupted mid-generation for candidate ${i + 1} (${candidate.provider}:${candidate.model})`
+            );
             res.write(`data: ${JSON.stringify({ error: 'AI_STREAM_INTERRUPTED' })}\n\n`);
             res.end();
             return;
@@ -513,6 +516,14 @@ aiRouter.post(['/projects/:id/chat', '/projects/:id/chat/stream'], async (req, r
 
           if (!firstError) firstError = err;
           lastError = err;
+
+          const upstreamStatus =
+            err instanceof AIServiceError ? err.upstream_status || err.code : 'UNKNOWN';
+          const errCode =
+            err instanceof AIServiceError ? err.code : err?.name || 'ERROR';
+          console.error(
+            `[AI] Candidate ${i + 1}/${candidates.length} (${candidate.provider}:${candidate.model}) failed with HTTP ${upstreamStatus}: ${errCode}`
+          );
 
           if (!(err instanceof AIServiceError)) {
             throw err;
@@ -638,6 +649,14 @@ aiRouter.post(['/projects/:id/chat', '/projects/:id/chat/stream'], async (req, r
         if (!firstError) firstError = err;
         lastError = err;
 
+        const upstreamStatus =
+          err instanceof AIServiceError ? err.upstream_status || err.code : 'UNKNOWN';
+        const errCode =
+          err instanceof AIServiceError ? err.code : err?.name || 'ERROR';
+        console.error(
+          `[AI] Candidate ${i + 1}/${candidates.length} (${candidate.provider}:${candidate.model}) failed with HTTP ${upstreamStatus}: ${errCode}`
+        );
+
         if (!(err instanceof AIServiceError)) {
           throw err;
         }
@@ -721,6 +740,9 @@ aiRouter.post(['/projects/:id/chat', '/projects/:id/chat/stream'], async (req, r
     });
   } catch (err: any) {
     if (err instanceof AIServiceError) {
+      console.error(
+        `[AI] Chat request failed: ${err.shortCode} (HTTP ${err.upstream_status || 'UNKNOWN'})`
+      );
       const httpStatus =
         err.upstream_status ||
         (err.code === 'AI_QUOTA_EXHAUSTED'
@@ -738,6 +760,7 @@ aiRouter.post(['/projects/:id/chat', '/projects/:id/chat/stream'], async (req, r
       return res.status(httpStatus).json({ data: null, error: err.shortCode });
     }
 
+    console.error(`[AI] Chat request internal failure: ${err?.name || 'UnknownError'}`);
     return res
       .status(502)
       .json({ data: null, error: 'AI_UNAVAILABLE [INTERNAL_ERROR]' });

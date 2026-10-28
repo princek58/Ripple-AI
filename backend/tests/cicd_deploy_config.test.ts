@@ -109,8 +109,8 @@ describe('CI/CD and Render Blueprint Configuration', () => {
     // GEMINI_API_KEY marked sync: false
     expect(content).toMatch(/key:\s*GEMINI_API_KEY\s+sync:\s*false/);
 
-    // GEMINI_MODEL set to gemini-2.5-flash
-    expect(content).toMatch(/key:\s*GEMINI_MODEL\s+value:\s*gemini-2\.5-flash/);
+    // GEMINI_MODEL set to gemini-1.5-flash
+    expect(content).toMatch(/key:\s*GEMINI_MODEL\s+value:\s*gemini-1\.5-flash/);
 
     // GROQ_API_KEY marked sync: false
     expect(content).toMatch(/key:\s*GROQ_API_KEY\s+sync:\s*false/);

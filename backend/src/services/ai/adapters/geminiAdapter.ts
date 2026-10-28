@@ -77,8 +77,10 @@ export class GeminiAdapter implements AIAdapter {
     } catch (err: any) {
       clearTimeout(timeout);
       if (err?.name === 'AbortError' || controller.signal.aborted) {
+        console.error(`[AI] Gemini request timed out for model: ${this.config.model}`);
         throw new AIServiceError('AI_TIMEOUT');
       }
+      console.error(`[AI] Gemini network unreachable for model: ${this.config.model}`);
       throw new AIServiceError('AI_UNREACHABLE');
     } finally {
       clearTimeout(timeout);
@@ -91,6 +93,9 @@ export class GeminiAdapter implements AIAdapter {
       } catch {}
       const { statusWord, reason } = extractSafeErrorDetails(errBody);
       const code = mapHttpStatusToAiError(res.status);
+      console.error(
+        `[AI] Gemini adapter HTTP ${res.status} (${statusWord || reason || code}) for model: ${this.config.model}`
+      );
       throw new AIServiceError(code, res.status, reason, statusWord);
     }
 
@@ -151,8 +156,10 @@ export class GeminiAdapter implements AIAdapter {
     } catch (err: any) {
       clearTimeout(timeout);
       if (err?.name === 'AbortError' || controller.signal.aborted) {
+        console.error(`[AI] Gemini stream request timed out for model: ${this.config.model}`);
         throw new AIServiceError('AI_TIMEOUT');
       }
+      console.error(`[AI] Gemini stream network unreachable for model: ${this.config.model}`);
       throw new AIServiceError('AI_UNREACHABLE');
     }
 
@@ -164,6 +171,9 @@ export class GeminiAdapter implements AIAdapter {
       } catch {}
       const { statusWord, reason } = extractSafeErrorDetails(errBody);
       const code = mapHttpStatusToAiError(res.status);
+      console.error(
+        `[AI] Gemini stream HTTP ${res.status} (${statusWord || reason || code}) for model: ${this.config.model}`
+      );
       throw new AIServiceError(code, res.status, reason, statusWord);
     }
 
