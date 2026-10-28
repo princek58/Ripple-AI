@@ -171,6 +171,23 @@ For full host-agnostic instructions, environment variables, and go-live checklis
 - **Access Gate**: Setting `APP_ACCESS_CODE` and `APP_SESSION_SECRET` enables an authentication gate on all API routes and presents an "Enter access code" screen to users.
 - **Public Demo Mode**: Setting `PUBLIC_DEMO_MODE=1` forces snippet code sharing OFF across all projects, preventing code lines from being sent to external AI providers during public demonstrations.
 
+#### 1-Click Render Blueprint Deployment
+Deploy Ripple AI continuously to Render with one click via [`render.yaml`](render.yaml):
+- Deploys a single Node.js service (`ripple-ai`) on the free tier.
+- Build command: `npm run install:all && npm run build:all` (clean monorepo installation and production build).
+- Start command: `npm run start:prod` (serves the REST API and the built single-page frontend from one process).
+- Built-in public health check route: `/api/health`.
+- Pre-configured environment variables with secure credential inputs in the Render dashboard.
+
+#### Continuous Integration (GitHub Actions)
+The repository includes an automated CI pipeline at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) that triggers on `push` and `pull_request` to `main`:
+- Runs on `ubuntu-latest` with Node.js 20 and a 15-minute timeout.
+- Cleanly installs monorepo dependencies (`npm ci`).
+- Validates backend typechecking (`npx tsc -p tsconfig.test.json --noEmit`), tests (`npm test`), and builds (`npm run build`).
+- Validates frontend typechecking (`npx tsc -b`) and tests (`npm test`).
+- Executes the full production single-service build (`npm run build:all`) and asserts that `frontend/dist/index.html` and `backend/dist/server.js` exist.
+- Hardcoded secrets and API keys are strictly forbidden.
+
 ### Visual QA
 
 Run full automated browser visual regression and quality verification:
@@ -278,5 +295,6 @@ In honest plain words, the following expansions and improvements are planned for
 - **Step DEP1 (Deploy Ready & One Service)**: Complete.
 - **Step K6 (Multi-Key Failover, Project Brief, Saved Chat History, Draggable Panel)**: Complete.
 - **Step R2 (False Alarms Fixed & Presentation UI Polished)**: Complete.
-- **Test suite**: 930 tests passing across 71 test files (290 backend tests, 640 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
+- **Step CI1 (Automated GitHub Actions CI & 1-Click Render Blueprint CD)**: Complete.
+- **Test suite**: 949 tests passing across 73 test files (305 backend tests, 644 frontend tests, 0 failures, 5 skipped) as of 2026-10-28.
 

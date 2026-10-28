@@ -52,6 +52,53 @@ Configure the following environment variables in your hosting provider's dashboa
 
 ---
 
+## 1-Click Render Blueprint Deployment (`render.yaml`)
+
+Ripple AI includes a native Render Blueprint specification (`render.yaml`) in the repository root for continuous deployment as a single unified service:
+
+- **Service Type**: Single Node.js web service (`name: ripple-ai`, `plan: free`).
+- **Build Command**: `npm run install:all && npm run build:all` — cleanly installs all monorepo workspace dependencies (`shared`, `frontend`, `backend`) and builds both production artifacts.
+- **Start Command**: `npm run start:prod` — starts the single unified Node.js process serving the REST API and the built single-page frontend.
+- **Health Check**: `/api/health` — validates that the server is responding with `{ data: { status: "ok" } }` without requiring access gate credentials.
+- **Configured Environment Variables**:
+  - `NODE_ENV`: Set to `production`.
+  - `PUBLIC_DEMO_MODE`: Set to `true` (forces code line sharing OFF for safe public demonstration).
+  - `APP_SESSION_SECRET`: Auto-generated high-entropy cryptographic secret (`generateValue: true`).
+  - `APP_ACCESS_CODE`: Marked `sync: false` to be set securely in the Render dashboard.
+  - `GEMINI_API_KEY`: Marked `sync: false` to be set securely in the Render dashboard.
+  - `GEMINI_MODEL`: Set to `gemini-2.5-flash`.
+  - `GROQ_API_KEY`: Marked `sync: false` to be set securely in the Render dashboard.
+  - `GROQ_MODEL`: Set to `llama-3.3-70b-versatile`.
+
+### How to Deploy via Render Blueprint
+
+1. Fork or push this repository to your GitHub account.
+2. In the Render Dashboard, navigate to **New +** > **Blueprint**.
+3. Select your repository. Render will automatically detect `render.yaml`.
+4. Enter the required secrets (`APP_ACCESS_CODE`, and at least one API key: `GEMINI_API_KEY` or `GROQ_API_KEY`).
+5. Click **Apply**. Render will automatically build the monorepo and deploy the service.
+
+---
+
+## Continuous Integration (GitHub Actions)
+
+An automated CI workflow is configured at `.github/workflows/ci.yml` that runs on every `push` and `pull_request` targeting `main`:
+
+- **Environment**: Runs on `ubuntu-latest` with a strict `timeout-minutes: 15` safety limit.
+- **Checkout & Node**: Uses `actions/checkout@v4` and `actions/setup-node@v4` configured for Node.js 20 with npm caching.
+- **Clean Installation**: Executes `npm ci` across the monorepo workspace.
+- **Verification Steps**:
+  1. **Backend Typecheck**: `npx tsc -p tsconfig.test.json --noEmit` in `backend`.
+  2. **Backend Tests**: `npm test` in `backend`.
+  3. **Backend Build**: `npm run build` in `backend`.
+  4. **Frontend Typecheck**: `npx tsc -b` in `frontend`.
+  5. **Frontend Tests**: `npm test` in `frontend`.
+  6. **Full Production Build**: `npm run build:all` in the repository root.
+  7. **Artifact Verification**: Verifies that `frontend/dist/index.html` and `backend/dist/server.js` exist.
+- **Security**: The workflow file contains zero hardcoded API keys, tokens, or secrets.
+
+---
+
 ## Go-Live Checklist
 
 Complete this checklist before sharing your deployment:

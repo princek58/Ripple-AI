@@ -11,3 +11,4 @@ frontend/test-results/
 frontend/playwright-report/
 *.mp4
 *.mov
+structure.txt
