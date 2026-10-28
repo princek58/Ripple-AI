@@ -3,7 +3,7 @@ services:
     name: ripple-ai
     runtime: node
     plan: free
-    buildCommand: npm run install:all && npm run build:all
+    buildCommand: npm install --legacy-peer-deps && npm run build:all
     startCommand: npm run start:prod
     healthCheckPath: /api/health
     envVars:
