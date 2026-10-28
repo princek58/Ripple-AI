@@ -556,7 +556,12 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
     const originalEnv = { ...process.env };
 
     afterEach(() => {
-      process.env = { ...originalEnv };
+      for (const key of Object.keys(process.env)) {
+        if (!(key in originalEnv)) {
+          delete process.env[key];
+        }
+      }
+      Object.assign(process.env, originalEnv);
     });
 
     it('falls back to GEMINI_* when AI_* are unset and provider is gemini', () => {

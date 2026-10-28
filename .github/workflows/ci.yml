@@ -33,7 +33,7 @@ jobs:
 
       - name: Backend Tests
         working-directory: backend
-        run: npm test
+        run: npm test -- --pool=forks --poolOptions.forks.singleFork=true --poolOptions.forks.isolate=true
 
       - name: Backend Build
         working-directory: backend

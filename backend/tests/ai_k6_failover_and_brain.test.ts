@@ -97,7 +97,12 @@ describe('Step K6 Part 1: Multi-Key & Multi-Provider Auto-Failover (Gemini <-> G
 
   afterEach(async () => {
     // Restore environment
-    process.env = { ...originalEnv };
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) {
+        delete process.env[key];
+      }
+    }
+    Object.assign(process.env, originalEnv);
 
     mockGeminiServer.closeAllConnections?.();
     await new Promise<void>((resolve) => mockGeminiServer.close(() => resolve()));
