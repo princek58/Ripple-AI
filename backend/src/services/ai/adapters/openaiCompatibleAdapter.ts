@@ -1,6 +1,7 @@
 import type { AIAdapter, AIConfig, AIRequest, AIResponse, AIProvider } from '../types.js';
 import { AIServiceError, mapHttpStatusToAiError, extractSafeErrorDetails } from '../errors.js';
 import { isOpenAIReasoningModel } from '../modelOptions.js';
+import { parseSSEStream } from '../sseParser.js';
 
 export class OpenAICompatibleAdapter implements AIAdapter {
   readonly provider: AIProvider;
@@ -11,14 +12,7 @@ export class OpenAICompatibleAdapter implements AIAdapter {
     this.provider = provider || (config.provider as AIProvider) || 'openai_compatible';
   }
 
-  async generate(request: AIRequest): Promise<AIResponse> {
-    if (!this.config.apiKey || !this.config.model) {
-      throw new AIServiceError('AI_REQUEST_REJECTED');
-    }
-
-    const baseUrl = this.config.apiBase.replace(/\/+$/, '');
-    const url = `${baseUrl}/chat/completions`;
-
+  private buildPayload(request: AIRequest, stream: boolean = false): Record<string, any> {
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
     if (request.systemPrompt) {
@@ -49,6 +43,10 @@ export class OpenAICompatibleAdapter implements AIAdapter {
       messages,
     };
 
+    if (stream) {
+      payload.stream = true;
+    }
+
     if (typeof request.maxTokens === 'number') {
       if (isReasoning) {
         payload.max_completion_tokens = request.maxTokens;
@@ -60,6 +58,18 @@ export class OpenAICompatibleAdapter implements AIAdapter {
     if (!isReasoning && typeof request.temperature === 'number') {
       payload.temperature = request.temperature;
     }
+
+    return payload;
+  }
+
+  async generate(request: AIRequest): Promise<AIResponse> {
+    if (!this.config.apiKey || !this.config.model) {
+      throw new AIServiceError('AI_REQUEST_REJECTED');
+    }
+
+    const baseUrl = this.config.apiBase.replace(/\/+$/, '');
+    const url = `${baseUrl}/chat/completions`;
+    const payload = this.buildPayload(request, false);
 
     let res: Response;
     const controller = new AbortController();
@@ -112,5 +122,96 @@ export class OpenAICompatibleAdapter implements AIAdapter {
       provider: this.provider,
       model: this.config.model,
     };
+  }
+
+  async *generateStream(request: AIRequest): AsyncIterable<string> {
+    if (!this.config.apiKey || !this.config.model) {
+      throw new AIServiceError('AI_REQUEST_REJECTED');
+    }
+
+    const baseUrl = this.config.apiBase.replace(/\/+$/, '');
+    const url = `${baseUrl}/chat/completions`;
+    const payload = this.buildPayload(request, true);
+
+    let res: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      clearTimeout(timeout);
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        throw new AIServiceError('AI_TIMEOUT');
+      }
+      throw new AIServiceError('AI_UNREACHABLE');
+    }
+
+    if (!res.ok) {
+      clearTimeout(timeout);
+      let errBody: any = null;
+      try {
+        errBody = await res.json();
+      } catch {}
+      const { statusWord, reason } = extractSafeErrorDetails(errBody);
+      const code = mapHttpStatusToAiError(res.status);
+      throw new AIServiceError(code, res.status, reason, statusWord);
+    }
+
+    if (!res.body) {
+      clearTimeout(timeout);
+      throw new AIServiceError('AI_NO_ANSWER');
+    }
+
+    let totalYielded = 0;
+    try {
+      for await (const line of parseSSEStream(res.body)) {
+        if (!line.startsWith('data:')) continue;
+        const dataStr = line.slice(5).trim();
+        if (dataStr === '[DONE]') break;
+        if (!dataStr) continue;
+
+        let data: any;
+        try {
+          data = JSON.parse(dataStr);
+        } catch {
+          continue;
+        }
+
+        if (data.error) {
+          const { statusWord, reason } = extractSafeErrorDetails(data);
+          const code = mapHttpStatusToAiError(data.error.code || 500);
+          throw new AIServiceError(code, data.error.code || 500, reason, statusWord);
+        }
+
+        const content = data?.choices?.[0]?.delta?.content;
+        if (typeof content === 'string' && content.length > 0) {
+          totalYielded += content.length;
+          yield content;
+        }
+      }
+    } catch (err: any) {
+      if (err instanceof AIServiceError) {
+        throw err;
+      }
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        throw new AIServiceError('AI_TIMEOUT');
+      }
+      throw new AIServiceError('AI_UNREACHABLE');
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (totalYielded === 0) {
+      throw new AIServiceError('AI_NO_ANSWER');
+    }
   }
 }

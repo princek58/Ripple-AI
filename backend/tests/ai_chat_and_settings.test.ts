@@ -968,5 +968,91 @@ describe('AI Settings, Context, Prompt, Rate Limiter & Chat Route (Step K1b)', (
 
       spy.mockRestore();
     });
+
+    it('28. streaming chat returns text/event-stream chunks, persists message to SQLite, and ends with [DONE]', async () => {
+      const mockAdapter = {
+        provider: 'gemini' as const,
+        generate: vi.fn(),
+        generateStream: vi.fn().mockImplementation(async function* () {
+          yield 'Streaming chunk 1. ';
+          yield 'Streaming chunk 2.';
+        }),
+      };
+      const spy = vi.spyOn(aiServiceModule, 'createAIAdapter').mockReturnValue(mockAdapter as any);
+
+      const res = await request(app)
+        .post(`/api/projects/${projId}/chat`)
+        .send({ message: 'Stream this answer', screen: 'general', stream: true });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/event-stream');
+      expect(res.text).toContain('data: {"delta":"Streaming chunk 1. "');
+      expect(res.text).toContain('data: {"delta":"Streaming chunk 2."');
+      expect(res.text).toContain('"done":true');
+      expect(res.text).toContain('data: [DONE]');
+
+      // Message persisted to SQLite
+      const historyRes = await request(app).get(`/api/projects/${projId}/chat/history`);
+      expect(historyRes.status).toBe(200);
+      const items = historyRes.body.data.items;
+      const last = items[items.length - 1];
+      expect(last.role).toBe('assistant');
+      expect(last.content).toBe('Streaming chunk 1. Streaming chunk 2.');
+
+      spy.mockRestore();
+    });
+
+    it('29. POST /api/projects/:id/chat/stream endpoint routes to streaming response automatically', async () => {
+      const mockAdapter = {
+        provider: 'gemini' as const,
+        generate: vi.fn(),
+        generateStream: vi.fn().mockImplementation(async function* () {
+          yield 'Chunk from /stream endpoint.';
+        }),
+      };
+      const spy = vi.spyOn(aiServiceModule, 'createAIAdapter').mockReturnValue(mockAdapter as any);
+
+      const res = await request(app)
+        .post(`/api/projects/${projId}/chat/stream`)
+        .send({ message: 'Stream endpoint test', screen: 'overview' });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/event-stream');
+      expect(res.text).toContain('data: {"delta":"Chunk from /stream endpoint."');
+      expect(res.text).toContain('"done":true');
+      expect(res.text).toContain('data: [DONE]');
+
+      spy.mockRestore();
+    });
+
+    it('30. cached response in streaming mode returns text/event-stream with cached delta and [DONE]', async () => {
+      const db = getDatabase();
+      const lastScan = db.prepare('SELECT id FROM scans WHERE project_id = ? ORDER BY started_at DESC LIMIT 1').get(projId) as any;
+      const scanId = lastScan?.id || null;
+
+      const cacheKey = createProjectAICacheKey({
+        provider: 'gemini',
+        model: 'gemini-1.5-flash',
+        projectId: projId,
+        scanId,
+        screen: 'general',
+        shareCode: false,
+        message: 'Cached streaming question',
+      });
+
+      const { setCachedAIResponse } = await import('../src/db/aiRepository.js');
+      setCachedAIResponse(cacheKey, 'Pre-cached streaming answer', 'gemini', 'gemini-1.5-flash');
+
+      const res = await request(app)
+        .post(`/api/projects/${projId}/chat`)
+        .send({ message: 'Cached streaming question', screen: 'general', stream: true });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/event-stream');
+      expect(res.text).toContain('data: {"delta":"Pre-cached streaming answer"');
+      expect(res.text).toContain('"source":"saved"');
+      expect(res.text).toContain('"done":true');
+      expect(res.text).toContain('data: [DONE]');
+    });
   });
 });

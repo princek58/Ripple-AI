@@ -43,5 +43,6 @@ export interface AIConfig {
 export interface AIAdapter {
   readonly provider: AIProvider;
   generate(request: AIRequest): Promise<AIResponse>;
+  generateStream?(request: AIRequest): AsyncIterable<string>;
 }
 

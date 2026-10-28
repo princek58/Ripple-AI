@@ -466,4 +466,55 @@ describe('Step K6 Part 1: Multi-Key & Multi-Provider Auto-Failover (Gemini <-> G
     expect(ctx).not.toContain('/home/');
     expect(ctx).not.toContain('/Users/');
   });
+
+  it('10. Multi-provider streaming failover: Gemini fails with 429 before first chunk, Groq streams SSE chunks, persists full message to SQLite', async () => {
+    process.env.GEMINI_API_KEY = 'gemini-key-1';
+    process.env.GEMINI_MODEL = 'gemini-1.5-flash';
+    process.env.GEMINI_API_BASE = mockGeminiBaseUrl;
+
+    process.env.GROQ_API_KEY = 'groq-key-1';
+    process.env.GROQ_MODEL = 'llama-3.3-70b-versatile';
+    process.env.GROQ_BASE_URL = mockGroqBaseUrl;
+
+    // Gemini returns 429 rate limit error
+    geminiHandler = (_req, res) => {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED' } }));
+    };
+
+    // Groq streams chunks via SSE
+    groqHandler = (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write('data: {"choices":[{"delta":{"content":"Streaming answer from "}}]}\n\n');
+      res.write('data: {"choices":[{"delta":{"content":"Groq llama model!"}}]}\n\n');
+      res.write('data: [DONE]\n\n');
+      res.end();
+    };
+
+    const res = await request(app)
+      .post(`/api/projects/${projId}/chat`)
+      .send({ message: 'Explain failover stream', screen: 'overview', stream: true });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    expect(res.text).toContain('data: {"delta":"Streaming answer from "');
+    expect(res.text).toContain('data: {"delta":"Groq llama model!"');
+    expect(res.text).toContain('"provider":"groq"');
+    expect(res.text).toContain('"done":true');
+    expect(res.text).toContain('data: [DONE]');
+
+    // Both servers were called in failover order
+    expect(geminiCalls.length).toBe(1);
+    expect(groqCalls.length).toBe(1);
+
+    // Verify full accumulated message was persisted into SQLite
+    const historyRes = await request(app).get(`/api/projects/${projId}/chat/history`);
+    expect(historyRes.status).toBe(200);
+    const msgs = historyRes.body.data.items;
+    const assistantMsg = msgs.find((m: any) => m.role === 'assistant');
+    expect(assistantMsg).toBeDefined();
+    expect(assistantMsg.content).toBe('Streaming answer from Groq llama model!');
+    expect(assistantMsg.provider).toBe('groq');
+    expect(assistantMsg.model).toBe('llama-3.3-70b-versatile');
+  });
 });

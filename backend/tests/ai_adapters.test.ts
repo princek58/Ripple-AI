@@ -284,6 +284,63 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
         expect(err.code).toBe('AI_TIMEOUT');
       }
     });
+
+    it('generateStream streams chunks via SSE alt=sse and preserves x-goog-api-key header', async () => {
+      mockHandler = (_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        res.write('data: {"candidates":[{"content":{"parts":[{"text":"Hello "}]}}]}\n\n');
+        res.write('data: {"candidates":[{"content":{"parts":[{"text":"from Gemini stream!"}]}}]}\n\n');
+        res.end();
+      };
+
+      const adapter = new GeminiAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+      });
+
+      const chunks: string[] = [];
+      for await (const chunk of adapter.generateStream({ userPrompt: 'Stream test' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['Hello ', 'from Gemini stream!']);
+      expect(lastCapturedRequest.headers?.['x-goog-api-key']).toBe('test-gemini-key-xyz');
+      expect(lastCapturedRequest.url).toContain('/v1beta/models/gemini-1.5-pro:streamGenerateContent?alt=sse');
+      expect(lastCapturedRequest.url).not.toContain('?key=');
+    });
+
+    it('generateStream handles 429 quota exhausted by throwing AIServiceError', async () => {
+      mockHandler = (_req, res) => {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } }));
+      };
+
+      const adapter = new GeminiAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+      });
+
+      await expect(async () => {
+        for await (const _chunk of adapter.generateStream({ userPrompt: 'Quota test' })) {}
+      }).rejects.toThrow('AI_QUOTA_EXHAUSTED');
+    });
+
+    it('generateStream throws AI_NO_ANSWER on empty stream', async () => {
+      mockHandler = (_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        res.write('data: {"candidates":[]}\n\n');
+        res.end();
+      };
+
+      const adapter = new GeminiAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+      });
+
+      await expect(async () => {
+        for await (const _chunk of adapter.generateStream({ userPrompt: 'Empty test' })) {}
+      }).rejects.toThrow('AI_NO_ANSWER');
+    });
   });
 
   describe('OpenAI-compatible Adapter (Step 2a & 2b Fixes)', () => {
@@ -434,6 +491,64 @@ describe('Provider-Neutral AI Adapters (Addendum v2 & Step K1)', () => {
         expect(err).toBeInstanceOf(AIServiceError);
         expect(err.code).toBe('AI_TIMEOUT');
       }
+    });
+
+    it('generateStream streams chunks via SSE with stream: true and Authorization Bearer header', async () => {
+      mockHandler = (_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        res.write('data: {"choices":[{"delta":{"content":"Hello "}}]}\n\n');
+        res.write('data: {"choices":[{"delta":{"content":"world from OpenAI stream!"}}]}\n\n');
+        res.write('data: [DONE]\n\n');
+        res.end();
+      };
+
+      const adapter = new OpenAICompatibleAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+      });
+
+      const chunks: string[] = [];
+      for await (const chunk of adapter.generateStream({ userPrompt: 'Stream test' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['Hello ', 'world from OpenAI stream!']);
+      expect(lastCapturedRequest.headers?.authorization).toBe('Bearer test-openai-key-abc');
+      expect(lastCapturedRequest.body?.stream).toBe(true);
+      expect(lastCapturedRequest.url).toBe('/chat/completions');
+    });
+
+    it('generateStream handles 401 auth failure by throwing AIServiceError', async () => {
+      mockHandler = (_req, res) => {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'Invalid API key', status: 'UNAUTHENTICATED' } }));
+      };
+
+      const adapter = new OpenAICompatibleAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+      });
+
+      await expect(async () => {
+        for await (const _chunk of adapter.generateStream({ userPrompt: 'Auth test' })) {}
+      }).rejects.toThrow('AI_REQUEST_REJECTED [UNAUTHENTICATED]');
+    });
+
+    it('generateStream throws AI_NO_ANSWER on empty stream', async () => {
+      mockHandler = (_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        res.write('data: [DONE]\n\n');
+        res.end();
+      };
+
+      const adapter = new OpenAICompatibleAdapter({
+        ...testConfig,
+        apiBase: mockBaseUrl,
+      });
+
+      await expect(async () => {
+        for await (const _chunk of adapter.generateStream({ userPrompt: 'Empty test' })) {}
+      }).rejects.toThrow('AI_NO_ANSWER');
     });
   });
 

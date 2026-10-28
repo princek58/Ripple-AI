@@ -68,6 +68,7 @@ const chatRequestSchema = z
       .max(6)
       .optional(),
     lang: z.enum(['en', 'hi']).optional(),
+    stream: z.boolean().optional(),
   })
   .strict();
 
@@ -225,10 +226,11 @@ aiRouter.delete('/projects/:id/chat/history', (req, res) => {
 });
 
 /**
- * POST /api/projects/:id/chat
+ * POST /api/projects/:id/chat and POST /api/projects/:id/chat/stream
  * Explains findings, code architecture, and answers developer questions across all screens.
+ * Supports streaming responses using Server-Sent Events (SSE).
  */
-aiRouter.post('/projects/:id/chat', async (req, res) => {
+aiRouter.post(['/projects/:id/chat', '/projects/:id/chat/stream'], async (req, res) => {
   const paramParsed = projectIdParamsSchema.safeParse(req.params);
   if (!paramParsed.success) {
     return sendError(res, 'Invalid project ID format, must be a UUID', 400);
@@ -240,8 +242,15 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   }
 
   const { id } = paramParsed.data;
-  const { message, screen, finding_id, node_id, fix_id, report_id, history, lang } =
+  const { message, screen, finding_id, node_id, fix_id, report_id, history, lang, stream } =
     bodyParsed.data;
+
+  const isStream =
+    req.path.endsWith('/stream') ||
+    stream === true ||
+    req.query.stream === 'true' ||
+    req.query.stream === '1' ||
+    req.headers.accept?.includes('text/event-stream') === true;
 
   const db = getDatabase();
   const repo = new ProjectsRepository(db);
@@ -336,6 +345,26 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   if (cached) {
     saveChatMessage(id, 'user', message);
     saveChatMessage(id, 'assistant', cached, aiConfig.provider, aiConfig.model);
+    if (isStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders?.();
+      res.write(`data: ${JSON.stringify({ delta: cached, text: cached })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          done: true,
+          text: cached,
+          source: 'saved',
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+        })}\n\n`
+      );
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
     return sendSuccess(res, {
       text: cached,
       source: 'saved',
@@ -387,6 +416,188 @@ aiRouter.post('/projects/:id/chat', async (req, res) => {
   let lastError: any = null;
 
   try {
+    if (isStream) {
+      let streamStarted = false;
+      let fullAnswer = '';
+
+      for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        if (i > 0) {
+          // Each failover attempt consumes 1 unit from rate limiter
+          consumeRateLimit(aiConfig.ratePerMinute);
+        }
+
+        const elapsed = Date.now() - startTime;
+        const remainingTimeout = Math.max(1, aiConfig.timeoutMs - elapsed);
+        if (remainingTimeout <= 1) {
+          const timeoutErr = new AIServiceError('AI_TIMEOUT', 504);
+          if (!firstError) firstError = timeoutErr;
+          lastError = timeoutErr;
+          break;
+        }
+
+        const candidateConfig = {
+          ...aiConfig,
+          provider: candidate.provider,
+          apiKey: candidate.apiKey,
+          model: candidate.model,
+          apiBase: candidate.apiBase,
+          timeoutMs: remainingTimeout,
+        };
+        const candidateAdapter = createAIAdapter(candidateConfig);
+
+        try {
+          const streamGen =
+            typeof candidateAdapter.generateStream === 'function'
+              ? candidateAdapter.generateStream({
+                  systemPrompt,
+                  history: effectiveHistory?.map((h) => ({ role: h.role, content: h.text })),
+                  userPrompt,
+                  maxTokens: AI_MAX_OUTPUT_TOKENS,
+                })
+              : (async function* () {
+                  const r = await candidateAdapter.generate({
+                    systemPrompt,
+                    history: effectiveHistory?.map((h) => ({ role: h.role, content: h.text })),
+                    userPrompt,
+                    maxTokens: AI_MAX_OUTPUT_TOKENS,
+                  });
+                  yield r.text;
+                })();
+
+          const iterator = streamGen[Symbol.asyncIterator]();
+          const first = await iterator.next();
+          if (first.done && (!first.value || first.value.trim().length === 0)) {
+            throw new AIServiceError('AI_NO_ANSWER');
+          }
+
+          // Candidate successfully produced the first chunk!
+          activeProvider = candidate.provider;
+          activeModel = candidate.model;
+          streamStarted = true;
+
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Accel-Buffering', 'no');
+          res.flushHeaders?.();
+
+          const firstChunk = first.value || '';
+          if (firstChunk) {
+            fullAnswer += firstChunk;
+            res.write(`data: ${JSON.stringify({ delta: firstChunk, text: fullAnswer })}\n\n`);
+          }
+
+          while (true) {
+            const next = await iterator.next();
+            if (next.done) {
+              if (next.value) {
+                fullAnswer += next.value;
+                res.write(`data: ${JSON.stringify({ delta: next.value, text: fullAnswer })}\n\n`);
+              }
+              break;
+            }
+            if (next.value) {
+              fullAnswer += next.value;
+              res.write(`data: ${JSON.stringify({ delta: next.value, text: fullAnswer })}\n\n`);
+            }
+          }
+
+          break; // Stream finished successfully
+        } catch (err: any) {
+          if (streamStarted) {
+            res.write(`data: ${JSON.stringify({ error: 'AI_STREAM_INTERRUPTED' })}\n\n`);
+            res.end();
+            return;
+          }
+
+          if (!firstError) firstError = err;
+          lastError = err;
+
+          if (!(err instanceof AIServiceError)) {
+            throw err;
+          }
+
+          const hasNext = i + 1 < candidates.length;
+          if (!hasNext) {
+            break;
+          }
+
+          const next = candidates[i + 1];
+          const isDifferentKeyOrProvider =
+            next.apiKey !== candidate.apiKey || next.provider !== candidate.provider;
+
+          if (!isDifferentKeyOrProvider) {
+            const canFallback =
+              err.code === 'AI_UNAVAILABLE' || err.code === 'AI_MODEL_NOT_FOUND';
+            if (!canFallback) {
+              break;
+            }
+          } else {
+            const canFailover =
+              err.code === 'AI_QUOTA_EXHAUSTED' ||
+              err.code === 'AI_UNAVAILABLE' ||
+              err.code === 'AI_MODEL_NOT_FOUND' ||
+              err.code === 'AI_TIMEOUT' ||
+              err.code === 'AI_AUTH_FAILED' ||
+              err.upstream_status === 429 ||
+              (typeof err.upstream_status === 'number' && err.upstream_status >= 500) ||
+              err.upstream_status === 404 ||
+              err.upstream_status === 401 ||
+              err.upstream_status === 403;
+
+            if (!canFailover) {
+              break;
+            }
+          }
+        }
+      }
+
+      if (!streamStarted) {
+        throw firstError || lastError || new AIServiceError('AI_UNAVAILABLE', 502);
+      }
+
+      if (fullAnswer.length > aiConfig.maxOutputChars) {
+        fullAnswer = fullAnswer.slice(0, aiConfig.maxOutputChars);
+      }
+
+      const activeCacheKey = createProjectAICacheKey({
+        provider: activeProvider,
+        model: activeModel,
+        projectId: id,
+        scanId,
+        screen,
+        findingId: finding_id,
+        nodeId: node_id,
+        fixId: fix_id,
+        reportId: report_id,
+        shareCode: settings.share_code,
+        lang,
+        message,
+        history,
+      });
+
+      setCachedAIResponse(activeCacheKey, fullAnswer, activeProvider, activeModel);
+
+      // Persist conversation turn into SQLite history
+      saveChatMessage(id, 'user', message);
+      saveChatMessage(id, 'assistant', fullAnswer, activeProvider, activeModel);
+
+      const source = activeProvider === 'gemini' ? 'gemini' : 'ai';
+      res.write(
+        `data: ${JSON.stringify({
+          done: true,
+          text: fullAnswer,
+          provider: activeProvider,
+          model: activeModel,
+          source,
+        })}\n\n`
+      );
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
     for (let i = 0; i < candidates.length; i++) {
       const candidate = candidates[i];
       if (i > 0) {
