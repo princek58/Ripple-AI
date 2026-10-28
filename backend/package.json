@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc && node -e \"const fs = require('fs'); fs.cpSync('src/db/migrations', 'dist/db/migrations', { recursive: true, force: true });\"",
     "start": "node dist/server.js",
-    "test": "vitest run --pool=forks --poolOptions.forks.singleFork=true --poolOptions.forks.isolate=true"
+    "test": "vitest run"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
