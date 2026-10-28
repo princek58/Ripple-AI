@@ -193,4 +193,16 @@ html {
   }
 }
 
+/* Print Specific Styles */
+@media print {
+  body,
+  html,
+  #printable-area,
+  .printable-component {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+}
+
 

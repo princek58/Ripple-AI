@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   AlertTriangle,
   FolderOpen,
@@ -211,7 +212,12 @@ export const OverviewPage: React.FC = () => {
 
   // 4. Scanned State: Full View
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-6"
+    >
       {/* Header with Project Title and LastScanLabel */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -342,6 +348,6 @@ export const OverviewPage: React.FC = () => {
           <ExplanationCard summary={summaryState.data} />
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };

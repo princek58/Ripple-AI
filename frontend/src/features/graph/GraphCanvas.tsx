@@ -37,6 +37,7 @@ export interface GraphCanvasProps {
   onSelectNode: (nodeId: string) => void;
   onDoubleClickNode?: (nodeId: string, nodeType?: string) => void;
   isPanelOpen?: boolean;
+  isFullscreen?: boolean;
   className?: string;
 }
 
@@ -47,6 +48,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
   onSelectNode,
   onDoubleClickNode,
   isPanelOpen = false,
+  isFullscreen = false,
   className = '',
 }) => {
   const [isLayouting, setIsLayouting] = useState<boolean>(true);
@@ -96,7 +98,7 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
     };
   }, [initialNodes, initialEdges, fitView, prefersReducedMotion]);
 
-  // Call fitView again after the panel opens or closes
+  // Call fitView again after the panel opens or closes, or when isFullscreen toggles
   useEffect(() => {
     if (isPanelInitialMount.current) {
       isPanelInitialMount.current = false;
@@ -109,10 +111,10 @@ const GraphCanvasInner: React.FC<GraphCanvasProps> = ({
         maxZoom: 1.5,
         duration: prefersReducedMotion ? 0 : 200,
       });
-    }, 50);
+    }, 100);
 
     return () => clearTimeout(timer);
-  }, [isPanelOpen, fitView, prefersReducedMotion]);
+  }, [isPanelOpen, isFullscreen, fitView, prefersReducedMotion]);
 
   // Connected nodes & edges calculation for hover/keyboard focus highlight
   const connectedInfo = useMemo(() => {

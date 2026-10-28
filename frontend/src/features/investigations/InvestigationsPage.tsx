@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft } from 'lucide-react';
 import { useProjects } from '../../lib/projectContext.js';
 import { isNeverScanned } from '../../lib/scanState.js';
@@ -387,7 +388,12 @@ export const InvestigationsPage: React.FC = () => {
   const showMobileDetail = isMobile && Boolean(urlState.findingId);
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col overflow-x-hidden p-4 sm:p-6 gap-4">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col overflow-x-hidden p-4 sm:p-6 gap-4"
+    >
       {selectedProjectId && <ScanHistoryStrip projectId={selectedProjectId} />}
 
       {/* Two Column Layout on Desktop, Single Column Stack on Phone */}
@@ -513,7 +519,7 @@ export const InvestigationsPage: React.FC = () => {
           )}
         </section>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

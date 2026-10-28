@@ -29,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary:
-        'bg-forest text-cream dark:bg-lime dark:text-forest hover:bg-forest/90 dark:hover:bg-lime/90 shadow-sm',
+        'bg-forest text-cream dark:bg-lime dark:text-forest hover:bg-forest/90 dark:hover:bg-lime/90 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] disabled:hover:translate-y-0 disabled:hover:scale-100 disabled:hover:shadow-sm motion-reduce:transition-none motion-reduce:hover:transform-none',
       secondary:
         'bg-theme-surface text-theme-text border border-theme-border hover:bg-theme-surface-active shadow-sm',
       ghost:

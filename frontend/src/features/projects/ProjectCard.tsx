@@ -93,7 +93,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   return (
     <Card
       data-testid={`project-card-${project.id}`}
-      className="p-5 flex flex-col justify-between hover:border-theme-border/90 transition-shadow duration-150 motion-reduce:transition-none"
+      className="p-5 flex flex-col justify-between hover:border-theme-border/90 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none"
     >
       <div className="space-y-4">
         {/* Card Header */}

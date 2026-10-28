@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { AlertCircle, RefreshCw, FolderOpen, ArrowLeft, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  AlertCircle,
+  RefreshCw,
+  FolderOpen,
+  ArrowLeft,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Maximize,
+  Minimize,
+} from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useProjects } from '../../lib/projectContext.js';
 import { isNeverScanned } from '../../lib/scanState.js';
 import { api, ApiClientError, getFriendlyErrorMessage } from '../../lib/api.js';
@@ -63,6 +74,37 @@ export const GraphPage: React.FC = () => {
   const [focusNodeDetails, setFocusNodeDetails] = useState<NodeDetailsData | null>(null);
   const [maxNodes, setMaxNodes] = useState<number>(50);
   const [isLegendOpen, setIsLegendOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const handleToggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => !prev);
+  }, []);
+
+  // Handle escape key to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  // Dispatch window resize event after fullscreen toggle transition so ReactFlow canvas resizes
+  useEffect(() => {
+    const timer1 = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 50);
+    const timer2 = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 320);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [isFullscreen]);
 
   // References to handle project switching and race conditions
   const activeAbortRef = useRef<AbortController | null>(null);
@@ -440,7 +482,13 @@ export const GraphPage: React.FC = () => {
   }
 
   return (
-    <div className="relative flex flex-col min-h-[calc(100vh-4rem)] overflow-y-auto bg-theme-background">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      style={isFullscreen ? { transform: 'none' } : undefined}
+      className="relative flex flex-col min-h-[calc(100vh-4rem)] overflow-y-auto bg-theme-background"
+    >
       {/* Top Bar: Breadcrumb, ShownCounter, Search & Filters */}
       <header className="flex-shrink-0 border-b border-theme-border bg-theme-surface/80 backdrop-blur-md px-4 py-2.5 z-20 flex flex-col gap-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -534,7 +582,32 @@ export const GraphPage: React.FC = () => {
       </header>
 
       {/* Main Canvas Area */}
-      <main className="relative w-full h-[clamp(420px,65vh,720px)] flex-shrink-0">
+      <motion.main
+        layout
+        transition={{ duration: 0.3 }}
+        data-testid="graph-container"
+        className={
+          isFullscreen
+            ? 'fixed inset-0 z-50 w-screen h-screen bg-theme-bg overflow-hidden flex flex-col'
+            : 'relative w-full h-[clamp(420px,65vh,720px)] flex-shrink-0'
+        }
+      >
+        {/* Fullscreen / Expand Toggle Button */}
+        <button
+          type="button"
+          data-testid="graph-fullscreen-btn"
+          aria-label={isFullscreen ? 'Exit fullscreen graph' : 'Expand graph fullscreen'}
+          title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Expand graph fullscreen'}
+          onClick={handleToggleFullscreen}
+          className="absolute top-3 right-3 z-30 p-2 rounded-lg bg-theme-surface/90 hover:bg-theme-surface-active border border-theme-border text-theme-text shadow-md backdrop-blur-sm transition-all duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest dark:focus-visible:ring-lime"
+        >
+          {isFullscreen ? (
+            <Minimize className="w-4 h-4" aria-hidden="true" />
+          ) : (
+            <Maximize className="w-4 h-4" aria-hidden="true" />
+          )}
+        </button>
+
         {isGraphLoading ? (
           <div className="w-full h-full flex items-center justify-center p-8">
             <div className="flex flex-col items-center gap-3">
@@ -552,7 +625,8 @@ export const GraphPage: React.FC = () => {
               onSelectNode={handleSelectNode}
               onDoubleClickNode={handleDoubleClickNode}
               isPanelOpen={Boolean(selectedNodeId || isLegendOpen)}
-              className="w-full h-full"
+              isFullscreen={isFullscreen}
+              className="w-full h-full flex-1"
             />
 
             {/* Node Details Panel */}
@@ -574,7 +648,7 @@ export const GraphPage: React.FC = () => {
             )}
           </>
         )}
-      </main>
+      </motion.main>
 
       {/* Ripple View (Change Impact) Panel */}
       {urlImpact && selectedProjectId && (
@@ -616,7 +690,7 @@ export const GraphPage: React.FC = () => {
           clustersCount={flowResult.clustersCount}
         />
       </footer>
-    </div>
+    </motion.div>
   );
 };
 

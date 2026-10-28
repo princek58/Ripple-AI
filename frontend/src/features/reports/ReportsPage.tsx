@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   FileText,
   Download,
@@ -436,7 +437,12 @@ export const ReportsPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto"
+    >
       {/* Inline Error Banner (e.g. from failed generate action) */}
       {listError && (
         <div
@@ -711,7 +717,7 @@ export const ReportsPage: React.FC = () => {
           )}
         </section>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

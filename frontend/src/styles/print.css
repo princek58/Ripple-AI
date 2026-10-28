@@ -1,5 +1,10 @@
 /* Print Stylesheet for Ripple AI Analysis Reports */
 
+@page {
+  size: portrait;
+  margin: 20mm;
+}
+
 .print-only {
   display: none !important;
 }
@@ -21,29 +26,166 @@
     display: none !important;
   }
 
-  /* Document body and main container formatting */
+  /* Document body and main container formatting: force pristine white background and black text */
+  html,
   body,
   #root,
+  #printable-area,
+  .printable-component,
+  [data-testid="report-preview"],
   main {
-    background: transparent !important;
-    color: currentColor !important;
+    background: white !important;
+    background-color: white !important;
+    color: black !important;
     margin: 0 !important;
     padding: 0 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Remove all dark overlays, shadows, and tints: strip backgrounds from summary cards, severity indicators, and grids */
+  #printable-area *,
+  .printable-component *,
+  [data-testid="report-preview"] * {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Remove fade/opacity styles: force solid black and full opacity across all elements */
+  *,
+  *::before,
+  *::after,
+  #printable-area,
+  .printable-component,
+  [data-testid="report-preview"],
+  [data-testid="report-preview"] * {
+    opacity: 1 !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Set all headings (h1, h2, h3), tables, paragraphs, lists, and metadata blocks to solid black */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  ul,
+  ol,
+  li,
+  span,
+  strong,
+  code,
+  pre,
+  table,
+  caption,
+  th,
+  td,
+  div,
+  blockquote {
+    color: black !important;
+    opacity: 1 !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600 !important;
+  }
+
+  p,
+  li,
+  td,
+  span,
+  div,
+  table {
+    font-weight: 500 !important;
   }
 
   /* Show report preview container cleanly */
+  #printable-area,
+  .printable-component,
   [data-testid="report-preview"] {
     display: block !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
-    background: transparent !important;
+    background: white !important;
+    background-color: white !important;
     box-shadow: none !important;
   }
 
-  /* Avoid page breaks inside table rows, tables, preformatted text */
+  /* Fix table cutoff: ensure table fits within printable page width exactly */
+  table,
+  [data-testid="report-table-container"],
+  [data-testid="report-table-container"] table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    border: 1px solid black !important;
+  }
+
+  /* Increase contrast of borders and tables: sharp solid borders and dynamic word wrap */
+  th,
+  td,
+  [data-testid="report-table-container"] th,
+  [data-testid="report-table-container"] td {
+    border: 1px solid black !important;
+    color: black !important;
+    font-weight: 500 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    padding: 6px 8px !important;
+  }
+
+  th,
+  [data-testid="report-table-container"] th {
+    font-weight: 600 !important;
+    border-bottom: 2px solid black !important;
+  }
+
+  [data-testid="report-table-container"] {
+    overflow: visible !important;
+    border: 1px solid black !important;
+  }
+
+  /* Preformatted text / code blocks */
+  pre,
+  code {
+    border: 1px solid gray !important;
+    background: transparent !important;
+    color: black !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Dividers and borders */
+  hr,
+  .border-b,
+  .border-t,
+  .border {
+    border-color: gray !important;
+  }
+
+  /* Avoid page breaks inside table rows, tables, preformatted text (fix row splitting) */
   tr,
+  [data-testid="report-table-row"],
   table,
   pre,
   blockquote {
@@ -56,3 +198,4 @@
     display: block !important;
   }
 }
+
