@@ -50,3 +50,14 @@ export interface ChatResponseData {
   provider: string;
   model: string;
 }
+
+/** Streaming chunk payload shape from SSE data events */
+export interface StreamChunk {
+  delta?: string;
+  text?: string;
+  done?: boolean;
+  provider?: string;
+  model?: string;
+  source?: string;
+  error?: string;
+}

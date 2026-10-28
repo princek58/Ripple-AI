@@ -11,6 +11,7 @@ export {
   fetchProjectAiSettings,
   putProjectAiSettings,
   postChatMessage,
+  streamChatMessage,
 } from './chatApi.js';
 export type {
   ChatScreen,
@@ -20,4 +21,5 @@ export type {
   AiStatusData,
   ProjectAiSettings,
   ChatResponseData,
+  StreamChunk,
 } from './types.js';

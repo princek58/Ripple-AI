@@ -95,7 +95,11 @@ function getScreenExamples(screen: string, lang: 'en' | 'hi'): string[] {
   }
 }
 
-export const ChatPanelContent: React.FC = () => {
+export interface ChatPanelContentProps {
+  onSendMessage?: (text: string) => Promise<void>;
+}
+
+export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessage }) => {
   const chat = useChatSafe();
   if (!chat) return null;
   const {
@@ -169,7 +173,11 @@ export const ChatPanelContent: React.FC = () => {
     if (!input.trim() || busy) return;
     const textToSend = input;
     setInput('');
-    await sendMessage(textToSend);
+    if (onSendMessage) {
+      await onSendMessage(textToSend);
+    } else {
+      await sendMessage(textToSend);
+    }
   };
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -536,13 +544,23 @@ export const ChatPanelContent: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleCopy(m.id, m.text)}
-                      className="ml-2 text-theme-primary hover:underline font-medium flex-shrink-0"
+                      className="ml-2 text-theme-primary hover:underline font-medium flex-shrink-0 disabled:opacity-40"
                       aria-label="Copy answer"
+                      disabled={m.isStreaming}
                     >
-                      {copiedId === m.id ? 'Copied!' : 'Copy'}
+                      {m.isStreaming ? 'Generating...' : copiedId === m.id ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <MessageContent text={m.text} />
+                  <div className="relative">
+                    <MessageContent text={m.text} />
+                    {m.isStreaming && (
+                      <span
+                        data-testid="chat-typewriter-cursor"
+                        className="inline-block w-1.5 h-3.5 bg-forest dark:bg-lime ml-1 animate-pulse align-middle"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
                 </div>
               );
             })}

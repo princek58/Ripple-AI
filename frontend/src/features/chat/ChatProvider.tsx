@@ -17,7 +17,7 @@ import {
   fetchAiStatus,
   fetchProjectAiSettings,
   putProjectAiSettings,
-  postChatMessage,
+  streamChatMessage,
   fetchChatHistory,
   deleteChatHistory,
 } from './chatApi.js';
@@ -84,6 +84,7 @@ export interface ChatMessage {
   text: string;
   type?: 'user' | 'offline' | 'ai' | 'thinking' | 'error';
   isThinking?: boolean;
+  isStreaming?: boolean;
   canRetry?: boolean;
   source?: string;
   provider?: string;
@@ -466,8 +467,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .map((m) => ({ role: m.role, text: m.text }));
       const history = trimHistory(historySource);
 
+      let accumulatedText = '';
+      let activeProvider = '';
+      let activeModel = '';
+      let activeSource = '';
+
       try {
-        const res = await postChatMessage(
+        const res = await streamChatMessage(
           currentProjectId!,
           {
             message: clean.slice(0, 1500),
@@ -479,24 +485,56 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fix_id: ctx.fix_id,
             report_id: ctx.report_id,
           },
+          (chunk) => {
+            clearTimeout(timer12);
+            if (chunk.provider) activeProvider = chunk.provider;
+            if (chunk.model) activeModel = chunk.model;
+            if (chunk.source) activeSource = chunk.source;
+
+            if (chunk.text !== undefined) {
+              accumulatedText = chunk.text;
+            } else if (chunk.delta) {
+              accumulatedText += chunk.delta;
+            }
+
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === thinkingId
+                  ? {
+                      id: thinkingId,
+                      role: 'assistant',
+                      text: accumulatedText,
+                      type: 'ai',
+                      isThinking: false,
+                      isStreaming: !chunk.done,
+                      provider: activeProvider || m.provider,
+                      model: activeModel || m.model,
+                      source: activeSource || m.source,
+                    }
+                  : m
+              )
+            );
+          },
           controller.signal
         );
 
         clearTimeout(timer12);
         clearTimeout(timer40);
 
-        // Success: replace thinkingMsg with AI answer
+        // Finalize message with complete text and provider info
         setMessages((prev) =>
           prev.map((m) =>
             m.id === thinkingId
               ? {
                   id: thinkingId,
                   role: 'assistant',
-                  text: res.text,
+                  text: res.text || accumulatedText,
                   type: 'ai',
-                  source: res.source,
-                  provider: res.provider,
-                  model: res.model,
+                  isThinking: false,
+                  isStreaming: false,
+                  source: res.source || activeSource,
+                  provider: res.provider || activeProvider,
+                  model: res.model || activeModel,
                 }
               : m
           )
