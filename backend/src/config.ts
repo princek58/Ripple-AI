@@ -64,31 +64,31 @@ export const config = {
     return process.env.NODE_ENV || 'development';
   },
   get dbPath(): string {
-    return (
-      process.env.DB_PATH ||
-      process.env.DATABASE_PATH ||
-      path.resolve(backendRootDir, 'data', 'ripple.db')
-    );
+    const raw = process.env.DB_PATH || process.env.DATABASE_PATH;
+    if (raw) {
+      return path.isAbsolute(raw) ? raw : path.resolve(backendRootDir, raw);
+    }
+    return path.resolve(backendRootDir, 'data', 'ripple.db');
   },
   set storagePath(val: string) {
     customStoragePath = val;
   },
   get storagePath(): string {
-    return (
-      customStoragePath ||
-      process.env.STORAGE_PATH ||
-      path.resolve(backendRootDir, 'storage')
-    );
+    const raw = customStoragePath || process.env.STORAGE_PATH;
+    if (raw) {
+      return path.isAbsolute(raw) ? raw : path.resolve(backendRootDir, raw);
+    }
+    return path.resolve(backendRootDir, 'storage');
   },
   set tempStoragePath(val: string) {
     customTempStoragePath = val;
   },
   get tempStoragePath(): string {
-    return (
-      customTempStoragePath ||
-      process.env.TEMP_STORAGE_PATH ||
-      path.resolve(backendRootDir, 'storage', 'tmp')
-    );
+    const raw = customTempStoragePath || process.env.TEMP_STORAGE_PATH;
+    if (raw) {
+      return path.isAbsolute(raw) ? raw : path.resolve(backendRootDir, raw);
+    }
+    return path.resolve(backendRootDir, 'storage', 'tmp');
   },
   get corsOrigin(): string {
     if (process.env.CORS_ORIGIN !== undefined) {

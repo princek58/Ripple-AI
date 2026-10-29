@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import { Transform, Writable } from 'node:stream';
 import yauzl from 'yauzl';
 import config, { type UploadLimits } from '../../config.js';
 import { ZipError, type ExtractResult, type ExtractedFile, type SkippedItem } from './types.js';
@@ -248,143 +250,127 @@ export async function extractZip(
       // Ensure target directory exists
       fs.mkdirSync(path.dirname(targetPath), { recursive: true });
 
-      // Stream the entry and count REAL uncompressed bytes
-      await new Promise<void>((resolve, reject) => {
+      // Open read stream for entry
+      const readStream = await new Promise<any>((resolve, reject) => {
         // Set validateEntrySizes: false to allow our real-byte counter to handle lying headers
-        (zipfile as any).openReadStream(entry, { validateEntrySizes: false }, (err: Error | null, readStream: any) => {
-          if (err || !readStream) {
-            return reject(
+        (zipfile as any).openReadStream(
+          entry,
+          { validateEntrySizes: false },
+          (err: Error | null, stream: any) => {
+            if (err || !stream) {
+              return reject(
+                new ZipError(
+                  'ZIP_INVALID',
+                  err ? err.message : `Failed to read stream for ${relPath}`
+                )
+              );
+            }
+            resolve(stream);
+          }
+        );
+      });
+
+      let fileRealBytes = 0;
+      const meter = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+          fileRealBytes += chunk.length;
+          totalRealBytes += chunk.length;
+
+          // 1. Real single-file size check (prevents lying headers)
+          if (fileRealBytes > limits.maxSingleFileSizeBytes) {
+            return callback(
               new ZipError(
-                'ZIP_INVALID',
-                err ? err.message : `Failed to read stream for ${relPath}`
+                'ZIP_TOO_LARGE',
+                `Streamed file ${relPath} exceeded single file limit (${limits.maxSingleFileSizeBytes} bytes)`
               )
             );
           }
 
-          let fileRealBytes = 0;
-          let aborted = false;
-
-          const abortWithError = (zipErr: ZipError) => {
-            if (aborted) return;
-            aborted = true;
-            readStream.destroy();
-            reject(zipErr);
-          };
-
-          readStream.on('data', (chunk: Buffer) => {
-            if (aborted) return;
-            fileRealBytes += chunk.length;
-            totalRealBytes += chunk.length;
-
-            // 1. Real single-file size check (prevents lying headers)
-            if (fileRealBytes > limits.maxSingleFileSizeBytes) {
-              return abortWithError(
-                new ZipError(
-                  'ZIP_TOO_LARGE',
-                  `Streamed file ${relPath} exceeded single file limit (${limits.maxSingleFileSizeBytes} bytes)`
-                )
-              );
-            }
-
-            // 2. Real total uncompressed size check
-            if (totalRealBytes > limits.maxUncompressedSizeBytes) {
-              return abortWithError(
-                new ZipError(
-                  'ZIP_TOO_LARGE',
-                  `Total uncompressed bytes exceeded limit (${limits.maxUncompressedSizeBytes} bytes)`
-                )
-              );
-            }
-
-            // 3. Real compression ratio check (zip bomb)
-            // Apply only after at least 1 MB has been decompressed for this entry
-            // to avoid rejecting small, legit, highly-compressible files.
-            const MIN_BYTES_FOR_RATIO_CHECK = 1024 * 1024; // 1 MB
-            if (entry.compressedSize > 0 && fileRealBytes >= MIN_BYTES_FOR_RATIO_CHECK) {
-              const ratio = fileRealBytes / entry.compressedSize;
-              if (ratio > limits.maxCompressionRatio) {
-                return abortWithError(
-                  new ZipError(
-                    'ZIP_BOMB',
-                    `Zip bomb ratio exceeded for ${relPath}: ${ratio.toFixed(1)}:1 > ${limits.maxCompressionRatio}:1`
-                  )
-                );
-              }
-            }
-          });
-
-          const isSensitive = isEnvFile(relPath);
-
-          if (isSensitive) {
-            // Buffer sensitive env file in memory for sanitization
-            const chunks: Buffer[] = [];
-            readStream.on('data', (chunk: Buffer) => {
-              if (!aborted) chunks.push(chunk);
-            });
-
-            readStream.on('error', (streamErr: Error) => {
-              const msg = streamErr ? streamErr.message : 'Stream read error';
-              if (msg.includes('too many bytes') || msg.includes('size mismatch')) {
-                abortWithError(new ZipError('ZIP_TOO_LARGE', msg));
-              } else {
-                abortWithError(new ZipError('ZIP_INVALID', msg));
-              }
-            });
-
-            readStream.on('end', () => {
-              if (aborted) return;
-              try {
-                const rawContent = Buffer.concat(chunks).toString('utf-8');
-                const sanitized = sanitizeEnvContent(rawContent);
-                fs.writeFileSync(targetPath, sanitized, 'utf-8');
-                const writtenSize = Buffer.byteLength(sanitized, 'utf-8');
-
-                extractedFiles.push({
-                  path: relPath,
-                  size: writtenSize,
-                  language: 'Environment',
-                  sensitive: true,
-                });
-                resolve();
-              } catch (writeErr) {
-                reject(writeErr);
-              }
-            });
-          } else {
-            // Pipe directly to target file stream
-            const writeStream = fs.createWriteStream(targetPath);
-
-            readStream.on('error', (streamErr: Error) => {
-              writeStream.destroy();
-              const msg = streamErr ? streamErr.message : 'Stream read error';
-              if (msg.includes('too many bytes') || msg.includes('size mismatch')) {
-                abortWithError(new ZipError('ZIP_TOO_LARGE', msg));
-              } else {
-                abortWithError(new ZipError('ZIP_INVALID', msg));
-              }
-            });
-
-            writeStream.on('error', (writeErr: Error) => {
-              abortWithError(
-                new ZipError('ZIP_INVALID', writeErr ? writeErr.message : 'Stream write error')
-              );
-            });
-
-            writeStream.on('finish', () => {
-              if (aborted) return;
-              extractedFiles.push({
-                path: relPath,
-                size: fileRealBytes,
-                language: detectLanguage(relPath),
-                sensitive: false,
-              });
-              resolve();
-            });
-
-            readStream.pipe(writeStream);
+          // 2. Real total uncompressed size check
+          if (totalRealBytes > limits.maxUncompressedSizeBytes) {
+            return callback(
+              new ZipError(
+                'ZIP_TOO_LARGE',
+                `Total uncompressed bytes exceeded limit (${limits.maxUncompressedSizeBytes} bytes)`
+              )
+            );
           }
-        });
+
+          // 3. Real compression ratio check (zip bomb)
+          // Apply only after at least 1 MB has been decompressed for this entry
+          // to avoid rejecting small, legit, highly-compressible files.
+          const MIN_BYTES_FOR_RATIO_CHECK = 1024 * 1024; // 1 MB
+          if (entry.compressedSize > 0 && fileRealBytes >= MIN_BYTES_FOR_RATIO_CHECK) {
+            const ratio = fileRealBytes / entry.compressedSize;
+            if (ratio > limits.maxCompressionRatio) {
+              return callback(
+                new ZipError(
+                  'ZIP_BOMB',
+                  `Zip bomb ratio exceeded for ${relPath}: ${ratio.toFixed(1)}:1 > ${limits.maxCompressionRatio}:1`
+                )
+              );
+            }
+          }
+
+          callback(null, chunk);
+        },
       });
+
+      const isSensitive = isEnvFile(relPath);
+
+      if (isSensitive) {
+        // Buffer sensitive env file in memory for sanitization
+        const chunks: Buffer[] = [];
+        const collector = new Writable({
+          write(chunk: Buffer, _encoding, callback) {
+            chunks.push(chunk);
+            callback();
+          },
+        });
+
+        try {
+          await pipeline(readStream, meter, collector);
+        } catch (streamErr: any) {
+          if (streamErr instanceof ZipError) throw streamErr;
+          const msg = streamErr ? streamErr.message : 'Stream read error';
+          if (msg.includes('too many bytes') || msg.includes('size mismatch')) {
+            throw new ZipError('ZIP_TOO_LARGE', msg);
+          }
+          throw new ZipError('ZIP_INVALID', msg);
+        }
+
+        const rawContent = Buffer.concat(chunks).toString('utf-8');
+        const sanitized = sanitizeEnvContent(rawContent);
+        fs.writeFileSync(targetPath, sanitized, 'utf-8');
+        const writtenSize = Buffer.byteLength(sanitized, 'utf-8');
+
+        extractedFiles.push({
+          path: relPath,
+          size: writtenSize,
+          language: 'Environment',
+          sensitive: true,
+        });
+      } else {
+        // Stream directly to file on disk using pipeline for safe descriptor cleanup
+        const writeStream = fs.createWriteStream(targetPath);
+        try {
+          await pipeline(readStream, meter, writeStream);
+        } catch (streamErr: any) {
+          if (streamErr instanceof ZipError) throw streamErr;
+          const msg = streamErr ? streamErr.message : 'Stream write error';
+          if (msg.includes('too many bytes') || msg.includes('size mismatch')) {
+            throw new ZipError('ZIP_TOO_LARGE', msg);
+          }
+          throw new ZipError('ZIP_INVALID', msg);
+        }
+
+        extractedFiles.push({
+          path: relPath,
+          size: fileRealBytes,
+          language: detectLanguage(relPath),
+          sensitive: false,
+        });
+      }
     }
 
     return {

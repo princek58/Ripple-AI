@@ -76,13 +76,18 @@ export async function processProjectZip(
   // Set up project and extraction paths
   const projectId = crypto.randomUUID();
   const storageBase = path.resolve(config.storagePath);
-  const tempExtractionDir = path.resolve(config.tempStoragePath, `extract_${projectId}`);
+  const tempStorageBase = path.resolve(config.tempStoragePath);
+  const tempExtractionDir = path.resolve(tempStorageBase, `extract_${projectId}`);
   const projectDir = path.resolve(storageBase, projectId);
   const projectFilesDir = path.resolve(projectDir, 'files');
 
-  // Safety check: Ensure paths stay inside backend/storage
+  // Explicitly ensure storage base and temp storage base exist
+  fs.mkdirSync(storageBase, { recursive: true });
+  fs.mkdirSync(tempStorageBase, { recursive: true });
+
+  // Safety check: Ensure paths stay inside their respective base directories
   if (
-    !tempExtractionDir.startsWith(storageBase + path.sep) ||
+    !tempExtractionDir.startsWith(tempStorageBase + path.sep) ||
     !projectDir.startsWith(storageBase + path.sep)
   ) {
     throw new ZipError('ZIP_UNSAFE_PATH', 'Invalid storage path');
@@ -219,11 +224,13 @@ router.post('/projects', async (req: Request, res: Response) => {
   try {
     const limits = config.upload;
 
-    // Ensure temp storage directory exists
+    // Ensure storage and temp storage directories exist before handling upload
+    fs.mkdirSync(config.storagePath, { recursive: true });
     fs.mkdirSync(config.tempStoragePath, { recursive: true });
 
     const storage = multer.diskStorage({
       destination: (_req, _file, cb) => {
+        fs.mkdirSync(config.tempStoragePath, { recursive: true });
         cb(null, config.tempStoragePath);
       },
       filename: (_req, _file, cb) => {
