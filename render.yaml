@@ -11,13 +11,18 @@ services:
         value: production
       - key: APP_SESSION_SECRET
         generateValue: true
-      - key: APP_ACCESS_CODE
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
       - key: GEMINI_MODEL
         value: gemini-1.5-flash
-      - key: GROQ_API_KEY
-        sync: false
       - key: GROQ_MODEL
-        value: llama3-8b-8192
+        value: llama-3.1-8b-instant
+      
+      # Asli API keys yahan inverted commas (" ") ke andar daalein
+      - key: GEMINI_API_KEY
+        value: "YAHAN_APNI_ASLI_GEMINI_KEY_PASTE_KAREIN"
+        
+      - key: GROQ_API_KEY
+        value: "YAHAN_APNI_ASLI_GROQ_KEY_PASTE_KAREIN"
+        
+      # Password wapas safe kar diya gaya hai
+      - key: APP_ACCESS_CODE
+        sync: false
