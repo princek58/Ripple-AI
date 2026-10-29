@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { Send } from 'lucide-react';
 import { useChatSafe, registerChatModules } from './ChatProvider.js';
 import { useProjects } from '../../lib/projectContext.js';
 import { contextIdsFromUrl } from './urlHelpers.js';
@@ -307,7 +308,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
             <h1 className="font-heading font-semibold text-sm text-theme-text pointer-events-none">Ripple AI</h1>
             <span
               data-testid="chat-status-badge"
-              className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-theme-surface-active text-theme-text border border-theme-border pointer-events-none"
+              className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-theme-surface-active text-theme-text border border-theme-border pointer-events-none"
             >
               {statusText}
             </span>
@@ -320,7 +321,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
                 type="button"
                 data-testid="chat-reset-position"
                 onClick={resetPosition}
-                className="p-1.5 text-xs rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
+                className="w-8 h-8 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-white/10 transition-colors flex items-center justify-center text-[16px] leading-none"
                 title="Reset panel position"
                 aria-label="Reset panel position"
               >
@@ -333,7 +334,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
               type="button"
               data-testid="chat-clear-button"
               onClick={() => clearChat()}
-              className="p-1.5 text-xs rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
+              className="w-8 h-8 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-white/10 transition-colors flex items-center justify-center text-[16px] leading-none"
               title="Clear chat history"
               aria-label="Clear chat history"
             >
@@ -344,7 +345,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
             <button
               type="button"
               onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
-              className="px-2 py-1 text-xs font-medium rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors"
+              className="w-8 h-8 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-white/10 transition-colors flex items-center justify-center text-xs font-semibold tracking-wide"
               title="Toggle language"
               aria-label={`Language: ${lang === 'en' ? 'English' : 'Hinglish'}`}
             >
@@ -355,8 +356,8 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
             <button
               type="button"
               onClick={() => setShowSettings((prev) => !prev)}
-              className={`p-1.5 rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors ${
-                showSettings ? 'bg-theme-surface-active text-theme-text' : ''
+              className={`w-8 h-8 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-white/10 transition-colors flex items-center justify-center text-[16px] leading-none ${
+                showSettings ? 'bg-white/10 text-theme-text' : ''
               }`}
               title="Chat settings"
               aria-label="Chat settings"
@@ -369,7 +370,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
               type="button"
               data-testid="chat-minimize-button"
               onClick={toggleMinimized}
-              className="p-1.5 text-xs rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none font-bold"
+              className="w-8 h-8 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-white/10 transition-colors flex items-center justify-center text-[16px] leading-none font-bold"
               title={isMinimized ? 'Expand chat' : 'Minimize chat'}
               aria-label={isMinimized ? 'Expand chat' : 'Minimize chat'}
             >
@@ -380,7 +381,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
             <button
               type="button"
               onClick={handleClose}
-              className="p-1.5 text-sm rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-active transition-colors leading-none"
+              className="w-8 h-8 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-white/10 transition-colors flex items-center justify-center text-[16px] leading-none"
               aria-label="Close Ripple AI chat"
             >
               ✕
@@ -391,7 +392,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
         {!isMinimized && (
           <div
             data-testid="chat-header-note"
-            className="px-4 pb-2 text-[10.5px] leading-snug text-theme-text-muted border-t border-theme-border/40 pt-1"
+            className="px-4 pb-2 text-xs text-white/70 leading-snug border-t border-theme-border/40 pt-1.5"
           >
             {isSharingCode
               ? 'Code lines are being sent to Google Gemini for better answers (secrets are never sent).'
@@ -411,7 +412,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
           <div
             role="log"
             aria-live="polite"
-            className="flex-1 overflow-y-auto p-4 space-y-3"
+            className="flex-1 overflow-y-auto p-4 space-y-3 chat-scrollbar"
             data-testid="chat-message-list"
           >
             {/* First-open Welcome Card */}
@@ -458,7 +459,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
                     <span className="text-[10px] font-semibold text-theme-text-muted uppercase tracking-wider pr-1">
                       You
                     </span>
-                    <div className="bg-forest text-cream dark:bg-lime dark:text-forest rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%] text-xs whitespace-pre-wrap font-sans break-words shadow-sm font-medium">
+                    <div className="bg-forest text-cream dark:bg-lime dark:text-forest rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap font-sans break-words shadow-sm font-medium">
                       {m.text}
                     </div>
                   </div>
@@ -469,7 +470,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
                 return (
                   <div
                     key={m.id}
-                    className="flex flex-col gap-1 rounded-xl bg-theme-surface border border-theme-border p-3 text-xs"
+                    className="flex flex-col gap-1 rounded-xl bg-theme-surface border border-theme-border p-3.5 text-sm leading-relaxed"
                     data-testid="chat-offline-message"
                   >
                     <span className="text-[10px] font-semibold text-theme-text-muted uppercase tracking-wider">
@@ -497,7 +498,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
                 return (
                   <div
                     key={m.id}
-                    className="flex flex-col gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-500"
+                    className="flex flex-col gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 p-3.5 text-sm leading-relaxed text-red-500"
                     data-testid="chat-error-message"
                   >
                     <div className="whitespace-pre-wrap font-sans break-words">{m.text}</div>
@@ -526,7 +527,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
               return (
                 <div
                   key={m.id}
-                  className="flex flex-col gap-1.5 rounded-xl bg-theme-surface border border-theme-border p-3 text-xs"
+                  className="flex flex-col gap-1.5 rounded-xl bg-theme-surface border border-theme-border p-3.5 text-sm leading-relaxed"
                   data-testid="chat-ai-message"
                 >
                   <div className="flex items-center justify-between text-[10px] text-theme-text-muted pb-1 border-b border-theme-border">
@@ -589,7 +590,7 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
               />
 
               <div className="absolute bottom-2 left-3 right-2 flex items-center justify-between">
-                <span className="text-[10px] text-theme-text-muted">
+                <span className="text-xs text-white/70 font-mono">
                   {input.length}/1500
                 </span>
 
@@ -609,10 +610,11 @@ export const ChatPanelContent: React.FC<ChatPanelContentProps> = ({ onSendMessag
                       data-testid="chat-send-btn"
                       disabled={!input.trim()}
                       onClick={handleSend}
-                      className="px-3 py-1 text-xs font-medium rounded-lg bg-theme-primary text-theme-surface hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-theme-primary text-theme-surface hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
                       aria-label="Send message"
                     >
-                      Send
+                      <span>Send</span>
+                      <Send className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                   )}
                 </div>
